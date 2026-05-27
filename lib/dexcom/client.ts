@@ -2,7 +2,9 @@ import { getValidAccessToken } from './auth'
 import { createServerClient } from '@/lib/supabase/server'
 import type { DexcomEgv } from '@/types/health'
 
-const BASE = 'https://api.dexcom.com'
+const BASE = process.env.DEXCOM_SANDBOX === 'true'
+  ? 'https://sandbox-api.dexcom.com'
+  : 'https://api.dexcom.com'
 
 async function dexcomFetch(path: string) {
   const token = await getValidAccessToken()

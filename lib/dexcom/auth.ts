@@ -1,6 +1,10 @@
 import { createServerClient } from '@/lib/supabase/server'
 
-const DEXCOM_TOKEN_URL = 'https://api.dexcom.com/v2/oauth2/token'
+const DEXCOM_BASE = process.env.DEXCOM_SANDBOX === 'true'
+  ? 'https://sandbox-api.dexcom.com'
+  : 'https://api.dexcom.com'
+
+const DEXCOM_TOKEN_URL = `${DEXCOM_BASE}/v2/oauth2/token`
 
 export function getDexcomAuthUrl(): string {
   const params = new URLSearchParams({
@@ -9,7 +13,7 @@ export function getDexcomAuthUrl(): string {
     response_type: 'code',
     scope: 'offline_access egv calibration device statistics event',
   })
-  return `https://api.dexcom.com/v2/oauth2/login?${params}`
+  return `${DEXCOM_BASE}/v2/oauth2/login?${params}`
 }
 
 export async function exchangeCodeForTokens(code: string) {
