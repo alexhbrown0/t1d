@@ -32,7 +32,7 @@ export async function fetchDataRange() {
   return dexcomFetch('/v3/users/self/dataRange')
 }
 
-export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: number }> {
+export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: number; info?: string }> {
   const supabase = createServerClient()
 
   const { data: lastRow } = await supabase
@@ -53,8 +53,7 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
   const egvs: Array<Record<string, unknown>> = data.egvs ?? data.records ?? []
 
   if (egvs.length === 0) {
-    console.error('EGV debug', { keys: Object.keys(data), startIso, endIso, sample: JSON.stringify(data).slice(0, 300) })
-    return { inserted: 0, skipped: 0 }
+    return { inserted: 0, skipped: 0, info: `empty: keys=${Object.keys(data).join(',')} start=${startIso} end=${endIso}` }
   }
 
   const rows = egvs.map((e) => ({
