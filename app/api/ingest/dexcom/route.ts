@@ -26,8 +26,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
-    const range = await fetchDataRange()
-    return NextResponse.json(range)
+    const end = new Date()
+    const start = new Date(end.getTime() - 3 * 60 * 60 * 1000)
+    const startIso = start.toISOString().replace(/\.\d{3}Z$/, '')
+    const endIso = end.toISOString().replace(/\.\d{3}Z$/, '')
+    const [range, egvs] = await Promise.all([
+      fetchDataRange(),
+      fetchEgvs(startIso, endIso),
+    ])
+    return NextResponse.json({ range, egvs, startIso, endIso })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: message }, { status: 500 })
