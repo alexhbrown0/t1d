@@ -7,7 +7,7 @@ export function getDexcomAuthUrl(): string {
     client_id: process.env.DEXCOM_CLIENT_ID!,
     redirect_uri: process.env.DEXCOM_REDIRECT_URI!,
     response_type: 'code',
-    scope: 'offline_access',
+    scope: 'offline_access egv calibration device statistics event',
   })
   return `https://api.dexcom.com/v2/oauth2/login?${params}`
 }
