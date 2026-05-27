@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ingestRecentEgvs, fetchDataRange, fetchEgvs } from '@/lib/dexcom/client'
 import { checkPendingDoses } from '@/lib/t1d/pending-dose-monitor'
 
+function isAuthorized(req: NextRequest): boolean {
+  const cronAuth = req.headers.get('authorization')
+  const manualSecret = req.headers.get('x-cron-secret')
+  return cronAuth === `Bearer ${process.env.CRON_SECRET}` || manualSecret === process.env.CRON_SECRET
+}
+
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -21,8 +26,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {

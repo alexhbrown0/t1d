@@ -50,13 +50,9 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
   const endIso = endTime.toISOString().replace(/\.\d{3}Z$/, '')
 
   const data = await fetchEgvs(startIso, endIso)
-  console.log('Dexcom EGV response keys:', Object.keys(data), 'startIso:', startIso, 'endIso:', endIso)
   const egvs: Array<Record<string, unknown>> = data.egvs ?? data.records ?? []
 
-  if (egvs.length === 0) {
-    console.log('Raw EGV response (truncated):', JSON.stringify(data).slice(0, 500))
-    return { inserted: 0, skipped: 0 }
-  }
+  if (egvs.length === 0) return { inserted: 0, skipped: 0, debug: { keys: Object.keys(data), startIso, endIso, sample: JSON.stringify(data).slice(0, 300) } }
 
   const rows = egvs.map((e) => ({
     system_time: e.systemTime,

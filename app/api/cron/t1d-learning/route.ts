@@ -12,8 +12,10 @@ import {
 import { getCurrentEngineParams } from '@/lib/supabase/queries/t1d'
 
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  const cronAuth = req.headers.get('authorization')
+  const manualSecret = req.headers.get('x-cron-secret')
+  const secret = cronAuth === `Bearer ${process.env.CRON_SECRET}` || manualSecret === process.env.CRON_SECRET
+  if (!secret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
