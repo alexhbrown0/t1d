@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ingestRecentEgvs, fetchDataRange } from '@/lib/dexcom/client'
+import { ingestRecentEgvs, fetchDataRange, fetchEgvs } from '@/lib/dexcom/client'
 import { checkPendingDoses } from '@/lib/t1d/pending-dose-monitor'
 
 export async function GET(req: NextRequest) {
