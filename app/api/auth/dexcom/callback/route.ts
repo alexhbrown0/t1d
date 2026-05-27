@@ -13,8 +13,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No code returned from Dexcom' }, { status: 400 })
   }
 
-  const tokens = await exchangeCodeForTokens(code)
-  await storeTokens(tokens.access_token, tokens.refresh_token, tokens.expires_in)
-
-  return NextResponse.redirect(new URL('/now', req.nextUrl.origin))
+  try {
+    const tokens = await exchangeCodeForTokens(code)
+    await storeTokens(tokens.access_token, tokens.refresh_token, tokens.expires_in)
+    return NextResponse.redirect(new URL('/now', req.nextUrl.origin))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
