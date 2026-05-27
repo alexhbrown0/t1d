@@ -1,10 +1,193 @@
-import { AppHeader } from '@/components/t1d/app-header'
+import { createServerClient } from '@/lib/supabase/server'
+import type { T1dSchoolSchedule } from '@/types/health'
 
-export default function Page() {
+export const dynamic = 'force-dynamic'
+
+function formatTime(t: string) {
+  const [h, m] = t.split(':').map(Number)
+  const d = new Date()
+  d.setHours(h, m)
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function minutesSinceMidnight(t: string) {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
+}
+
+const SCHOOL_START = 8 * 60
+const SCHOOL_END = 15 * 60
+const SCHOOL_TOTAL = SCHOOL_END - SCHOOL_START
+
+const EVENT_COLORS: Record<string, string> = {
+  pe: 'bg-green-500',
+  recess: 'bg-yellow-500',
+  lunch: 'bg-teal-500',
+}
+
+const EVENT_LABELS: Record<string, string> = {
+  pe: 'PE',
+  recess: 'Recess',
+  lunch: 'Lunch',
+}
+
+const EVENT_BORDER: Record<string, string> = {
+  pe: 'border-green-500/30 bg-green-500/5',
+  recess: 'border-yellow-500/30 bg-yellow-500/5',
+  lunch: 'border-teal-500/30 bg-teal-500/5',
+}
+
+const EVENT_TEXT: Record<string, string> = {
+  pe: 'text-green-400',
+  recess: 'text-yellow-400',
+  lunch: 'text-teal-400',
+}
+
+export default async function SchedulePage() {
+  const supabase = createServerClient()
+  const now = new Date()
+  const todayDay = now.getDay()
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+
+  const { data: scheduleData } = await supabase
+    .from('t1d_school_schedule')
+    .select('*')
+    .eq('day_of_week', todayDay)
+    .eq('active', true)
+    .order('start_time', { ascending: true })
+
+  const schedule: T1dSchoolSchedule[] = scheduleData ?? []
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const isWeekend = todayDay === 0 || todayDay === 6
+
+  const peEvents = schedule.filter(e => e.event_type === 'pe')
+  const peMinutes = peEvents.reduce((acc, e) => {
+    const start = minutesSinceMidnight(e.start_time)
+    const end = minutesSinceMidnight(e.end_time)
+    return acc + (end - start)
+  }, 0)
+
+  const lunchEvent = schedule.find(e => e.event_type === 'lunch')
+  const recessEvents = schedule.filter(e => e.event_type === 'recess')
+  const recessMinutes = recessEvents.reduce((acc, e) => {
+    const start = minutesSinceMidnight(e.start_time)
+    const end = minutesSinceMidnight(e.end_time)
+    return acc + (end - start)
+  }, 0)
+
   return (
-    <div className="px-4 pt-5">
-      <AppHeader />
-      <div className="mt-8 text-gray-600 text-sm">Coming soon</div>
+    <div className="px-4 pt-5 pb-4 space-y-4">
+      {/* Header */}
+      <div>
+        <p className="text-[10px] tracking-widest text-gray-500 font-semibold">SCHEDULE</p>
+        <p className="text-lg font-semibold text-white mt-0.5">{dayNames[todayDay]}</p>
+      </div>
+
+      {isWeekend ? (
+        <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-8 text-center">
+          <p className="text-gray-500 text-sm">No school today</p>
+          <p className="text-gray-700 text-xs mt-1">Weekend schedule</p>
+        </div>
+      ) : (
+        <>
+          {/* Day bar */}
+          <div className="bg-[#141414] rounded-2xl border border-white/5 p-4">
+            <p className="text-[10px] tracking-widest text-gray-500 font-semibold mb-3">DAY OVERVIEW</p>
+            <div className="relative h-6 bg-white/5 rounded-full overflow-hidden">
+              {/* Current time indicator */}
+              {nowMinutes >= SCHOOL_START && nowMinutes <= SCHOOL_END && (
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-white/60 z-10"
+                  style={{ left: `${((nowMinutes - SCHOOL_START) / SCHOOL_TOTAL) * 100}%` }}
+                />
+              )}
+              {schedule.map(event => {
+                const start = minutesSinceMidnight(event.start_time)
+                const end = minutesSinceMidnight(event.end_time)
+                const left = ((start - SCHOOL_START) / SCHOOL_TOTAL) * 100
+                const width = ((end - start) / SCHOOL_TOTAL) * 100
+                return (
+                  <div
+                    key={event.id}
+                    className={`absolute top-0 bottom-0 ${EVENT_COLORS[event.event_type] ?? 'bg-gray-500'} opacity-70`}
+                    style={{ left: `${Math.max(0, left)}%`, width: `${width}%` }}
+                  />
+                )
+              })}
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-gray-700">8 AM</span>
+              <span className="text-[10px] text-gray-700">3 PM</span>
+            </div>
+          </div>
+
+          {/* Stat chips */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-[#141414] rounded-xl border border-green-500/20 px-3 py-3 text-center">
+              <p className="text-xs font-semibold text-green-400">{peMinutes}m</p>
+              <p className="text-[10px] text-gray-600 mt-0.5">Active</p>
+            </div>
+            <div className="bg-[#141414] rounded-xl border border-yellow-500/20 px-3 py-3 text-center">
+              <p className="text-xs font-semibold text-yellow-400">{recessMinutes}m</p>
+              <p className="text-[10px] text-gray-600 mt-0.5">Recess</p>
+            </div>
+            <div className="bg-[#141414] rounded-xl border border-white/10 px-3 py-3 text-center">
+              <p className="text-xs font-semibold text-gray-400">
+                {lunchEvent ? formatTime(lunchEvent.start_time) : '—'}
+              </p>
+              <p className="text-[10px] text-gray-600 mt-0.5">Lunch</p>
+            </div>
+          </div>
+
+          {/* Timeline */}
+          <div className="space-y-2">
+            <p className="text-[10px] tracking-widest text-gray-500 font-semibold">TIMELINE</p>
+            {schedule.length === 0 && (
+              <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-6 text-center">
+                <p className="text-gray-600 text-sm">No events scheduled</p>
+              </div>
+            )}
+            {schedule.map(event => {
+              const startMin = minutesSinceMidnight(event.start_time)
+              const endMin = minutesSinceMidnight(event.end_time)
+              const isNow = nowMinutes >= startMin && nowMinutes < endMin
+              const isPast = nowMinutes >= endMin
+
+              return (
+                <div
+                  key={event.id}
+                  className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${
+                    isNow ? EVENT_BORDER[event.event_type] ?? 'border-white/10 bg-white/5' : 'border-white/5 bg-[#141414]'
+                  }`}
+                >
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    isPast ? 'bg-gray-700' : (EVENT_COLORS[event.event_type] ?? 'bg-gray-500')
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className={`text-sm font-semibold ${isPast ? 'text-gray-600' : 'text-white'}`}>
+                        {EVENT_LABELS[event.event_type] ?? event.event_type}
+                      </p>
+                      {isNow && (
+                        <span className={`text-[10px] font-semibold tracking-widest px-1.5 py-0.5 rounded ${
+                          EVENT_TEXT[event.event_type] ?? 'text-white'
+                        } bg-white/5`}>
+                          NOW
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {formatTime(event.start_time)} – {formatTime(event.end_time)}
+                      {event.notes && ` · ${event.notes}`}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
     </div>
   )
 }
