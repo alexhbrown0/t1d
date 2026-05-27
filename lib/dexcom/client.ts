@@ -52,7 +52,10 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
   const data = await fetchEgvs(startIso, endIso)
   const egvs: Array<Record<string, unknown>> = data.egvs ?? data.records ?? []
 
-  if (egvs.length === 0) return { inserted: 0, skipped: 0, debug: { keys: Object.keys(data), startIso, endIso, sample: JSON.stringify(data).slice(0, 300) } }
+  if (egvs.length === 0) {
+    console.error('EGV debug', { keys: Object.keys(data), startIso, endIso, sample: JSON.stringify(data).slice(0, 300) })
+    return { inserted: 0, skipped: 0 }
+  }
 
   const rows = egvs.map((e) => ({
     system_time: e.systemTime,
