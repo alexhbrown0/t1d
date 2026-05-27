@@ -46,8 +46,8 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
     ? new Date(lastRow.last_synced_at)
     : new Date(endTime.getTime() - 3 * 60 * 60 * 1000)
 
-  const startIso = startTime.toISOString().replace(/\.\d{3}Z$/, 'Z')
-  const endIso = endTime.toISOString().replace(/\.\d{3}Z$/, 'Z')
+  const startIso = startTime.toISOString().replace(/\.\d{3}Z$/, '')
+  const endIso = endTime.toISOString().replace(/\.\d{3}Z$/, '')
 
   const data = await fetchEgvs(startIso, endIso)
   const egvs: Array<Record<string, unknown>> = data.egvs ?? []
