@@ -15,7 +15,11 @@ export function EngineData() {
     try {
       const res = await fetch('/api/ingest/glooko', { method: 'POST', body: form })
       const data = await res.json()
-      setResult(data.message ?? `Imported ${data.inserted ?? 0} rows`)
+      if (data.cgm_error) {
+        setResult(`CGM error: ${data.cgm_error}`)
+      } else {
+        setResult(`Done — ${data.cgm ?? 0} CGM readings, ${data.bolus ?? 0} bolus records`)
+      }
     } catch {
       setResult('Upload failed — check file format')
     } finally {
@@ -29,7 +33,7 @@ export function EngineData() {
       <div className="bg-[#141414] rounded-2xl border border-white/5 p-4 space-y-3">
         <p className="text-[10px] tracking-widest text-gray-500 font-semibold">GLOOKO IMPORT</p>
         <p className="text-xs text-gray-500 leading-relaxed">
-          Drop the Glooko zip export here. Only bolus data is imported — CGM comes from Dexcom, meals from photos.
+          Drop the Glooko zip export here. CGM readings backfill into the BG history; bolus records populate the dose log.
         </p>
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
