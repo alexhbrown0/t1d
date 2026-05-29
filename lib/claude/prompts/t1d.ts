@@ -1,8 +1,21 @@
-import type { T1dEngineParams, DexcomEgv, MealItem, LearnedStrategy, SimilarFoodOutcome, T1dSchoolSchedule } from '@/types/health'
+import type { T1dEngineParams, IcrSegment, DexcomEgv, MealItem, LearnedStrategy, SimilarFoodOutcome, T1dSchoolSchedule } from '@/types/health'
 import { computeFpu } from '@/lib/t1d/fpu'
 
+export function resolveActiveIcr(params: T1dEngineParams, now = new Date()): number {
+  if (!params.icr_segments?.length) return params.current_icr ?? 15
+  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const match = params.icr_segments.find(s => hhmm >= s.start && hhmm < s.end)
+  return match?.icr ?? params.current_icr ?? 15
+}
+
+function formatIcrForPrompt(params: T1dEngineParams): string {
+  if (!params.icr_segments?.length) return `${params.current_icr} g/unit`
+  return params.icr_segments.map((s: IcrSegment) => `${s.icr} g/unit (${s.start}–${s.end})`).join(', ')
+}
+
 export function buildDoseEngineSystemPrompt(params: T1dEngineParams): string {
-  const fpuCarbEquiv = ((params.fpu_insulin_factor ?? 0.5) * (params.current_icr ?? 20)).toFixed(1)
+  const activeIcr = resolveActiveIcr(params)
+  const fpuCarbEquiv = ((params.fpu_insulin_factor ?? 0.5) * activeIcr).toFixed(1)
 
   return `You are the dosing engine for Brooks, a child with Type 1 diabetes on Omnipod 5 (pump) and Dexcom G7 (CGM).
 
@@ -11,7 +24,7 @@ Your job: analyze a meal and its current context, then output a specific dosing 
 ## Brooks's Profile
 - Insulin: ${params.insulin_type} (Fiasp onset 0–5 min — dose when he starts eating, not before)
 - Target range: 70–180 mg/dL (target: ${params.target_bg} mg/dL)
-- ICR: ${params.current_icr} g/unit — reference only, do not output units
+- ICR: ${formatIcrForPrompt(params)} — reference only, do not output units
 - ISF: ${params.current_isf} mg/dL per unit
 - DIA: ${params.current_dia} hours
 

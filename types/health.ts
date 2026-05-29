@@ -209,6 +209,12 @@ export interface T1dMealEvent {
   updated_at: string
 }
 
+export interface IcrSegment {
+  start: string  // "HH:MM"
+  end: string    // "HH:MM"
+  icr: number
+}
+
 export interface T1dEngineParams {
   id: string
   effective_from: string
@@ -221,6 +227,7 @@ export interface T1dEngineParams {
   fpu_extension_hours: number | null
   low_carryover_reduction_pct: number | null
   current_icr: number | null
+  icr_segments: IcrSegment[] | null
   current_isf: number | null
   current_dia: number | null
   target_bg: number | null
