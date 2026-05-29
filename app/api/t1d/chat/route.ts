@@ -44,11 +44,13 @@ ${params ? `- ICR: ${params.current_icr}, ISF: ${params.current_isf}, Target BG:
 
 You help caregivers (parents, nurses, grandparents) make dosing decisions. Be concise, clear, and specific. When giving dosing guidance, always say "enter X grams into the pump" — not units. Only recommend doses when asked or when the situation clearly calls for it. For low BG: fast carbs only, no insulin. Always note if something is uncertain or needs Alexandra's input.`
 
+  const today = new Date().toISOString().split('T')[0]
+
   // Store user message
   const { data: userMsg } = await supabase.from('t1d_chat_log').insert({
+    session_date: today,
     role: 'user',
     content: message,
-    metadata: null,
   }).select().single()
 
   // Get recent chat for context
@@ -59,7 +61,7 @@ You help caregivers (parents, nurses, grandparents) make dosing decisions. Be co
     .limit(10)
 
   const messages = (history ?? []).reverse().map((m: { role: string; content: string }) => ({
-    role: m.role as 'user' | 'assistant',
+    role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
     content: m.content,
   }))
 
@@ -73,9 +75,9 @@ You help caregivers (parents, nurses, grandparents) make dosing decisions. Be co
   const reply = response.content[0].type === 'text' ? response.content[0].text : ''
 
   const { data: assistantMsg } = await supabase.from('t1d_chat_log').insert({
+    session_date: today,
     role: 'assistant',
     content: reply,
-    metadata: null,
   }).select().single()
 
   return NextResponse.json({ userMsg, assistantMsg })
