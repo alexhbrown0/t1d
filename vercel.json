@@ -9,7 +9,7 @@
       "schedule": "0 * * * *"
     },
     {
-      "path": "/api/cron/t1d-learning",
+      "path": "/api/claude/t1d-daily-learning",
       "schedule": "0 19 * * *"
     }
   ]

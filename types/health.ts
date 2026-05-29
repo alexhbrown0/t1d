@@ -233,6 +233,7 @@ export interface T1dEngineParams {
   target_bg: number | null
   insulin_type: string
   notes: string | null
+  clinical_notes: string | null
   approved_by: string | null
   created_at: string
 }
@@ -265,6 +266,11 @@ export interface T1dDoseSession {
   engine_reasoning: string | null
   engine_confidence: 'high' | 'medium' | 'low' | null
   context_snapshot: unknown | null
+  starting_bg: number | null
+  starting_trend: string | null
+  low_treatment_type: string | null
+  low_treatment_carbs: number | null
+  meal_gi_category: GiCategory | null
   entered_by: string | null
   created_at: string
 }

@@ -13,11 +13,12 @@ function formatIcrForPrompt(params: T1dEngineParams): string {
   return params.icr_segments.map((s: IcrSegment) => `${s.icr} g/unit (${s.start}–${s.end})`).join(', ')
 }
 
-export function buildDoseEngineSystemPrompt(params: T1dEngineParams): string {
+export function buildDoseEngineSystemPrompt(params: T1dEngineParams, clinicalNotes?: string | null): string {
   const activeIcr = resolveActiveIcr(params)
   const fpuCarbEquiv = ((params.fpu_insulin_factor ?? 0.5) * activeIcr).toFixed(1)
 
   return `You are the dosing engine for Brooks, a child with Type 1 diabetes on Omnipod 5 (pump) and Dexcom G7 (CGM).
+${clinicalNotes ? `\n## Clinical notes — follow these:\n${clinicalNotes}\n` : ''}
 
 Your job: analyze a meal and its current context, then output a specific dosing recommendation as JSON. You output carbs to enter into the pump — not insulin units. The pump converts to units using its ICR.
 
@@ -106,8 +107,13 @@ export function buildDoseEngineUserContext(input: {
   similarFoodOutcomes: SimilarFoodOutcome[]
   recentBoluses: { actual_dose_grams: number; actual_dose_timestamp: string }[]
   params: T1dEngineParams
+  mealGiCategory?: string | null
+  lowTreatmentCarbs?: number | null
+  lowTreatmentType?: string | null
+  startingBg?: number | null
+  startingTrend?: string | null
 }): string {
-  const { meal, last5Egvs, scheduleNext2h, recentFastCarbs, foodPlaybooks, similarFoodOutcomes, recentBoluses, params } = input
+  const { meal, last5Egvs, scheduleNext2h, recentFastCarbs, foodPlaybooks, similarFoodOutcomes, recentBoluses, params, mealGiCategory, lowTreatmentCarbs, lowTreatmentType, startingBg, startingTrend } = input
 
   const egvsWithDelta = last5Egvs.map((egv, i) => {
     const prev = last5Egvs[i + 1]
@@ -167,15 +173,27 @@ export function buildDoseEngineUserContext(input: {
     }
   }
 
+  if (lowTreatmentCarbs != null || startingBg != null) {
+    lines.push('\n## Low treatment at mealtime')
+    if (startingBg != null) lines.push(`  BG at meal start: ${startingBg} mg/dL${startingTrend ? `, ${startingTrend}` : ''}`)
+    if (lowTreatmentCarbs != null && lowTreatmentCarbs > 0) {
+      lines.push(`  Fast carbs given: ${lowTreatmentType ?? 'treatment'} (${lowTreatmentCarbs}g) — factor this into your assessment per clinical notes`)
+    } else if (lowTreatmentCarbs === 0) {
+      lines.push('  Fast carbs given: none — meal will be the primary BG treatment')
+    }
+  }
+
   lines.push('\n## Meal being dosed')
   for (const item of meal) {
+    const giStr = (item as MealItem & { gi_category?: string }).gi_category ? ` [${(item as MealItem & { gi_category?: string }).gi_category} GI]` : ''
     lines.push(
-      `  ${item.name}: ${item.carbs}g carbs, ${item.fat ?? 0}g fat, ${item.protein ?? 0}g protein`
+      `  ${item.name}${giStr}: ${item.carbs}g carbs, ${item.fat ?? 0}g fat, ${item.protein ?? 0}g protein`
     )
   }
   lines.push(
     `  Totals: ${totalCarbs}g carbs, ${totalFat}g fat, ${totalProtein}g protein — FPUs: ${fpuCount.toFixed(2)}`
   )
+  if (mealGiCategory) lines.push(`  Overall meal GI: ${mealGiCategory}`)
 
   lines.push('\n## Food history (Brooks\'s records)')
   for (const item of meal) {

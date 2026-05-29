@@ -25,6 +25,13 @@ function FoodRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold text-white truncate">{food.name}</p>
+            {food.gi_category && (
+              <span className={`text-[9px] px-1.5 py-0.5 rounded flex-shrink-0 font-semibold ${
+                food.gi_category === 'high' ? 'text-orange-400 bg-orange-500/10' :
+                food.gi_category === 'medium' ? 'text-yellow-400 bg-yellow-500/10' :
+                'text-green-400 bg-green-500/10'
+              }`}>{food.gi_category} GI</span>
+            )}
             {food.notes && (
               <span className="text-[9px] text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded flex-shrink-0">note</span>
             )}
@@ -63,6 +70,7 @@ function FoodRow({
         protein_g: draft.protein_g,
         calories: draft.calories,
         category: draft.category,
+        gi_category: draft.gi_category,
         notes: draft.notes,
         aliases: draft.aliases,
       }),
@@ -102,6 +110,19 @@ function FoodRow({
             {['lunch', 'snack', 'fruit', 'dairy', 'protein', 'drink', 'treat'].map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] text-gray-500 font-semibold">GLYCEMIC INDEX</label>
+          <select
+            value={draft.gi_category ?? ''}
+            onChange={e => setDraft(p => ({ ...p, gi_category: (e.target.value || null) as 'high' | 'medium' | 'low' | null }))}
+            className="block w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white mt-1 outline-none"
+          >
+            <option value="">unknown</option>
+            <option value="high">high (potato, white rice, bread)</option>
+            <option value="medium">medium (pasta, banana, oats)</option>
+            <option value="low">low (protein, fat, most veg)</option>
           </select>
         </div>
         <div>
@@ -182,7 +203,7 @@ function FoodRow({
 
 function AddFoodForm({ onAdded }: { onAdded: (f: T1dFoodRepo) => void }) {
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', serving_size: '1 serving', carbs_g: '', fat_g: '', protein_g: '', category: 'snack', notes: '', aliases: '' })
+  const [form, setForm] = useState({ name: '', serving_size: '1 serving', carbs_g: '', fat_g: '', protein_g: '', category: 'snack', gi_category: '', notes: '', aliases: '' })
   const [saving, setSaving] = useState(false)
 
   if (!open) {
@@ -210,13 +231,14 @@ function AddFoodForm({ onAdded }: { onAdded: (f: T1dFoodRepo) => void }) {
         fat_g: form.fat_g ? parseFloat(form.fat_g) : null,
         protein_g: form.protein_g ? parseFloat(form.protein_g) : null,
         category: form.category,
+        gi_category: form.gi_category || null,
         notes: form.notes || null,
         aliases: form.aliases.split(',').map(s => s.trim()).filter(Boolean),
       }),
     })
     const added = await res.json()
     onAdded(added)
-    setForm({ name: '', serving_size: '1 serving', carbs_g: '', fat_g: '', protein_g: '', category: 'snack', notes: '', aliases: '' })
+    setForm({ name: '', serving_size: '1 serving', carbs_g: '', fat_g: '', protein_g: '', category: 'snack', gi_category: '', notes: '', aliases: '' })
     setOpen(false)
     setSaving(false)
   }
@@ -237,6 +259,15 @@ function AddFoodForm({ onAdded }: { onAdded: (f: T1dFoodRepo) => void }) {
           <label className="text-[10px] text-gray-500 font-semibold">CATEGORY</label>
           <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className="block w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white mt-1 outline-none">
             {['lunch', 'snack', 'fruit', 'dairy', 'protein', 'drink', 'treat'].map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] text-gray-500 font-semibold">GLYCEMIC INDEX</label>
+          <select value={form.gi_category} onChange={e => setForm(p => ({ ...p, gi_category: e.target.value }))} className="block w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white mt-1 outline-none">
+            <option value="">unknown</option>
+            <option value="high">high (potato, white rice, bread)</option>
+            <option value="medium">medium (pasta, banana, oats)</option>
+            <option value="low">low (protein, fat, most veg)</option>
           </select>
         </div>
         <div>

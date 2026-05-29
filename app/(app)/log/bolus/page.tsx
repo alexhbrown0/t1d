@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface FoodItem {
@@ -9,16 +9,39 @@ interface FoodItem {
   carbs: number
   fat: number | null
   protein: number | null
+  gi_category: 'high' | 'medium' | 'low' | null
 }
+
+const LOW_TREATMENT_OPTIONS = [
+  { label: 'None', carbs: 0 },
+  { label: '1 glucose tab', carbs: 4 },
+  { label: 'Half juice', carbs: 8 },
+  { label: 'Full juice', carbs: 15 },
+]
 
 export default function LogBolusPage() {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [step, setStep] = useState<'capture' | 'items' | 'dose'>('capture')
+  const [step, setStep] = useState<'capture' | 'items' | 'low_treatment' | 'dose'>('capture')
   const [analyzing, setAnalyzing] = useState(false)
   const [items, setItems] = useState<FoodItem[]>([])
+  const [mealGi, setMealGi] = useState<'high' | 'medium' | 'low' | null>(null)
   const [dose, setDose] = useState<{ grams: number; reasoning: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [currentBg, setCurrentBg] = useState<{ value: number; trend: string } | null>(null)
+  const [lowTreatment, setLowTreatment] = useState<{ type: string; carbs: number; label: string } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/t1d/bg-latest')
+      .then(r => r.json())
+      .then(d => { if (d?.value_mgdl) setCurrentBg({ value: d.value_mgdl, trend: d.trend ?? 'none' }) })
+      .catch(() => null)
+  }, [])
+
+  const isLowOrDropping = currentBg != null && (
+    currentBg.value < 80 ||
+    (currentBg.value < 100 && (currentBg.trend === 'falling' || currentBg.trend === 'fallingQuickly'))
+  )
 
   const analyzePhoto = async (file: File) => {
     setAnalyzing(true)
@@ -29,8 +52,8 @@ export default function LogBolusPage() {
       const data = await res.json()
       if (data.items) {
         setItems(data.items)
+        setMealGi(data.meal_gi_category ?? null)
         setStep('items')
-        if (data.dose_grams) setDose({ grams: data.dose_grams, reasoning: data.reasoning ?? '' })
       }
     } catch {
       setStep('items')
@@ -40,17 +63,34 @@ export default function LogBolusPage() {
   }
 
   const addManualItem = () => {
-    setItems(prev => [...prev, { name: '', qty: 1, carbs: 0, fat: null, protein: null }])
+    setItems(prev => [...prev, { name: '', qty: 1, carbs: 0, fat: null, protein: null, gi_category: null }])
     setStep('items')
   }
 
   const totalCarbs = items.reduce((sum, i) => sum + i.carbs * i.qty, 0)
 
-  const getDose = async () => {
+  const proceedFromItems = () => {
+    if (isLowOrDropping) {
+      setStep('low_treatment')
+    } else {
+      getDose(null)
+    }
+  }
+
+  const getDose = async (treatment: { type: string; carbs: number; label?: string } | null) => {
+    if (treatment) setLowTreatment({ ...treatment, label: treatment.label ?? treatment.type })
     const res = await fetch('/api/t1d/engine', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items, context: 'home_dinner' }),
+      body: JSON.stringify({
+        items,
+        context: 'home_dinner',
+        meal_gi_category: mealGi,
+        low_treatment_carbs: treatment?.carbs ?? 0,
+        low_treatment_type: treatment?.type ?? null,
+        starting_bg: currentBg?.value ?? null,
+        starting_trend: currentBg?.trend ?? null,
+      }),
     }).catch(() => null)
     if (res?.ok) {
       const data = await res.json()
@@ -69,26 +109,48 @@ export default function LogBolusPage() {
         total_carbs: totalCarbs,
         recommended_dose_grams: dose?.grams,
         context: 'home_dinner',
+        meal_gi_category: mealGi,
+        starting_bg: currentBg?.value ?? null,
+        starting_trend: currentBg?.trend ?? null,
+        low_treatment_type: lowTreatment?.type ?? null,
+        low_treatment_carbs: lowTreatment?.carbs ?? null,
         entered_by: 'alexandra',
       }),
     }).catch(() => null)
     router.push('/now')
   }
 
+  const bgColor = currentBg
+    ? currentBg.value < 70 ? 'text-red-400'
+    : currentBg.value < 85 ? 'text-orange-400'
+    : 'text-teal-400'
+    : 'text-gray-500'
+
   return (
     <div className="px-4 pt-5 pb-4 space-y-5">
-      {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => (step === 'capture' ? router.back() : setStep('capture'))} className="text-gray-500">
+        <button onClick={() => (step === 'capture' ? router.back() : setStep(step === 'dose' ? (isLowOrDropping ? 'low_treatment' : 'items') : step === 'low_treatment' ? 'items' : 'capture'))} className="text-gray-500">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <div>
+        <div className="flex-1">
           <p className="text-[10px] tracking-widest text-blue-400 font-semibold">BOLUS</p>
           <p className="text-lg font-semibold text-white">Food Bolus</p>
         </div>
+        {currentBg && (
+          <p className={`text-sm font-bold tabular-nums ${bgColor}`}>{Math.round(currentBg.value)}</p>
+        )}
       </div>
+
+      {/* Low warning banner */}
+      {isLowOrDropping && step !== 'low_treatment' && (
+        <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl px-4 py-3">
+          <p className="text-xs text-orange-400 font-semibold">
+            BG {currentBg!.value < 80 ? 'is low' : 'dropping'} — you'll confirm fast carb treatment before dosing
+          </p>
+        </div>
+      )}
 
       {/* Capture step */}
       {step === 'capture' && (
@@ -104,38 +166,20 @@ export default function LogBolusPage() {
               <p className="text-sm font-semibold text-white">TAP TO TAKE PHOTO</p>
               <p className="text-xs text-gray-500">Claude will identify foods and estimate carbs</p>
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={e => {
-                const file = e.target.files?.[0]
-                if (file) analyzePhoto(file)
-              }}
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) analyzePhoto(f) }}
             />
           </label>
-
           {analyzing && (
             <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-4 text-center">
               <p className="text-sm text-teal-400 animate-pulse">Analyzing photo...</p>
             </div>
           )}
-
           <div className="flex gap-3">
-            <button
-              onClick={() => {
-                fileRef.current?.click()
-              }}
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 text-xs text-gray-400 font-semibold"
-            >
+            <button onClick={() => fileRef.current?.click()} className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 text-xs text-gray-400 font-semibold">
               Pick from library
             </button>
-            <button
-              onClick={addManualItem}
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 text-xs text-gray-400 font-semibold"
-            >
+            <button onClick={addManualItem} className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 text-xs text-gray-400 font-semibold">
               Skip · manual
             </button>
           </div>
@@ -155,6 +199,13 @@ export default function LogBolusPage() {
                     placeholder="Food name"
                     className="bg-transparent text-sm font-semibold text-white outline-none w-full"
                   />
+                  {item.gi_category && (
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                      item.gi_category === 'high' ? 'text-orange-400 bg-orange-500/10' :
+                      item.gi_category === 'medium' ? 'text-yellow-400 bg-yellow-500/10' :
+                      'text-green-400 bg-green-500/10'
+                    }`}>{item.gi_category} GI</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <input
@@ -165,38 +216,66 @@ export default function LogBolusPage() {
                   />
                   <span className="text-xs text-gray-600">g</span>
                 </div>
-                <button
-                  onClick={() => setItems(prev => prev.filter((_, idx) => idx !== i))}
-                  className="text-gray-700"
-                >
+                <button onClick={() => setItems(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-700">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
               </div>
             </div>
           ))}
-
-          <button
-            onClick={addManualItem}
-            className="w-full bg-white/5 border border-dashed border-white/10 rounded-2xl py-3 text-xs text-gray-500"
-          >
+          <button onClick={addManualItem} className="w-full bg-white/5 border border-dashed border-white/10 rounded-2xl py-3 text-xs text-gray-500">
             + Add item
           </button>
-
           <div className="bg-[#141414] rounded-2xl border border-blue-500/20 px-5 py-4 flex items-center justify-between">
             <div>
               <p className="text-[10px] text-gray-500 font-semibold">TOTAL CARBS</p>
               <p className="text-2xl font-bold text-white">{totalCarbs}g</p>
+              {mealGi && (
+                <p className={`text-[10px] font-semibold mt-0.5 ${mealGi === 'high' ? 'text-orange-400' : mealGi === 'medium' ? 'text-yellow-400' : 'text-green-400'}`}>
+                  {mealGi.toUpperCase()} GI MEAL
+                </p>
+              )}
             </div>
             <button
-              onClick={getDose}
+              onClick={proceedFromItems}
               disabled={items.length === 0 || totalCarbs === 0}
               className="bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm font-semibold px-4 py-2.5 rounded-xl disabled:opacity-40"
             >
-              Get Dose
+              {isLowOrDropping ? 'Next →' : 'Get Dose'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Low treatment step */}
+      {step === 'low_treatment' && (
+        <div className="space-y-4">
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl px-5 py-4">
+            <p className="text-[10px] tracking-widest text-orange-400 font-semibold mb-1">BG IS {currentBg?.value} — LOW AT MEALTIME</p>
+            {mealGi === 'high' ? (
+              <p className="text-sm text-gray-300 leading-relaxed">
+                This is a high-GI meal — it will bring BG up on its own. A full juice may cause a spike. Choose below based on how fast BG is dropping.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-300 leading-relaxed">
+                This meal is {mealGi ?? 'unknown'} GI — it won't bring BG up quickly. Fast carbs before eating are likely needed.
+              </p>
+            )}
+          </div>
+
+          <p className="text-[10px] tracking-widest text-gray-500 font-semibold">FAST CARBS GIVEN BEFORE/DURING MEAL</p>
+          <div className="space-y-2">
+            {LOW_TREATMENT_OPTIONS.map(opt => (
+              <button
+                key={opt.label}
+                onClick={() => getDose({ type: opt.label, carbs: opt.carbs })}
+                className="w-full bg-[#141414] border border-white/10 rounded-xl px-5 py-4 flex items-center justify-between active:bg-white/5"
+              >
+                <span className="text-sm text-white font-semibold">{opt.label}</span>
+                {opt.carbs > 0 && <span className="text-sm text-orange-400 font-bold">{opt.carbs}g fast carbs</span>}
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -204,31 +283,27 @@ export default function LogBolusPage() {
       {/* Dose step */}
       {step === 'dose' && dose && (
         <div className="space-y-3">
+          {lowTreatment && lowTreatment.carbs > 0 && (
+            <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl px-4 py-2.5 flex items-center gap-2">
+              <span className="text-xs text-orange-400">{lowTreatment.label} ({lowTreatment.carbs}g fast carbs) factored in</span>
+            </div>
+          )}
           <div className="bg-[#141414] rounded-2xl border border-blue-500/20 p-5">
             <p className="text-[10px] tracking-widest text-blue-400 font-semibold mb-2">RECOMMENDED DOSE</p>
             <p className="text-4xl font-bold text-white">{dose.grams}g</p>
             <p className="text-xs text-gray-500 mt-1">Enter into the pump</p>
           </div>
-
           {dose.reasoning && (
             <div className="bg-[#141414] rounded-2xl border border-white/5 p-4">
               <p className="text-[10px] tracking-widest text-gray-500 font-semibold mb-2">REASONING</p>
               <p className="text-xs text-gray-400 leading-relaxed">{dose.reasoning}</p>
             </div>
           )}
-
           <div className="flex gap-3">
-            <button
-              onClick={() => setStep('items')}
-              className="flex-1 bg-white/5 border border-white/10 rounded-2xl py-4 text-sm text-gray-400 font-semibold"
-            >
+            <button onClick={() => setStep('items')} className="flex-1 bg-white/5 border border-white/10 rounded-2xl py-4 text-sm text-gray-400 font-semibold">
               Edit items
             </button>
-            <button
-              onClick={logDose}
-              disabled={submitting}
-              className="flex-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 font-semibold py-4 rounded-2xl text-sm"
-            >
+            <button onClick={logDose} disabled={submitting} className="flex-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 font-semibold py-4 rounded-2xl text-sm">
               {submitting ? 'Logging...' : 'I did it'}
             </button>
           </div>

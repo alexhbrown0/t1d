@@ -13,11 +13,14 @@ export async function GET() {
   return NextResponse.json(data ?? null)
 }
 
+const NUMERIC_PARAMS = new Set([
+  'pre_bolus_pct', 'pre_bolus_lead_min', 'activity_reduction_pct',
+  'activity_window_min', 'fpu_insulin_factor', 'fpu_extension_hours',
+  'low_carryover_reduction_pct', 'current_icr', 'current_isf', 'current_dia', 'target_bg',
+])
+
 export async function PATCH(req: NextRequest) {
-  const { clinical_notes } = await req.json()
-  if (typeof clinical_notes !== 'string') {
-    return NextResponse.json({ error: 'clinical_notes must be a string' }, { status: 400 })
-  }
+  const body = await req.json() as Record<string, unknown>
   const supabase = createServerClient()
   const { data: current } = await supabase
     .from('t1d_engine_params')
@@ -26,11 +29,21 @@ export async function PATCH(req: NextRequest) {
     .limit(1)
     .single()
   if (!current) return NextResponse.json({ error: 'No engine params found' }, { status: 404 })
+
+  const update: Record<string, unknown> = {}
+  if (typeof body.clinical_notes === 'string') update.clinical_notes = body.clinical_notes
+  for (const [k, v] of Object.entries(body)) {
+    if (NUMERIC_PARAMS.has(k) && typeof v === 'number') update[k] = v
+  }
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+  }
+
   const { data, error } = await supabase
     .from('t1d_engine_params')
-    .update({ clinical_notes })
+    .update(update)
     .eq('id', current.id)
-    .select('clinical_notes')
+    .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)

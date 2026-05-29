@@ -12,7 +12,15 @@ import {
 } from '@/lib/supabase/queries/t1d'
 import type { MealItem, EngineOutput } from '@/types/health'
 
-export async function runDoseEngine(meal: MealItem[]): Promise<EngineOutput> {
+interface EngineContext {
+  mealGiCategory?: string | null
+  lowTreatmentCarbs?: number | null
+  lowTreatmentType?: string | null
+  startingBg?: number | null
+  startingTrend?: string | null
+}
+
+export async function runDoseEngine(meal: MealItem[], ctx: EngineContext = {}): Promise<EngineOutput> {
   const [params, egvs, schedule, recentFastCarbs, allFoods] = await Promise.all([
     getCurrentEngineParams(),
     getLatestEgvs(5),
@@ -25,7 +33,7 @@ export async function runDoseEngine(meal: MealItem[]): Promise<EngineOutput> {
   const foodPlaybooks = buildPlaybookMap(allFoods)
   const similarFoodOutcomes = getSimilarFoods(meal, allFoods)
 
-  const systemPrompt = buildDoseEngineSystemPrompt(params)
+  const systemPrompt = buildDoseEngineSystemPrompt(params, params.clinical_notes)
   const userContext = buildDoseEngineUserContext({
     meal,
     last5Egvs: egvs.map(e => ({ system_time: e.system_time, value_mgdl: e.value_mgdl })),
@@ -35,6 +43,7 @@ export async function runDoseEngine(meal: MealItem[]): Promise<EngineOutput> {
     similarFoodOutcomes,
     recentBoluses,
     params,
+    ...ctx,
   })
 
   const response = await claude.messages.create({

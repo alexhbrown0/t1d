@@ -5,17 +5,29 @@ import type { MealItem, T1dDoseSession } from '@/types/health'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { meal, meal_event_id, entered_by } = body as {
-    meal: MealItem[]
+  // Support both `meal` and `items` field names
+  const meal = (body.meal ?? body.items) as MealItem[] | undefined
+  const { meal_event_id, entered_by, meal_gi_category, low_treatment_carbs, low_treatment_type, starting_bg, starting_trend } = body as {
     meal_event_id?: string
     entered_by?: string
+    meal_gi_category?: string | null
+    low_treatment_carbs?: number | null
+    low_treatment_type?: string | null
+    starting_bg?: number | null
+    starting_trend?: string | null
   }
 
   if (!meal || !Array.isArray(meal) || meal.length === 0) {
     return NextResponse.json({ error: 'meal is required' }, { status: 400 })
   }
 
-  const output = await runDoseEngine(meal)
+  const output = await runDoseEngine(meal, {
+    mealGiCategory: meal_gi_category,
+    lowTreatmentCarbs: low_treatment_carbs,
+    lowTreatmentType: low_treatment_type,
+    startingBg: starting_bg,
+    startingTrend: starting_trend,
+  })
 
   // Persist the dose session
   const supabase = createServerClient()
@@ -40,6 +52,11 @@ export async function POST(req: NextRequest) {
     engine_reasoning: output.reasoning,
     engine_confidence: output.confidence,
     context_snapshot: { flags: output.flags, pump_iob_flag: output.pump_iob_flag },
+    starting_bg: starting_bg ?? null,
+    starting_trend: starting_trend ?? null,
+    low_treatment_type: low_treatment_type ?? null,
+    low_treatment_carbs: low_treatment_carbs ?? null,
+    meal_gi_category: (meal_gi_category ?? null) as 'high' | 'medium' | 'low' | null,
     entered_by: entered_by ?? null,
   }
 
