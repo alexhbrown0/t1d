@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { claude } from '@/lib/claude/client'
 import { getLatestEgvs } from '@/lib/dexcom/client'
 
-const SAVE_INTENT = /\b(save|log|add|write|capture|record)\b.{0,60}\b(note|clinical|protocol|rule|guideline|learning|engine)\b/i
+const SAVE_INTENT = /(save|log|add|write|capture|record|remember|keep).{0,60}(notes?|clinical|protocol|rules?|guidelines?|learnings?|engine)/i
 
 function rateOfChange(egvs: { system_time: string; value_mgdl: unknown }[]): number | null {
   const pts = egvs
@@ -149,14 +149,17 @@ Rules:
   }).select().single()
 
   let proposal: string | null = null
-  if (SAVE_INTENT.test(message)) {
-    const recentConvo = messages.slice(-8).map(m => `${m.role === 'user' ? 'Alexandra' : 'Assistant'}: ${m.content}`).join('\n')
+  if (SAVE_INTENT.test(message) || SAVE_INTENT.test(reply)) {
+    const fullConvo = [
+      ...messages.slice(-8),
+      { role: 'assistant' as const, content: reply },
+    ].map(m => `${m.role === 'user' ? 'Alexandra' : 'Assistant'}: ${m.content}`).join('\n')
     const distillResult = await claude.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
+      max_tokens: 300,
       messages: [{
         role: 'user',
-        content: `Distill the clinical insight or rule from this conversation into a precise, factual protocol note (2-4 sentences). Write it as a standing instruction — not a conversation summary. Plain text only, no markdown.\n\n${recentConvo}`,
+        content: `Distill the clinical insight or rule from this conversation into a precise, factual protocol note (2-4 sentences). Write it as a standing instruction — not a conversation summary. Plain text only, no markdown.\n\n${fullConvo}`,
       }],
     })
     proposal = distillResult.content[0].type === 'text' ? distillResult.content[0].text.trim() : null
