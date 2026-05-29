@@ -68,7 +68,7 @@ export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto">
+    <div className="fixed bottom-0 left-0 right-0 z-50 max-w-lg mx-auto">
       <div className="bg-[#111111]/95 backdrop-blur border-t border-white/5 px-2 pt-1.5" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 6px)' }}>
         <div className="flex justify-around">
           {tabs.map((tab) => {

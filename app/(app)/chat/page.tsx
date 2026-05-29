@@ -150,7 +150,7 @@ export default function ChatPage() {
     : 'Brooks · –'
 
   return (
-    <div className="flex flex-col w-full overflow-x-hidden" style={{ height: 'calc(100svh - 56px)' }}>
+    <div className="flex flex-col w-full overflow-x-hidden" style={{ height: 'calc(100svh - env(safe-area-inset-bottom, 0px) - 56px)' }}>
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-white/5 flex-shrink-0">
         <p className="text-[10px] tracking-widest text-gray-500 font-semibold">ASSIST</p>
