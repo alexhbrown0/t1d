@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { claude } from '@/lib/claude/client'
 import { getLatestEgvs } from '@/lib/dexcom/client'
 
-const SAVE_INTENT = /\b(save|log|add|write|capture|record)\b.{0,30}\b(note|clinical|protocol|rule|guideline)\b/i
+const SAVE_INTENT = /\b(save|log|add|write|capture|record)\b.{0,60}\b(note|clinical|protocol|rule|guideline|learning|engine)\b/i
 
 function rateOfChange(egvs: { system_time: string; value_mgdl: unknown }[]): number | null {
   const pts = egvs
@@ -38,9 +38,14 @@ export async function POST(req: NextRequest) {
   const sixHoursAgo = new Date(Date.now() - 6 * 3600000).toISOString()
   const dayOfWeek = now.getDay()
 
-  const [egvs, bolusResult, lowResult, scheduleResult, paramsResult] = await Promise.all([
+  const midnight = new Date(now)
+  midnight.setHours(0, 0, 0, 0)
+  const midnightIso = midnight.toISOString()
+
+  const [egvs, bolusResult, bolusToday, lowResult, scheduleResult, paramsResult] = await Promise.all([
     getLatestEgvs(5),
     supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u, bg_input_mgdl').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
+    supabase.from('glooko_bolus').select('timestamp').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(1),
     supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('t1d_school_schedule').select('event_type, start_time, day_of_week').eq('active', true).eq('day_of_week', dayOfWeek).order('start_time'),
     supabase.from('t1d_engine_params').select('*').order('effective_from', { ascending: false }).limit(1),
@@ -50,6 +55,7 @@ export async function POST(req: NextRequest) {
   const boluses = bolusResult.data ?? []
   const lows = lowResult.data ?? []
   const schedule = scheduleResult.data ?? []
+  const isFirstMealOfDay = (bolusToday.data ?? []).length === 0
 
   const latest = egvs[0]
   const bg = latest?.value_mgdl ? Number(latest.value_mgdl) : null
@@ -74,8 +80,11 @@ export async function POST(req: NextRequest) {
     .filter((_, i, arr) => i < 3)
     .join(', ')
 
+  const hour = now.getHours()
+  const mealPeriod = hour < 10 ? 'breakfast' : hour < 14 ? 'lunch' : hour < 17 ? 'afternoon' : 'dinner/evening'
+
   const contextBlock = [
-    `Time: ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}, ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayOfWeek]}`,
+    `Time: ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}, ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayOfWeek]} — meal period: ${mealPeriod}${isFirstMealOfDay ? ' — FIRST MEAL OF DAY (fasting state, stomach empty, fast Fiasp absorption, full pre-bolus timing applies)' : ' — fed state (not first meal, stomach not empty, absorption slower than fasting)'}`,
     bg != null
       ? `BG (oldest→newest): ${bgSequence} | now ${bg} mg/dL, ${minsAgo}min ago, rate: ${rateStr}`
       : 'BG: no recent data',
@@ -91,16 +100,19 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean).join('\n')
 
   const systemPrompt = `You are an AI assistant helping manage Brooks's Type 1 diabetes. Brooks is a child on Omnipod 5 with Fiasp insulin and Dexcom G7 CGM.
-${params?.clinical_notes ? `\nClinical notes (follow these):\n${params.clinical_notes}\n` : ''}
+${params?.clinical_notes ? `\nClinical notes (follow these — these persist across all sessions and inform every recommendation):\n${params.clinical_notes}\n` : ''}
 Current context:
 ${contextBlock}
 
 Rules:
 - Write in plain text only. No markdown, no bold, no headers, no bullet symbols, no asterisks.
-- Be concise and direct. One or two sentences is usually enough.
+- Be concise. Give as much detail as the situation needs — simple status checks warrant one sentence, meal dosing discussions warrant full guidance.
 - Dosing guidance: always say "enter X grams into the pump", never units.
 - For lows: fast carbs only, no insulin.
-- Flag anything uncertain or that needs Alexandra's input.`
+- Flag anything uncertain or that needs Alexandra's input.
+- Voice dictation: Alexandra and the school nurse often use voice-to-text. Interpret phonetic errors charitably — "bowl" likely means bolus, "fee" or "fee-asp" means Fiasp, "ain't" means ate, "people is" means pre-bolus, "correction" and "correction dose" are interchangeable.
+- Fasting vs. fed state: "first meal of day" means his stomach is empty after overnight fasting — Fiasp absorbs fastest, BG rises quickly, and the full pre-bolus lead time matters most. Any meal after the first (even an hour later) is fed state — gastric emptying is slower and pre-bolus timing is less critical. The context block will tell you which state applies.
+- Memory: clinical notes ARE the persistence mechanism. When you identify a dosing rule, protocol, or observation worth keeping, propose saving it as a clinical note. Clinical notes persist to every future session and all dosing calculations. You do not need to disclaim that you lack memory — notes bridge that gap.`
 
   const today = now.toISOString().split('T')[0]
 
@@ -123,7 +135,7 @@ Rules:
 
   const response = await claude.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 512,
+    max_tokens: 1024,
     system: systemPrompt,
     messages,
   })
