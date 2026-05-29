@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { DeviceStrip } from '@/components/t1d/device-strip'
 import type { T1dDoseSession, T1dLowTreatment } from '@/types/health'
 
 export const dynamic = 'force-dynamic'
@@ -25,7 +26,7 @@ export default async function LogPage() {
   const supabase = createServerClient()
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  const [sessionsResult, lowsResult, egvsResult] = await Promise.all([
+  const [sessionsResult, lowsResult, egvsResult, cgmResult, podResult] = await Promise.all([
     supabase
       .from('t1d_dose_sessions')
       .select('*')
@@ -43,11 +44,31 @@ export default async function LogPage() {
       .select('value_mgdl')
       .gte('system_time', since)
       .order('system_time', { ascending: true }),
+    supabase
+      .from('t1d_device_changes')
+      .select('*')
+      .eq('type', 'cgm')
+      .is('removed_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('t1d_device_changes')
+      .select('*')
+      .eq('type', 'pod')
+      .is('removed_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ])
 
   const sessions: T1dDoseSession[] = sessionsResult.data ?? []
   const lows: T1dLowTreatment[] = lowsResult.data ?? []
   const egvs = egvsResult.data ?? []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cgm = (cgmResult.data ?? null) as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pod = (podResult.data ?? null) as any
 
   // TIR calculation
   const LOW = 70
@@ -101,6 +122,9 @@ export default async function LogPage() {
         <p className="text-[10px] tracking-widest text-gray-500 font-semibold">LOG</p>
         <p className="text-lg font-semibold text-white mt-0.5">Last 24 Hours</p>
       </div>
+
+      {/* Device status strip */}
+      <DeviceStrip initialCgm={cgm} initialPod={pod} />
 
       {/* TIR bar */}
       <div className="bg-[#141414] rounded-2xl border border-white/5 p-4">
