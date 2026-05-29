@@ -150,9 +150,9 @@ export default function ChatPage() {
     : 'Brooks · –'
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100dvh - 80px)' }}>
+    <div className="flex flex-col w-full overflow-x-hidden" style={{ height: 'calc(100svh - 56px)' }}>
       {/* Header */}
-      <div className="px-4 pt-5 pb-3 border-b border-white/5 flex-shrink-0">
+      <div className="px-4 pt-4 pb-3 border-b border-white/5 flex-shrink-0">
         <p className="text-[10px] tracking-widest text-gray-500 font-semibold">ASSIST</p>
         <p className="text-sm text-gray-400 mt-0.5">
           {bgSubtitle}
@@ -161,7 +161,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-3">
         {messages.length === 0 && !loading && (
           <div className="text-center mt-12">
             <p className="text-gray-600 text-sm">Ask me anything about Brooks.</p>
@@ -170,7 +170,7 @@ export default function ChatPage() {
         )}
         {messages.map((m) => (
           <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+            <div className={`max-w-[85%] min-w-0 rounded-2xl px-4 py-3 text-sm leading-relaxed break-words ${
               m.role === 'user'
                 ? 'bg-white/10 text-white rounded-br-sm'
                 : 'bg-[#141414] text-gray-200 border border-white/5 rounded-bl-sm'
@@ -225,8 +225,8 @@ export default function ChatPage() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send(input)}
-            placeholder="Ask a question or send an update..."
-            className="flex-1 bg-transparent text-sm text-white placeholder-gray-600 outline-none"
+            placeholder="Ask or send an update..."
+            className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder-gray-600 outline-none"
           />
           <button
             onClick={() => send(input)}
