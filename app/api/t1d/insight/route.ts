@@ -14,7 +14,7 @@ export async function GET() {
     supabase.from('dexcom_egvs').select('*').order('system_time', { ascending: false }).limit(6),
     supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u').order('timestamp', { ascending: false }).limit(1),
     supabase.from('t1d_school_schedule').select('*').eq('active', true).order('start_time'),
-    supabase.from('t1d_engine_params').select('current_dia, pre_bolus_lead_min, activity_reduction_pct').lte('effective_from', now.toISOString().split('T')[0]).order('effective_from', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('t1d_engine_params').select('current_dia, pre_bolus_lead_min, activity_reduction_pct, clinical_notes').lte('effective_from', now.toISOString().split('T')[0]).order('effective_from', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   const egvs = egvsResult.data ?? []
@@ -67,6 +67,7 @@ export async function GET() {
   ]
 
   const prompt = `You are helping manage T1D for Brooks, a child on Omnipod 5 + Dexcom G7 + Fiasp.
+${params?.clinical_notes ? `\nClinical notes:\n${params.clinical_notes}\n` : ''}
 
 ${contextLines.join('\n')}
 Pre-bolus lead time: ${params?.pre_bolus_lead_min ?? 8} min. Activity reduction: ${((params?.activity_reduction_pct ?? 0.3) * 100).toFixed(0)}%.

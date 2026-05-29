@@ -25,11 +25,58 @@ function TrendArrow({ trend }: { trend: string | null }) {
   return <span>{arrows[trend ?? 'none'] ?? '→'}</span>
 }
 
+function NoteProposalCard({
+  text,
+  onSave,
+  onDismiss,
+}: {
+  text: string
+  onSave: (text: string) => void
+  onDismiss: () => void
+}) {
+  const [draft, setDraft] = useState(text)
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    await onSave(draft)
+    setSaving(false)
+  }
+
+  return (
+    <div className="mx-1 mt-2 bg-teal-950/40 border border-teal-500/30 rounded-2xl p-4 space-y-3">
+      <p className="text-[10px] tracking-widest text-teal-400 font-semibold">CLINICAL NOTE READY TO SAVE</p>
+      <textarea
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        rows={4}
+        className="w-full bg-transparent text-sm text-gray-200 leading-relaxed resize-none outline-none border border-white/10 rounded-xl px-3 py-2"
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={save}
+          disabled={saving || !draft.trim()}
+          className="flex-1 bg-teal-500/20 text-teal-400 text-xs font-semibold py-2 rounded-xl disabled:opacity-40 active:bg-teal-500/30"
+        >
+          {saving ? 'Saving…' : 'Save note'}
+        </button>
+        <button
+          onClick={onDismiss}
+          className="px-4 text-gray-500 text-xs py-2 rounded-xl active:bg-white/5"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [bg, setBg] = useState<{ value: number | null; trend: string | null } | null>(null)
+  const [proposal, setProposal] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const autoSentRef = useRef(false)
 
@@ -58,13 +105,14 @@ export default function ChatPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, proposal])
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return
     const optimistic: ChatMsg = { id: Date.now().toString(), role: 'user', content: text, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, optimistic])
     setInput('')
+    setProposal(null)
     setLoading(true)
     try {
       const res = await fetch('/api/t1d/chat', {
@@ -72,11 +120,29 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
       })
-      const { userMsg, assistantMsg } = await res.json()
+      const { userMsg, assistantMsg, proposal: newProposal } = await res.json()
       setMessages(prev => [...prev.filter(m => m.id !== optimistic.id), userMsg, assistantMsg])
+      if (newProposal) setProposal(newProposal)
     } finally {
       setLoading(false)
     }
+  }
+
+  const saveNote = async (text: string) => {
+    await fetch('/api/t1d/engine-params', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clinical_notes: text }),
+    })
+    setProposal(null)
+    // Confirm in chat
+    const saved: ChatMsg = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: 'Clinical note saved. I\'ll apply this going forward.',
+      created_at: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, saved])
   }
 
   const bgSubtitle = bg?.value
@@ -127,6 +193,13 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
+        )}
+        {proposal && (
+          <NoteProposalCard
+            text={proposal}
+            onSave={saveNote}
+            onDismiss={() => setProposal(null)}
+          />
         )}
         <div ref={bottomRef} />
       </div>

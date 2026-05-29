@@ -3,6 +3,8 @@ import { createServerClient } from '@/lib/supabase/server'
 import { claude } from '@/lib/claude/client'
 import { getLatestEgvs } from '@/lib/dexcom/client'
 
+const SAVE_INTENT = /\b(save|log|add|write|capture|record)\b.{0,30}\b(note|clinical|protocol|rule|guideline)\b/i
+
 export async function GET() {
   const supabase = createServerClient()
   const { data } = await supabase
@@ -41,19 +43,18 @@ Current context:
 - ${bgContext}
 ${recentLowContext ? `- ${recentLowContext}` : ''}
 ${params ? `- ICR: ${params.current_icr}, ISF: ${params.current_isf}, Target BG: ${params.target_bg}` : ''}
+${params?.clinical_notes ? `\nClinical notes:\n${params.clinical_notes}` : ''}
 
 You help caregivers (parents, nurses, grandparents) make dosing decisions. Be concise, clear, and specific. When giving dosing guidance, always say "enter X grams into the pump" — not units. Only recommend doses when asked or when the situation clearly calls for it. For low BG: fast carbs only, no insulin. Always note if something is uncertain or needs Alexandra's input.`
 
   const today = new Date().toISOString().split('T')[0]
 
-  // Store user message
   const { data: userMsg } = await supabase.from('t1d_chat_log').insert({
     session_date: today,
     role: 'user',
     content: message,
   }).select().single()
 
-  // Get recent chat for context
   const { data: history } = await supabase
     .from('t1d_chat_log')
     .select('role, content')
@@ -80,5 +81,20 @@ You help caregivers (parents, nurses, grandparents) make dosing decisions. Be co
     content: reply,
   }).select().single()
 
-  return NextResponse.json({ userMsg, assistantMsg })
+  // Detect intent to save a clinical note — distill recent conversation into note text
+  let proposal: string | null = null
+  if (SAVE_INTENT.test(message)) {
+    const recentConvo = messages.slice(-8).map(m => `${m.role === 'user' ? 'Alexandra' : 'Assistant'}: ${m.content}`).join('\n')
+    const distillResult = await claude.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `Distill the clinical insight or rule from this conversation into a precise, factual protocol note (2-4 sentences). Write it as a standing instruction for how to handle this situation — not as a conversation summary. No preamble, just the note.\n\n${recentConvo}`,
+      }],
+    })
+    proposal = distillResult.content[0].type === 'text' ? distillResult.content[0].text.trim() : null
+  }
+
+  return NextResponse.json({ userMsg, assistantMsg, ...(proposal ? { proposal } : {}) })
 }
