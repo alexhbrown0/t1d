@@ -5,6 +5,22 @@ import { getLatestEgvs } from '@/lib/dexcom/client'
 
 const SAVE_INTENT = /\b(save|log|add|write|capture|record)\b.{0,30}\b(note|clinical|protocol|rule|guideline)\b/i
 
+function rateOfChange(egvs: { system_time: string; value_mgdl: unknown }[]): number | null {
+  const pts = egvs
+    .filter(e => e.value_mgdl != null)
+    .slice(0, 5)
+    .map(e => ({ t: new Date(e.system_time).getTime(), bg: Number(e.value_mgdl) }))
+    .reverse()
+  if (pts.length < 2) return null
+  const spanMin = (pts[pts.length - 1].t - pts[0].t) / 60000
+  if (spanMin === 0) return null
+  return (pts[pts.length - 1].bg - pts[0].bg) / spanMin
+}
+
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 export async function GET() {
   const supabase = createServerClient()
   const { data } = await supabase
@@ -16,38 +32,77 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { message, role = 'user' } = await req.json()
+  const { message } = await req.json()
   const supabase = createServerClient()
+  const now = new Date()
+  const sixHoursAgo = new Date(Date.now() - 6 * 3600000).toISOString()
+  const dayOfWeek = now.getDay()
 
-  const [egvs, paramsResult, lowsResult] = await Promise.all([
+  const [egvs, bolusResult, lowResult, scheduleResult, paramsResult] = await Promise.all([
     getLatestEgvs(5),
+    supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u, bg_input_mgdl').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
+    supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
+    supabase.from('t1d_school_schedule').select('event_type, start_time, day_of_week').eq('active', true).eq('day_of_week', dayOfWeek).order('start_time'),
     supabase.from('t1d_engine_params').select('*').order('effective_from', { ascending: false }).limit(1),
-    supabase.from('t1d_low_treatments').select('*').gte('timestamp', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()).order('timestamp', { ascending: false }).limit(3),
   ])
 
-  const latest = egvs[0]
   const params = paramsResult.data?.[0]
-  const recentLows = lowsResult.data ?? []
+  const boluses = bolusResult.data ?? []
+  const lows = lowResult.data ?? []
+  const schedule = scheduleResult.data ?? []
 
-  const bgContext = latest
-    ? `Current BG: ${latest.value_mgdl} mg/dL, trend: ${latest.trend ?? 'unknown'}`
-    : 'No recent CGM data.'
+  const latest = egvs[0]
+  const bg = latest?.value_mgdl ? Number(latest.value_mgdl) : null
+  const minsAgo = latest ? Math.floor((Date.now() - new Date(latest.system_time).getTime()) / 60000) : null
+  const rate = rateOfChange(egvs)
+  const bgSequence = [...egvs].reverse().map(e => Math.round(Number(e.value_mgdl))).join(' → ')
+  const rateStr = rate != null ? `${rate > 0 ? '+' : ''}${rate.toFixed(1)} mg/dL/min` : 'unknown'
 
-  const recentLowContext = recentLows.length
-    ? `Recent lows in past 6h: ${recentLows.map(l => `${l.bg_at_treatment} mg/dL at ${new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`).join(', ')}`
-    : ''
+  const dia = (params?.current_dia ?? 2) * 3600000
+  const iob = boluses.reduce((sum, b) => {
+    const elapsed = Date.now() - new Date(b.timestamp).getTime()
+    return sum + Number(b.insulin_delivered_u ?? 0) * Math.max(0, 1 - elapsed / dia)
+  }, 0)
+
+  const nowMins = now.getHours() * 60 + now.getMinutes()
+  const upcomingSchedule = schedule
+    .map(s => {
+      const [h, m] = s.start_time.split(':').map(Number)
+      const minsUntil = (h * 60 + m) - nowMins
+      return `${s.event_type} at ${s.start_time} (${minsUntil > 0 ? `in ${minsUntil}min` : `${Math.abs(minsUntil)}min ago`})`
+    })
+    .filter((_, i, arr) => i < 3)
+    .join(', ')
+
+  const contextBlock = [
+    `Time: ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}, ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayOfWeek]}`,
+    bg != null
+      ? `BG (oldest→newest): ${bgSequence} | now ${bg} mg/dL, ${minsAgo}min ago, rate: ${rateStr}`
+      : 'BG: no recent data',
+    boluses.length > 0
+      ? `Boluses past 6h: ${boluses.map(b => `${fmtTime(b.timestamp)} ${b.insulin_delivered_u}U/${b.carbs_input_g ?? 0}g`).join(', ')}`
+      : 'No boluses past 6h',
+    `IOB: ~${iob.toFixed(2)}U`,
+    lows.length > 0
+      ? `Lows past 6h: ${lows.map(l => `${fmtTime(l.timestamp)} ${l.bg_at_treatment}mg/dL → ${l.treatment_type ?? 'treated'} ${l.treatment_carbs_g ?? '?'}g`).join(', ')}`
+      : 'No lows past 6h',
+    upcomingSchedule ? `Schedule today: ${upcomingSchedule}` : 'No upcoming schedule events',
+    params ? `ICR: ${params.current_icr}, ISF: ${params.current_isf}, target: ${params.target_bg}, pre-bolus lead: ${params.pre_bolus_lead_min}min` : '',
+  ].filter(Boolean).join('\n')
 
   const systemPrompt = `You are an AI assistant helping manage Brooks's Type 1 diabetes. Brooks is a child on Omnipod 5 with Fiasp insulin and Dexcom G7 CGM.
-
+${params?.clinical_notes ? `\nClinical notes (follow these):\n${params.clinical_notes}\n` : ''}
 Current context:
-- ${bgContext}
-${recentLowContext ? `- ${recentLowContext}` : ''}
-${params ? `- ICR: ${params.current_icr}, ISF: ${params.current_isf}, Target BG: ${params.target_bg}` : ''}
-${params?.clinical_notes ? `\nClinical notes:\n${params.clinical_notes}` : ''}
+${contextBlock}
 
-You help caregivers (parents, nurses, grandparents) make dosing decisions. Be concise, clear, and specific. When giving dosing guidance, always say "enter X grams into the pump" — not units. Only recommend doses when asked or when the situation clearly calls for it. For low BG: fast carbs only, no insulin. Always note if something is uncertain or needs Alexandra's input.`
+Rules:
+- Write in plain text only. No markdown, no bold, no headers, no bullet symbols, no asterisks.
+- Be concise and direct. One or two sentences is usually enough.
+- Dosing guidance: always say "enter X grams into the pump", never units.
+- For lows: fast carbs only, no insulin.
+- Flag anything uncertain or that needs Alexandra's input.`
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = now.toISOString().split('T')[0]
 
   const { data: userMsg } = await supabase.from('t1d_chat_log').insert({
     session_date: today,
@@ -81,7 +136,6 @@ You help caregivers (parents, nurses, grandparents) make dosing decisions. Be co
     content: reply,
   }).select().single()
 
-  // Detect intent to save a clinical note — distill recent conversation into note text
   let proposal: string | null = null
   if (SAVE_INTENT.test(message)) {
     const recentConvo = messages.slice(-8).map(m => `${m.role === 'user' ? 'Alexandra' : 'Assistant'}: ${m.content}`).join('\n')
@@ -90,7 +144,7 @@ You help caregivers (parents, nurses, grandparents) make dosing decisions. Be co
       max_tokens: 200,
       messages: [{
         role: 'user',
-        content: `Distill the clinical insight or rule from this conversation into a precise, factual protocol note (2-4 sentences). Write it as a standing instruction for how to handle this situation — not as a conversation summary. No preamble, just the note.\n\n${recentConvo}`,
+        content: `Distill the clinical insight or rule from this conversation into a precise, factual protocol note (2-4 sentences). Write it as a standing instruction — not a conversation summary. Plain text only, no markdown.\n\n${recentConvo}`,
       }],
     })
     proposal = distillResult.content[0].type === 'text' ? distillResult.content[0].text.trim() : null
