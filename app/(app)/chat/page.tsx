@@ -31,10 +31,21 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false)
   const [bg, setBg] = useState<{ value: number | null; trend: string | null } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const autoSentRef = useRef(false)
 
   useEffect(() => {
     fetch('/api/t1d/chat').then(r => r.json()).then(data => {
       setMessages([...data].reverse())
+
+      if (!autoSentRef.current) {
+        const params = new URLSearchParams(window.location.search)
+        const q = params.get('q')
+        if (q) {
+          autoSentRef.current = true
+          window.history.replaceState({}, '', '/chat')
+          setTimeout(() => send(q), 100)
+        }
+      }
     })
     fetch('/api/ingest/dexcom').catch(() => null)
   }, [])
