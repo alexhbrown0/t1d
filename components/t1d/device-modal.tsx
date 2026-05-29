@@ -10,10 +10,12 @@ interface DeviceRecord {
   grace_expires_at: string | null
   serial_number: string | null
   lot_number: string | null
+  sequence_number: string | null
   model: string | null
   removed_at: string | null
   removal_reason: string | null
   failure_notes: string | null
+  alarm_code: string | null
   claim_submitted: boolean
 }
 
@@ -32,6 +34,7 @@ interface ParsedDevice {
   model: string | null
   serial_number: string | null
   lot_number: string | null
+  sequence_number: string | null
   expiration_date: string | null
   notes: string | null
 }
@@ -46,6 +49,7 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
   const [step, setStep] = useState<ModalStep>('menu')
   const [removeReason, setRemoveReason] = useState<RemoveReason>('replaced')
   const [failureNotes, setFailureNotes] = useState('')
+  const [alarmCode, setAlarmCode] = useState('')
   const [claimNow, setClaimNow] = useState(false)
   const [saving, setSaving] = useState(false)
   const [parsed, setParsed] = useState<ParsedDevice | null>(null)
@@ -53,6 +57,7 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
   const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   const deviceLabel = type === 'cgm' ? 'Dexcom G7' : 'Omnipod 5'
+  const claimContact = type === 'cgm' ? 'Dexcom (1-844-607-8398)' : 'Insulet (1-800-641-2049)'
 
   async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -74,11 +79,11 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
       })
       if (res.ok) {
         const data = await res.json()
-        setParsed(data)
+        setParsed({ sequence_number: null, ...data })
         setStep('inserting_confirm')
       } else {
-        setParseError('Could not read the label. Fill in manually.')
-        setParsed({ model: deviceLabel, serial_number: null, lot_number: null, expiration_date: null, notes: null })
+        setParseError('Could not read the label — fill in manually.')
+        setParsed({ model: deviceLabel, serial_number: null, lot_number: null, sequence_number: null, expiration_date: null, notes: null })
         setStep('inserting_confirm')
       }
     }
@@ -96,6 +101,7 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
         inserted_at: new Date().toISOString(),
         serial_number: parsed.serial_number,
         lot_number: parsed.lot_number,
+        sequence_number: parsed.sequence_number,
         model: parsed.model ?? deviceLabel,
       }),
     })
@@ -117,6 +123,7 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
         removed_at: new Date().toISOString(),
         removal_reason: removeReason,
         failure_notes: removeReason === 'failed_early' ? failureNotes : null,
+        alarm_code: removeReason === 'failed_early' && alarmCode ? alarmCode : null,
         claim_submitted: claimNow,
       }),
     })
@@ -133,12 +140,11 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
         className="bg-[#111] rounded-t-3xl border-t border-white/10 px-5 pt-5 pb-8 space-y-5 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        {/* Handle */}
         <div className="flex justify-center -mt-1 mb-1">
           <div className="w-10 h-1 rounded-full bg-white/15" />
         </div>
 
-        {/* MENU: choose action */}
+        {/* MENU */}
         {step === 'menu' && (
           <>
             <div>
@@ -155,8 +161,9 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
             {device && (
               <div className="bg-[#1a1a1a] rounded-2xl border border-white/5 px-4 py-3 space-y-1.5 text-xs">
                 <Row label="Model" value={device.model ?? deviceLabel} />
-                <Row label="SN" value={device.serial_number ?? '—'} />
+                {type === 'cgm' && <Row label="SN" value={device.serial_number ?? '—'} />}
                 <Row label="Lot" value={device.lot_number ?? '—'} />
+                {type === 'pod' && <Row label="Seq #" value={device.sequence_number ?? '—'} />}
                 <Row label="Inserted" value={fmtDate(device.inserted_at)} />
                 <Row label="Expires" value={fmtDate(device.expires_at)} />
               </div>
@@ -187,61 +194,88 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
             <div>
               <p className="text-lg font-semibold text-white">Remove {deviceLabel}</p>
               <p className="text-xs text-gray-500 mt-1">
-                What's the story? If it failed early, the SN and lot are saved so you can claim a replacement.
+                {type === 'cgm'
+                  ? 'If it failed early, the SN and lot are saved so you can claim a replacement from Dexcom.'
+                  : 'If it failed early, lot and sequence numbers are saved. Insulet must be notified within 72 hours of activation.'}
               </p>
             </div>
 
             <div className="flex gap-2">
-              <button
-                onClick={() => setRemoveReason('replaced')}
-                className={`flex-1 rounded-2xl border p-3 text-left transition-colors ${
-                  removeReason === 'replaced'
-                    ? 'bg-[#1f2e2b] border-teal-500/40'
-                    : 'bg-[#1a1a1a] border-white/10'
-                }`}
-              >
-                <p className={`text-sm font-semibold ${removeReason === 'replaced' ? 'text-teal-300' : 'text-white'}`}>
-                  Replaced
-                </p>
-                <p className="text-[10px] text-gray-500 mt-0.5">normal end of wear</p>
-              </button>
-              <button
-                onClick={() => setRemoveReason('failed_early')}
-                className={`flex-1 rounded-2xl border p-3 text-left transition-colors ${
-                  removeReason === 'failed_early'
-                    ? 'bg-[#2e1f1f] border-red-500/40'
-                    : 'bg-[#1a1a1a] border-white/10'
-                }`}
-              >
-                <p className={`text-sm font-semibold ${removeReason === 'failed_early' ? 'text-red-300' : 'text-white'}`}>
-                  Failed early
-                </p>
-                <p className="text-[10px] text-gray-500 mt-0.5">died before expiry</p>
-              </button>
+              {(['replaced', 'failed_early'] as RemoveReason[]).map(r => (
+                <button
+                  key={r}
+                  onClick={() => setRemoveReason(r)}
+                  className={`flex-1 rounded-2xl border p-3 text-left transition-colors ${
+                    removeReason === r
+                      ? r === 'replaced' ? 'bg-[#1f2e2b] border-teal-500/40' : 'bg-[#2e1f1f] border-red-500/40'
+                      : 'bg-[#1a1a1a] border-white/10'
+                  }`}
+                >
+                  <p className={`text-sm font-semibold ${
+                    removeReason === r ? (r === 'replaced' ? 'text-teal-300' : 'text-red-300') : 'text-white'
+                  }`}>
+                    {r === 'replaced' ? 'Replaced' : 'Failed early'}
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    {r === 'replaced' ? 'normal end of wear' : 'died before expiry'}
+                  </p>
+                </button>
+              ))}
             </div>
 
             {removeReason === 'failed_early' && (
               <>
+                {type === 'pod' && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2.5">
+                    <p className="text-xs text-red-400 font-medium">72-hour reporting window</p>
+                    <p className="text-[10px] text-red-400/70 mt-0.5">
+                      Insulet requires notification within 72 hours of pod activation. Call 1-800-641-2049 or use PodderCentral.
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <p className="text-[10px] tracking-widest text-gray-500 font-semibold">WHAT HAPPENED</p>
                   <textarea
                     value={failureNotes}
                     onChange={e => setFailureNotes(e.target.value)}
-                    placeholder={`${deviceLabel} alarmed after 30 hours. BG ran high. Site looked fine…`}
+                    placeholder={type === 'pod'
+                      ? 'Pod alarmed with 0CCC error after 30 hours. Site looked fine, no occlusion visible…'
+                      : 'Sensor stopped reading after 6 days. No ???SEC error, just dropped out…'}
                     className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 resize-none focus:outline-none focus:border-red-500/30"
-                    rows={4}
+                    rows={3}
                   />
                 </div>
+
+                {type === 'pod' && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] tracking-widest text-gray-500 font-semibold">ALARM CODE</p>
+                    <input
+                      type="text"
+                      value={alarmCode}
+                      onChange={e => setAlarmCode(e.target.value)}
+                      placeholder="e.g. 0CCC, occl, or empty if unknown"
+                      className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500/30"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <p className="text-[10px] tracking-widest text-gray-500 font-semibold">FOR THE CLAIM</p>
                   <div className="bg-[#1a1a1a] rounded-2xl border border-white/5 px-4 py-3 space-y-1.5 text-xs">
                     <Row label="Model" value={device.model ?? deviceLabel} />
-                    <Row label="SN" value={device.serial_number ?? '—'} />
+                    {type === 'cgm' && <Row label="SN" value={device.serial_number ?? '—'} />}
                     <Row label="Lot" value={device.lot_number ?? '—'} />
+                    {type === 'pod' && <Row label="Seq #" value={device.sequence_number ?? '—'} />}
                     <Row label="Applied" value={fmtDate(device.inserted_at)} />
                     <Row label="Failed" value="now" highlight />
+                    {type === 'pod' && alarmCode && <Row label="Alarm" value={alarmCode} highlight />}
                   </div>
+                  {type === 'pod' && (
+                    <p className="text-[10px] text-gray-600 px-1">
+                      You&apos;ll also need your PDM serial number when you call Insulet. It&apos;s on the back of the controller.
+                    </p>
+                  )}
                 </div>
 
                 <label className="flex items-start gap-3 cursor-pointer">
@@ -252,8 +286,8 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
                     className="mt-0.5 w-4 h-4 rounded accent-red-400"
                   />
                   <div>
-                    <p className="text-xs text-white font-medium">Submit claim to {type === 'cgm' ? 'Dexcom' : 'Insulet'} now</p>
-                    <p className="text-[10px] text-gray-500">Or leave unchecked and submit later from Device history.</p>
+                    <p className="text-xs text-white font-medium">Mark as claim submitted to {type === 'cgm' ? 'Dexcom' : 'Insulet'}</p>
+                    <p className="text-[10px] text-gray-500">{claimContact} · Or leave unchecked and submit later from Device history.</p>
                   </div>
                 </label>
               </>
@@ -281,7 +315,9 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
             <div>
               <p className="text-lg font-semibold text-white">Insert new {deviceLabel}</p>
               <p className="text-xs text-gray-500 mt-1">
-                Take a photo of the packaging label to capture the SN, lot, and expiry automatically.
+                {type === 'cgm'
+                  ? 'Take a photo of the applicator or box to capture the SN and lot automatically.'
+                  : 'Take a photo of the pod tray to capture the lot and sequence numbers.'}
               </p>
             </div>
             <input
@@ -300,7 +336,7 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
             </button>
             <button
               onClick={() => {
-                setParsed({ model: deviceLabel, serial_number: null, lot_number: null, expiration_date: null, notes: null })
+                setParsed({ model: deviceLabel, serial_number: null, lot_number: null, sequence_number: null, expiration_date: null, notes: null })
                 setStep('inserting_confirm')
               }}
               className="w-full text-gray-500 text-sm py-2"
@@ -318,21 +354,44 @@ export function DeviceModal({ device, type, onClose, onDeviceInserted, onDeviceR
           </div>
         )}
 
-        {/* INSERT: confirm parsed info */}
+        {/* INSERT: confirm */}
         {step === 'inserting_confirm' && parsed && (
           <>
             <div>
               <p className="text-lg font-semibold text-white">Confirm device info</p>
-              {parseError && (
-                <p className="text-xs text-yellow-500 mt-1">{parseError}</p>
-              )}
+              {parseError && <p className="text-xs text-yellow-500 mt-1">{parseError}</p>}
             </div>
 
             <div className="space-y-2">
               <EditRow label="Model" value={parsed.model} onChange={v => setParsed(p => p ? { ...p, model: v } : p)} />
-              <EditRow label="SN" value={parsed.serial_number} onChange={v => setParsed(p => p ? { ...p, serial_number: v } : p)} placeholder="DM72-XXXXXXXX-XXXX" />
-              <EditRow label="Lot" value={parsed.lot_number} onChange={v => setParsed(p => p ? { ...p, lot_number: v } : p)} placeholder="LOT-XXXXX" />
-              <EditRow label="Exp. date" value={parsed.expiration_date} onChange={v => setParsed(p => p ? { ...p, expiration_date: v } : p)} placeholder="from packaging" />
+              {type === 'cgm' && (
+                <EditRow
+                  label="SN"
+                  value={parsed.serial_number}
+                  onChange={v => setParsed(p => p ? { ...p, serial_number: v } : p)}
+                  placeholder="21XXXXXXXXXXXX (from applicator)"
+                />
+              )}
+              <EditRow
+                label="Lot"
+                value={parsed.lot_number}
+                onChange={v => setParsed(p => p ? { ...p, lot_number: v } : p)}
+                placeholder={type === 'pod' ? 'from pod tray or bottom' : 'LOT-XXXXX'}
+              />
+              {type === 'pod' && (
+                <EditRow
+                  label="Seq #"
+                  value={parsed.sequence_number}
+                  onChange={v => setParsed(p => p ? { ...p, sequence_number: v } : p)}
+                  placeholder="sequence number if visible"
+                />
+              )}
+              <EditRow
+                label="Exp. date"
+                value={parsed.expiration_date}
+                onChange={v => setParsed(p => p ? { ...p, expiration_date: v } : p)}
+                placeholder="from packaging"
+              />
             </div>
 
             {imagePreview && (

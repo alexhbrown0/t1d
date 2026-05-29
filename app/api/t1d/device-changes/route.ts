@@ -38,9 +38,10 @@ export async function POST(req: NextRequest) {
     inserted_at?: string
     serial_number?: string
     lot_number?: string
+    sequence_number?: string
     model?: string
   }
-  const { type, serial_number, lot_number, model } = body
+  const { type, serial_number, lot_number, sequence_number, model } = body
   if (type !== 'cgm' && type !== 'pod') {
     return NextResponse.json({ error: 'type must be cgm or pod' }, { status: 400 })
   }
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
       grace_expires_at: graceExpiresAt.toISOString(),
       serial_number: serial_number ?? null,
       lot_number: lot_number ?? null,
+      sequence_number: sequence_number ?? null,
       model: model ?? (type === 'cgm' ? 'Dexcom G7' : 'Omnipod 5'),
     })
     .select('*')

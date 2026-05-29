@@ -11,10 +11,12 @@ interface DeviceRecord {
   grace_expires_at: string | null
   serial_number: string | null
   lot_number: string | null
+  sequence_number: string | null
   model: string | null
   removed_at: string | null
   removal_reason: string | null
   failure_notes: string | null
+  alarm_code: string | null
   claim_submitted: boolean
 }
 

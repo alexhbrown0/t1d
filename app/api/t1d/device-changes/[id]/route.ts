@@ -10,6 +10,7 @@ export async function PATCH(
     removed_at?: string
     removal_reason?: 'replaced' | 'failed_early'
     failure_notes?: string
+    alarm_code?: string
     claim_submitted?: boolean
   }
 
@@ -20,6 +21,7 @@ export async function PATCH(
       removed_at: body.removed_at ?? new Date().toISOString(),
       removal_reason: body.removal_reason ?? null,
       failure_notes: body.failure_notes ?? null,
+      alarm_code: body.alarm_code ?? null,
       claim_submitted: body.claim_submitted ?? false,
       claim_submitted_at: body.claim_submitted ? new Date().toISOString() : null,
     })
