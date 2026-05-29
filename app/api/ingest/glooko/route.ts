@@ -78,6 +78,31 @@ function parseBolusCsv(csv: string) {
   return rows
 }
 
+// Glooko exports timestamps in local time with no timezone marker.
+// Set GLOOKO_TIMEZONE to your IANA timezone (e.g. "America/Chicago").
+const GLOOKO_TZ = process.env.GLOOKO_TIMEZONE ?? 'America/Chicago'
+
+function localToUtc(localStr: string, timezone: string): string {
+  // localStr: "2026-03-12 05:52" — no seconds, no offset
+  const normalized = localStr.trim().replace(' ', 'T') + ':00'
+  // Parse as if it were UTC to get a Date we can pass to Intl
+  const asUtc = new Date(normalized + 'Z')
+  // Ask Intl what that UTC instant looks like in the target timezone
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(asUtc)
+  const p: Record<string, string> = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+  const h = p.hour === '24' ? '00' : p.hour
+  // What UTC time produces this local display? That's the offset reference.
+  const localAsUtc = new Date(`${p.year}-${p.month}-${p.day}T${h}:${p.minute}:${p.second}Z`)
+  const offsetMs = localAsUtc.getTime() - asUtc.getTime()
+  // Actual UTC = local time minus the timezone offset
+  return new Date(asUtc.getTime() - offsetMs).toISOString()
+}
+
 function parseCgmCsv(csv: string) {
   const lines = csv.replace(/^﻿/, '').split('\n').map(l => l.trim()).filter(Boolean)
   // line 0: metadata, line 1: Timestamp,CGM Glucose Value (mg/dl),Serial Number
@@ -88,7 +113,7 @@ function parseCgmCsv(csv: string) {
     const [timestamp, value_raw] = cols
     const value = parseFloat(value_raw)
     if (!timestamp || isNaN(value)) continue
-    const t = new Date(timestamp).toISOString()
+    const t = localToUtc(timestamp, GLOOKO_TZ)
     rows.push({
       system_time: t,
       display_time: t,
