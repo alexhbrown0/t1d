@@ -29,7 +29,7 @@ export function EngineData() {
       <div className="bg-[#141414] rounded-2xl border border-white/5 p-4 space-y-3">
         <p className="text-[10px] tracking-widest text-gray-500 font-semibold">GLOOKO IMPORT</p>
         <p className="text-xs text-gray-500 leading-relaxed">
-          Export from Glooko and drop the CSV here. Imports bolus, basal, CGM, and carb data.
+          Drop the Glooko zip export here. Only bolus data is imported — CGM comes from Dexcom, meals from photos.
         </p>
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -45,11 +45,11 @@ export function EngineData() {
           }`}
         >
           <label className="cursor-pointer">
-            <p className="text-sm text-gray-400">Drop CSV here</p>
+            <p className="text-sm text-gray-400">Drop Glooko zip here</p>
             <p className="text-xs text-gray-600 mt-1">or tap to pick file</p>
             <input
               type="file"
-              accept=".csv,.zip"
+              accept=".zip"
               className="hidden"
               onChange={e => {
                 const file = e.target.files?.[0]
