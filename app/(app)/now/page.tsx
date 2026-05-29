@@ -34,7 +34,7 @@ export default async function NowPage() {
   ) ?? null
 
   return (
-    <div className="px-4 pt-5 pb-4 space-y-3">
+    <div className="px-4 pt-3 pb-3 space-y-2.5">
       <AppHeader />
       <BgCard egvs={egvs} />
       <InsightTile />

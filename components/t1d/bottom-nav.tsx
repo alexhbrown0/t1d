@@ -69,7 +69,7 @@ export function BottomNav() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto">
-      <div className="bg-[#111111]/95 backdrop-blur border-t border-white/5 px-2 pb-6 pt-2">
+      <div className="bg-[#111111]/95 backdrop-blur border-t border-white/5 px-2 pt-1.5" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 6px)' }}>
         <div className="flex justify-around">
           {tabs.map((tab) => {
             const active = pathname.startsWith(tab.href)
@@ -77,7 +77,7 @@ export function BottomNav() {
               <Link
                 key={tab.href}
                 href={tab.href}
-                className="flex flex-col items-center gap-1 px-3 py-1"
+                className="flex flex-col items-center gap-0.5 px-3 py-0.5"
               >
                 {tab.icon(active)}
                 <span className={`text-[10px] font-medium ${active ? 'text-teal-400' : 'text-gray-500'}`}>

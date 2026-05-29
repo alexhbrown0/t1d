@@ -21,7 +21,7 @@ export function InsightTile() {
 
   if (!insight) {
     return (
-      <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-4 space-y-2.5 animate-pulse">
+      <div className="bg-[#141414] rounded-2xl border border-white/5 px-4 py-3 space-y-2 animate-pulse">
         <div className="h-2 bg-white/8 rounded w-20" />
         <div className="h-3 bg-white/8 rounded w-full" />
         <div className="h-3 bg-white/8 rounded w-4/5" />
@@ -37,10 +37,10 @@ export function InsightTile() {
 
   return (
     <Link href={href}>
-      <div className={`bg-[#141414] rounded-2xl border px-5 py-4 flex items-start gap-4 active:opacity-80 transition-opacity ${
+      <div className={`bg-[#141414] rounded-2xl border px-4 py-3 flex items-start gap-3 active:opacity-80 transition-opacity ${
         urgent ? 'border-red-500/20' : 'border-teal-500/20'
       }`}>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
           urgent ? 'bg-red-500/10' : 'bg-teal-500/10'
         }`}>
           {insight.cta === 'lunch' ? (
@@ -58,8 +58,8 @@ export function InsightTile() {
           <span className={`text-[10px] font-semibold tracking-widest ${urgent ? 'text-red-400' : 'text-teal-400'}`}>
             {insight.cta === 'lunch' ? 'LUNCH PREP' : 'INSIGHT'}
           </span>
-          <p className="text-sm text-white leading-relaxed mt-1">{insight.text}</p>
-          <p className={`text-xs mt-2 font-medium ${urgent ? 'text-red-400' : 'text-teal-400'}`}>
+          <p className="text-sm text-white leading-snug mt-0.5">{insight.text}</p>
+          <p className={`text-xs mt-1.5 font-medium ${urgent ? 'text-red-400' : 'text-teal-400'}`}>
             {insight.cta_label} →
           </p>
         </div>

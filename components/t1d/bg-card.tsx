@@ -86,18 +86,18 @@ export function BgCard({ egvs }: Props) {
 
   return (
     <div className="bg-[#141414] rounded-2xl border border-white/5 overflow-hidden">
-      <div className="px-5 pt-5 pb-3">
-        <div className="flex items-center gap-1.5 mb-2">
+      <div className="px-4 pt-3 pb-2">
+        <div className="flex items-center gap-1.5 mb-1.5">
           <div className={`w-1.5 h-1.5 rounded-full ${trendDotColor(value)}`} />
           <span className={`text-[10px] tracking-widest font-semibold ${trendCol}`}>{trendLabel}</span>
         </div>
 
         <div className="flex items-end gap-3">
-          <span className="text-[72px] font-bold leading-none text-white tabular-nums">
+          <span className="text-[58px] font-bold leading-none text-white tabular-nums">
             {latest?.status === 'HIGH' ? 'HI' : latest?.status === 'LOW' ? 'LO' : bgValue(value)}
           </span>
-          <div className="pb-3 flex flex-col gap-1">
-            <span className={`text-3xl font-light ${trendCol}`}>
+          <div className="pb-2 flex flex-col gap-1">
+            <span className={`text-2xl font-light ${trendCol}`}>
               {TREND_ARROW[trend] ?? '→'}
             </span>
           </div>
@@ -110,7 +110,7 @@ export function BgCard({ egvs }: Props) {
         <p className="text-[10px] text-gray-600 tracking-widest font-medium mt-0.5">MG/DL</p>
       </div>
 
-      <div className="px-3 pb-3">
+      <div className="px-3 pb-2">
         <ReadingTimer lastTime={latest?.system_time ?? null} />
         <BgChart egvs={egvs} />
       </div>
@@ -120,8 +120,8 @@ export function BgCard({ egvs }: Props) {
 
 function BgChart({ egvs }: { egvs: DexcomEgv[] }) {
   const W = 320
-  const H = 80
-  const PAD = { l: 4, r: 4, t: 8, b: 16 }
+  const H = 64
+  const PAD = { l: 4, r: 4, t: 6, b: 14 }
   const LOW = 70
   const HIGH = 180
   const MIN_BG = 50
@@ -163,7 +163,7 @@ function BgChart({ egvs }: { egvs: DexcomEgv[] }) {
   const lastPoint = points[points.length - 1]
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 80 }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 64 }}>
       {/* Range bands */}
       <line x1={PAD.l} x2={W - PAD.r} y1={highY} y2={highY} stroke="#374151" strokeWidth="0.5" strokeDasharray="3,3" />
       <line x1={PAD.l} x2={W - PAD.r} y1={lowY} y2={lowY} stroke="#374151" strokeWidth="0.5" strokeDasharray="3,3" />

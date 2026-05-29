@@ -60,7 +60,7 @@ export function QuickActions() {
     <div className="grid grid-cols-4 gap-2">
       {actions.map((a) => (
         <Link key={a.href} href={a.href}>
-          <div className={`rounded-xl border px-2 py-3 flex flex-col items-center gap-2 ${a.bg} ${a.color}`}>
+          <div className={`rounded-xl border px-2 py-2 flex flex-col items-center gap-1.5 ${a.bg} ${a.color}`}>
             {a.icon}
             <div className="text-center">
               <p className="text-[11px] font-semibold text-white leading-none">{a.label}</p>
