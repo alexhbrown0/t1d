@@ -89,7 +89,6 @@ function LogProposalCard({ proposal, onConfirm, onDismiss }: {
 }) {
   const [logging, setLogging] = useState(false)
   const isLow = proposal.type === 'low_treatment'
-  const time = new Date(proposal.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 
   const confirm = async () => {
     setLogging(true)
@@ -104,7 +103,7 @@ function LogProposalCard({ proposal, onConfirm, onDismiss }: {
       </p>
       <div className="space-y-1">
         <p className="text-sm text-white font-medium">{proposal.display}</p>
-        <p className="text-xs text-gray-500">Timestamp: {time} — tap to confirm this is accurate</p>
+        <p className="text-xs text-gray-500">Tap after you do it — timestamp will be recorded at that moment</p>
       </div>
       <div className="flex gap-2">
         <button
@@ -112,7 +111,7 @@ function LogProposalCard({ proposal, onConfirm, onDismiss }: {
           disabled={logging}
           className={`flex-1 text-xs font-semibold py-2 rounded-xl disabled:opacity-40 ${isLow ? 'bg-red-500/20 text-red-400 active:bg-red-500/30' : 'bg-blue-500/20 text-blue-400 active:bg-blue-500/30'}`}
         >
-          {logging ? 'Logging…' : 'Yes, log it'}
+          {logging ? 'Logging…' : 'Done — log it'}
         </button>
         <button onClick={onDismiss} className="px-4 text-gray-500 text-xs py-2 rounded-xl active:bg-white/5">
           Dismiss
@@ -216,13 +215,13 @@ export default function ChatPage() {
 
   const confirmLog = async () => {
     if (!logProposal) return
+    const timestamp = new Date().toISOString()
     if (logProposal.type === 'low_treatment') {
       await fetch('/api/t1d/low-treatments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          timestamp: logProposal.timestamp,
-          bg_at_treatment: logProposal.bg_at_treatment ?? null,
+          timestamp,
           treatment_type: logProposal.treatment_type ?? 'other',
           treatment_carbs_g: logProposal.treatment_carbs_g ?? null,
           source: 'chat',
@@ -233,7 +232,7 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          timestamp: logProposal.timestamp,
+          timestamp,
           recommended_dose_grams: logProposal.dose_grams ?? null,
           context: 'chat',
           entered_by: 'alexandra',

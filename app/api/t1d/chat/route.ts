@@ -5,8 +5,8 @@ import { getLatestEgvs } from '@/lib/dexcom/client'
 
 const SAVE_INTENT = /(save|log|add|write|capture|record|remember|keep).{0,60}(notes?|clinical|protocol|rules?|guidelines?|learnings?|engine)/i
 
-// Detect when the user is reporting a treatment or dose they took/gave
-const LOG_INTENT = /\b(gave|give|given|treated|treating|done|did it|entered|dosed|bolused|he (had|ate|took|got)|we (gave|did|entered|treated))\b.{0,60}\b(juice|gummy|gummies|glucose|tabs?|carbs?|pump|correction|low|bolus|grams?|units?)\b/i
+// Detect when Claude's response contains a dosing or treatment recommendation
+const LOG_INTENT = /\b(enter|give|treat|administer|pre-bolus)\b.{0,80}\b(grams?|juice|gummy|gummies|glucose|tabs?|fast carbs?|pump|correction)\b/i
 
 function rateOfChange(egvs: { system_time: string; value_mgdl: unknown }[]): number | null {
   const pts = egvs
@@ -214,17 +214,17 @@ Rules:
     proposal = distillResult.content[0].type === 'text' ? distillResult.content[0].text.trim() : null
   }
 
-  // Detect when a treatment or dose was taken and propose logging it
+  // When Claude's response contains a recommendation, propose logging it after it's done
   let log_proposal: Record<string, unknown> | null = null
-  if (LOG_INTENT.test(message)) {
+  if (LOG_INTENT.test(reply)) {
     const extractResult = await claude.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 200,
       messages: [{
         role: 'user',
-        content: `From this conversation, extract the medical action that was taken. Return ONLY valid JSON, no other text.
+        content: `From this conversation, extract the medical action being recommended. Return ONLY valid JSON, no other text.
 
-Schema: { "type": "low_treatment" | "dose" | "unknown", "treatment_type": "juice" | "gummies" | "glucose_tabs" | "candy" | "other" | null, "treatment_carbs_g": number | null, "bg_at_treatment": number | null, "dose_grams": number | null, "display": "short human-readable summary e.g. 2 gummies (~8g fast carbs) at 10:34 AM" }
+Schema: { "type": "low_treatment" | "dose" | "unknown", "treatment_type": "juice" | "gummies" | "glucose_tabs" | "candy" | "other" | null, "treatment_carbs_g": number | null, "dose_grams": number | null, "display": "short human-readable description of what to do, e.g. juice box (15g fast carbs) or 28g pre-bolus into pump" }
 
 Conversation:
 ${fullConvo}`,
