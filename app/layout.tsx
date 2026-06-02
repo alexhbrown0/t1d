@@ -20,8 +20,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}>
-      <body className="min-h-full bg-[#0a0a0a] text-white flex flex-col">{children}</body>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased overflow-x-hidden`}>
+      <body className="min-h-full bg-[#0a0a0a] text-white flex flex-col overflow-x-hidden">{children}</body>
     </html>
   )
 }
