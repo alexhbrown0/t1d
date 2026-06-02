@@ -5,6 +5,9 @@ import { getLatestEgvs } from '@/lib/dexcom/client'
 
 const SAVE_INTENT = /(save|log|add|write|capture|record|remember|keep).{0,60}(notes?|clinical|protocol|rules?|guidelines?|learnings?|engine)/i
 
+// Detect when the user is reporting a treatment or dose they took/gave
+const LOG_INTENT = /\b(gave|give|given|treated|treating|done|did it|entered|dosed|bolused|he (had|ate|took|got)|we (gave|did|entered|treated))\b.{0,60}\b(juice|gummy|gummies|glucose|tabs?|carbs?|pump|correction|low|bolus|grams?|units?)\b/i
+
 function rateOfChange(egvs: { system_time: string; value_mgdl: unknown }[]): number | null {
   const pts = egvs
     .filter(e => e.value_mgdl != null)
@@ -193,12 +196,13 @@ Rules:
     content: reply,
   }).select().single()
 
+  const fullConvo = [
+    ...messages.slice(-8),
+    { role: 'assistant' as const, content: reply },
+  ].map(m => `${m.role === 'user' ? 'Alexandra' : 'Assistant'}: ${typeof m.content === 'string' ? m.content : '[photo]'}`).join('\n')
+
   let proposal: string | null = null
   if (SAVE_INTENT.test(message) || SAVE_INTENT.test(reply)) {
-    const fullConvo = [
-      ...messages.slice(-8),
-      { role: 'assistant' as const, content: reply },
-    ].map(m => `${m.role === 'user' ? 'Alexandra' : 'Assistant'}: ${m.content}`).join('\n')
     const distillResult = await claude.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
@@ -210,5 +214,35 @@ Rules:
     proposal = distillResult.content[0].type === 'text' ? distillResult.content[0].text.trim() : null
   }
 
-  return NextResponse.json({ userMsg, assistantMsg, ...(proposal ? { proposal } : {}) })
+  // Detect when a treatment or dose was taken and propose logging it
+  let log_proposal: Record<string, unknown> | null = null
+  if (LOG_INTENT.test(message)) {
+    const extractResult = await claude.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `From this conversation, extract the medical action that was taken. Return ONLY valid JSON, no other text.
+
+Schema: { "type": "low_treatment" | "dose" | "unknown", "treatment_type": "juice" | "gummies" | "glucose_tabs" | "candy" | "other" | null, "treatment_carbs_g": number | null, "bg_at_treatment": number | null, "dose_grams": number | null, "display": "short human-readable summary e.g. 2 gummies (~8g fast carbs) at 10:34 AM" }
+
+Conversation:
+${fullConvo}`,
+      }],
+    })
+    try {
+      const raw = extractResult.content[0].type === 'text' ? extractResult.content[0].text.trim() : ''
+      const parsed = JSON.parse(raw.replace(/^```json\n?|\n?```$/g, ''))
+      if (parsed.type !== 'unknown') {
+        log_proposal = { ...parsed, timestamp: now.toISOString() }
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  return NextResponse.json({
+    userMsg,
+    assistantMsg,
+    ...(proposal ? { proposal } : {}),
+    ...(log_proposal ? { log_proposal } : {}),
+  })
 }

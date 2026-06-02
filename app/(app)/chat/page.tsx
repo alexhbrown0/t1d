@@ -72,6 +72,56 @@ function NoteProposalCard({
   )
 }
 
+interface LogProposal {
+  type: 'low_treatment' | 'dose'
+  display: string
+  treatment_type?: string
+  treatment_carbs_g?: number | null
+  bg_at_treatment?: number | null
+  dose_grams?: number | null
+  timestamp: string
+}
+
+function LogProposalCard({ proposal, onConfirm, onDismiss }: {
+  proposal: LogProposal
+  onConfirm: () => void
+  onDismiss: () => void
+}) {
+  const [logging, setLogging] = useState(false)
+  const isLow = proposal.type === 'low_treatment'
+  const time = new Date(proposal.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+
+  const confirm = async () => {
+    setLogging(true)
+    await onConfirm()
+    setLogging(false)
+  }
+
+  return (
+    <div className={`mx-1 mt-2 rounded-2xl p-4 space-y-3 border ${isLow ? 'bg-red-950/30 border-red-500/30' : 'bg-blue-950/30 border-blue-500/30'}`}>
+      <p className={`text-[10px] tracking-widest font-semibold ${isLow ? 'text-red-400' : 'text-blue-400'}`}>
+        {isLow ? 'LOG LOW TREATMENT' : 'LOG DOSE'}
+      </p>
+      <div className="space-y-1">
+        <p className="text-sm text-white font-medium">{proposal.display}</p>
+        <p className="text-xs text-gray-500">Timestamp: {time} — tap to confirm this is accurate</p>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={confirm}
+          disabled={logging}
+          className={`flex-1 text-xs font-semibold py-2 rounded-xl disabled:opacity-40 ${isLow ? 'bg-red-500/20 text-red-400 active:bg-red-500/30' : 'bg-blue-500/20 text-blue-400 active:bg-blue-500/30'}`}
+        >
+          {logging ? 'Logging…' : 'Yes, log it'}
+        </button>
+        <button onClick={onDismiss} className="px-4 text-gray-500 text-xs py-2 rounded-xl active:bg-white/5">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  )
+}
+
 interface Photo {
   preview: string
   base64: string
@@ -93,6 +143,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false)
   const [bg, setBg] = useState<{ value: number | null; trend: string | null } | null>(null)
   const [proposal, setProposal] = useState<string | null>(null)
+  const [logProposal, setLogProposal] = useState<LogProposal | null>(null)
   const [photo, setPhoto] = useState<Photo | null>(null)
   const [lightbox, setLightbox] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -141,6 +192,7 @@ export default function ChatPage() {
     setInput('')
     setPhoto(null)
     setProposal(null)
+    setLogProposal(null)
     setLoading(true)
     try {
       const body: Record<string, string> = { message: text.trim() || '' }
@@ -153,12 +205,49 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const { userMsg, assistantMsg, proposal: newProposal } = await res.json()
+      const { userMsg, assistantMsg, proposal: newProposal, log_proposal: newLogProposal } = await res.json()
       setMessages(prev => [...prev.filter(m => m.id !== optimistic.id), userMsg, assistantMsg])
       if (newProposal) setProposal(newProposal)
+      if (newLogProposal) setLogProposal(newLogProposal as LogProposal)
     } finally {
       setLoading(false)
     }
+  }
+
+  const confirmLog = async () => {
+    if (!logProposal) return
+    if (logProposal.type === 'low_treatment') {
+      await fetch('/api/t1d/low-treatments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timestamp: logProposal.timestamp,
+          bg_at_treatment: logProposal.bg_at_treatment ?? null,
+          treatment_type: logProposal.treatment_type ?? 'other',
+          treatment_carbs_g: logProposal.treatment_carbs_g ?? null,
+          source: 'chat',
+        }),
+      })
+    } else if (logProposal.type === 'dose') {
+      await fetch('/api/t1d/dose-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timestamp: logProposal.timestamp,
+          recommended_dose_grams: logProposal.dose_grams ?? null,
+          context: 'chat',
+          entered_by: 'alexandra',
+        }),
+      })
+    }
+    setLogProposal(null)
+    const confirmed: ChatMsg = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: `Logged: ${logProposal.display}`,
+      created_at: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, confirmed])
   }
 
   const saveNote = async (text: string) => {
@@ -247,6 +336,13 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
+        )}
+        {logProposal && (
+          <LogProposalCard
+            proposal={logProposal}
+            onConfirm={confirmLog}
+            onDismiss={() => setLogProposal(null)}
+          />
         )}
         {proposal && (
           <NoteProposalCard
