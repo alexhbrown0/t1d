@@ -181,7 +181,19 @@ export default function ChatPage() {
     : 'Brooks · –'
 
   return (
-    <div className="flex flex-col h-full">
+    <div
+      className="flex flex-col bg-[#0a0a0a]"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '100%',
+        maxWidth: 512,
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 50px)',
+        zIndex: 10,
+      }}
+    >
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-white/5 flex-none">
         <p className="text-[10px] tracking-widest text-gray-500 font-semibold">ASSIST</p>
