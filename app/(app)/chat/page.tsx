@@ -181,9 +181,9 @@ export default function ChatPage() {
     : 'Brooks · –'
 
   return (
-    <div className="flex flex-col w-full overflow-x-hidden" style={{ height: 'calc(100svh - env(safe-area-inset-bottom, 0px) - 56px)' }}>
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-white/5 flex-shrink-0">
+      <div className="px-4 pt-4 pb-3 border-b border-white/5 flex-none">
         <p className="text-[10px] tracking-widest text-gray-500 font-semibold">ASSIST</p>
         <p className="text-sm text-gray-400 mt-0.5">
           {bgSubtitle}
@@ -192,7 +192,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4 space-y-3">
         {messages.length === 0 && !loading && (
           <div className="text-center mt-12">
             <p className="text-gray-600 text-sm">Ask me anything about Brooks.</p>
@@ -236,8 +236,8 @@ export default function ChatPage() {
       </div>
 
       {/* Quick replies */}
-      <div className="pb-2 flex-shrink-0 w-full overflow-hidden">
-      <div className="px-4 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+      <div className="flex-none pb-2">
+      <div className="px-4 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
         {QUICK_REPLIES.map(r => (
           <button
             key={r}
@@ -253,7 +253,7 @@ export default function ChatPage() {
 
       {/* Photo preview */}
       {photo && (
-        <div className="px-4 pb-1 flex-shrink-0">
+        <div className="px-4 pb-1 flex-none">
           <div className="relative inline-block">
             <img src={photo.preview} alt="attached" className="h-20 rounded-xl object-cover border border-white/10" />
             <button
@@ -277,7 +277,7 @@ export default function ChatPage() {
       />
 
       {/* Input bar */}
-      <div className="px-4 pb-4 pt-1 flex-shrink-0">
+      <div className="px-4 pb-4 pt-1 flex-none">
         <div className="flex gap-2 items-center bg-[#141414] border border-white/10 rounded-2xl px-3 py-3">
           {/* Camera button */}
           <button
