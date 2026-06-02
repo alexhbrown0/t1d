@@ -4,6 +4,7 @@ import { claude } from '@/lib/claude/client'
 import { getLatestEgvs } from '@/lib/dexcom/client'
 
 const SAVE_INTENT = /(save|log|add|write|capture|record|remember|keep).{0,60}(notes?|clinical|protocol|rules?|guidelines?|learnings?|engine)/i
+const RECIPE_SAVE_INTENT = /(save|add|store|keep).{0,40}(recipe|this recipe|as a recipe|to recipes)/i
 
 // Detect when Claude's response contains a dosing or treatment recommendation
 const LOG_INTENT = /\b(enter|give|treat|administer|pre-bolus)\b.{0,80}\b(grams?|juice|gummy|gummies|glucose|tabs?|fast carbs?|pump|correction)\b/i
@@ -45,13 +46,14 @@ export async function POST(req: NextRequest) {
   midnight.setHours(0, 0, 0, 0)
   const midnightIso = midnight.toISOString()
 
-  const [egvs, bolusResult, bolusToday, lowResult, scheduleResult, paramsResult] = await Promise.all([
+  const [egvs, bolusResult, bolusToday, lowResult, scheduleResult, paramsResult, recipesResult] = await Promise.all([
     getLatestEgvs(5),
     supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u, bg_input_mgdl').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('glooko_bolus').select('timestamp').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(1),
     supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('t1d_school_schedule').select('event_type, start_time, day_of_week').eq('active', true).eq('day_of_week', dayOfWeek).order('start_time'),
     supabase.from('t1d_engine_params').select('*').order('effective_from', { ascending: false }).limit(1),
+    supabase.from('t1d_recipes').select('name, yield_count, yield_unit, carbs_per_piece, carbs_per_100g, typical_serving_g, typical_serving_description, gi_category, notes').eq('active', true),
   ])
 
   const params = paramsResult.data?.[0]
@@ -59,6 +61,7 @@ export async function POST(req: NextRequest) {
   const lows = lowResult.data ?? []
   const schedule = scheduleResult.data ?? []
   const isFirstMealOfDay = (bolusToday.data ?? []).length === 0
+  const recipes = recipesResult.data ?? []
 
   const latest = egvs[0]
   const minsAgo = latest ? Math.floor((Date.now() - new Date(latest.system_time).getTime()) / 60000) : null
@@ -101,6 +104,17 @@ export async function POST(req: NextRequest) {
       : 'No lows past 6h',
     upcomingSchedule ? `Schedule today: ${upcomingSchedule}` : 'No upcoming schedule events',
     params ? `ICR: ${params.current_icr}, ISF: ${params.current_isf}, target: ${params.target_bg}, pre-bolus lead: ${params.pre_bolus_lead_min}min` : '',
+    recipes.length > 0
+      ? `Saved recipes:\n${recipes.map(r => {
+          const perPiece = r.carbs_per_piece != null ? `${r.carbs_per_piece}g carbs per ${r.yield_unit?.replace(/s$/, '') ?? 'piece'}` : ''
+          const per100g = r.carbs_per_100g != null ? `${r.carbs_per_100g}g carbs/100g` : ''
+          const anchor = r.typical_serving_g != null ? `, typical serving ~${r.typical_serving_g}g (${r.typical_serving_description ?? 'one serving'})` : ''
+          const macros = [perPiece, per100g].filter(Boolean).join(', ')
+          const gi = r.gi_category ? ` — ${r.gi_category} GI` : ''
+          const notes = r.notes ? ` — ${r.notes}` : ''
+          return `  • ${r.name}: ${macros}${anchor}${gi}${notes}`
+        }).join('\n')}`
+      : '',
   ].filter(Boolean).join('\n')
 
   const systemPrompt = `You are an AI assistant helping manage Brooks's Type 1 diabetes. Brooks is a child on Omnipod 5 with Fiasp insulin and Dexcom G7 CGM.
@@ -239,10 +253,33 @@ ${fullConvo}`,
     } catch { /* ignore parse errors */ }
   }
 
+  // Detect recipe save intent and extract structured recipe data
+  let recipe_proposal: Record<string, unknown> | null = null
+  if (RECIPE_SAVE_INTENT.test(message) || RECIPE_SAVE_INTENT.test(reply)) {
+    const recipeResult = await claude.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `From this conversation, extract the recipe being described. Return ONLY valid JSON.
+
+Schema: { "name": string, "yield_count": number | null, "yield_unit": string | null, "carbs_per_piece": number | null, "fat_per_piece": number | null, "protein_per_piece": number | null, "carbs_per_100g": number | null, "fat_per_100g": number | null, "protein_per_100g": number | null, "typical_serving_g": number | null, "typical_serving_description": string | null, "gi_category": "high" | "medium" | "low" | null, "notes": string | null, "ingredients": [{ "name": string, "qty": string }] }
+
+Conversation:
+${fullConvo}`,
+      }],
+    })
+    try {
+      const raw = recipeResult.content[0].type === 'text' ? recipeResult.content[0].text.trim() : ''
+      recipe_proposal = JSON.parse(raw.replace(/^```json\n?|\n?```$/g, ''))
+    } catch { /* ignore */ }
+  }
+
   return NextResponse.json({
     userMsg,
     assistantMsg,
     ...(proposal ? { proposal } : {}),
     ...(log_proposal ? { log_proposal } : {}),
+    ...(recipe_proposal ? { recipe_proposal } : {}),
   })
 }

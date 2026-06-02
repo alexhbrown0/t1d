@@ -121,6 +121,57 @@ function LogProposalCard({ proposal, onConfirm, onDismiss }: {
   )
 }
 
+interface RecipeProposal {
+  name: string
+  yield_count?: number | null
+  yield_unit?: string | null
+  carbs_per_piece?: number | null
+  fat_per_piece?: number | null
+  protein_per_piece?: number | null
+  carbs_per_100g?: number | null
+  fat_per_100g?: number | null
+  protein_per_100g?: number | null
+  typical_serving_g?: number | null
+  typical_serving_description?: string | null
+  gi_category?: string | null
+  notes?: string | null
+}
+
+function RecipeProposalCard({ recipe, onSave, onDismiss }: {
+  recipe: RecipeProposal
+  onSave: () => void
+  onDismiss: () => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const hasPiece = recipe.carbs_per_piece != null
+  const has100g = recipe.carbs_per_100g != null
+
+  const save = async () => {
+    setSaving(true)
+    await onSave()
+    setSaving(false)
+  }
+
+  return (
+    <div className="mx-1 mt-2 bg-green-950/30 border border-green-500/30 rounded-2xl p-4 space-y-3">
+      <p className="text-[10px] tracking-widest text-green-400 font-semibold">SAVE RECIPE</p>
+      <div className="space-y-1">
+        <p className="text-sm text-white font-semibold">{recipe.name}</p>
+        {hasPiece && <p className="text-xs text-gray-400">{recipe.carbs_per_piece}g carbs per {recipe.yield_unit?.replace(/s$/, '') ?? 'piece'}{recipe.yield_count ? ` · makes ${recipe.yield_count} ${recipe.yield_unit}` : ''}</p>}
+        {has100g && <p className="text-xs text-gray-400">{recipe.carbs_per_100g}g carbs per 100g{recipe.typical_serving_g ? ` · typical serving ~${recipe.typical_serving_g}g` : ''}</p>}
+        {recipe.gi_category && <p className="text-xs text-gray-500">{recipe.gi_category} GI</p>}
+        {recipe.notes && <p className="text-xs text-gray-500 italic">{recipe.notes}</p>}
+      </div>
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving} className="flex-1 bg-green-500/20 text-green-400 text-xs font-semibold py-2 rounded-xl disabled:opacity-40 active:bg-green-500/30">
+          {saving ? 'Saving…' : 'Save recipe'}
+        </button>
+        <button onClick={onDismiss} className="px-4 text-gray-500 text-xs py-2 rounded-xl active:bg-white/5">Dismiss</button>
+      </div>
+    </div>
+  )
+}
+
 interface Photo {
   preview: string
   base64: string
@@ -143,6 +194,7 @@ export default function ChatPage() {
   const [bg, setBg] = useState<{ value: number | null; trend: string | null } | null>(null)
   const [proposal, setProposal] = useState<string | null>(null)
   const [logProposal, setLogProposal] = useState<LogProposal | null>(null)
+  const [recipeProposal, setRecipeProposal] = useState<RecipeProposal | null>(null)
   const [photo, setPhoto] = useState<Photo | null>(null)
   const [lightbox, setLightbox] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -192,6 +244,7 @@ export default function ChatPage() {
     setPhoto(null)
     setProposal(null)
     setLogProposal(null)
+    setRecipeProposal(null)
     setLoading(true)
     try {
       const body: Record<string, string> = { message: text.trim() || '' }
@@ -204,10 +257,11 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const { userMsg, assistantMsg, proposal: newProposal, log_proposal: newLogProposal } = await res.json()
+      const { userMsg, assistantMsg, proposal: newProposal, log_proposal: newLogProposal, recipe_proposal: newRecipeProposal } = await res.json()
       setMessages(prev => [...prev.filter(m => m.id !== optimistic.id), userMsg, assistantMsg])
       if (newProposal) setProposal(newProposal)
       if (newLogProposal) setLogProposal(newLogProposal as LogProposal)
+      if (newRecipeProposal) setRecipeProposal(newRecipeProposal as RecipeProposal)
     } finally {
       setLoading(false)
     }
@@ -247,6 +301,22 @@ export default function ChatPage() {
       created_at: new Date().toISOString(),
     }
     setMessages(prev => [...prev, confirmed])
+  }
+
+  const saveRecipe = async () => {
+    if (!recipeProposal) return
+    await fetch('/api/t1d/recipes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(recipeProposal),
+    })
+    setRecipeProposal(null)
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: `Recipe saved: ${recipeProposal.name}. I'll use it for dosing whenever you mention it.`,
+      created_at: new Date().toISOString(),
+    }])
   }
 
   const saveNote = async (text: string) => {
@@ -335,6 +405,13 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
+        )}
+        {recipeProposal && (
+          <RecipeProposalCard
+            recipe={recipeProposal}
+            onSave={saveRecipe}
+            onDismiss={() => setRecipeProposal(null)}
+          />
         )}
         {logProposal && (
           <LogProposalCard
