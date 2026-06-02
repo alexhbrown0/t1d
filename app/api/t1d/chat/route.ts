@@ -58,10 +58,11 @@ export async function POST(req: NextRequest) {
   const isFirstMealOfDay = (bolusToday.data ?? []).length === 0
 
   const latest = egvs[0]
-  const bg = latest?.value_mgdl ? Number(latest.value_mgdl) : null
   const minsAgo = latest ? Math.floor((Date.now() - new Date(latest.system_time).getTime()) / 60000) : null
-  const rate = rateOfChange(egvs)
-  const bgSequence = [...egvs].reverse().map(e => Math.round(Number(e.value_mgdl))).join(' → ')
+  const bgFresh = minsAgo != null && minsAgo <= 15
+  const bg = bgFresh && latest?.value_mgdl ? Number(latest.value_mgdl) : null
+  const rate = bgFresh ? rateOfChange(egvs) : null
+  const bgSequence = bgFresh ? [...egvs].reverse().map(e => Math.round(Number(e.value_mgdl))).join(' → ') : ''
   const rateStr = rate != null ? `${rate > 0 ? '+' : ''}${rate.toFixed(1)} mg/dL/min` : 'unknown'
 
   const dia = (params?.current_dia ?? 2) * 3600000
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
     `Time: ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}, ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayOfWeek]} — meal period: ${mealPeriod}${isFirstMealOfDay ? ' — FIRST MEAL OF DAY (fasting state, stomach empty, fast Fiasp absorption, full pre-bolus timing applies)' : ' — fed state (not first meal, stomach not empty, absorption slower than fasting)'}`,
     bg != null
       ? `BG (oldest→newest): ${bgSequence} | now ${bg} mg/dL, ${minsAgo}min ago, rate: ${rateStr}`
-      : 'BG: no recent data',
+      : `BG: no live reading (last reading ${minsAgo != null ? `was ${minsAgo} minutes ago — too stale to use` : 'unavailable'})`,
     boluses.length > 0
       ? `Boluses past 6h: ${boluses.map(b => `${fmtTime(b.timestamp)} ${b.insulin_delivered_u}U/${b.carbs_input_g ?? 0}g`).join(', ')}`
       : 'No boluses past 6h',
@@ -107,6 +108,7 @@ ${contextBlock}
 Rules:
 - Write in plain text only. No markdown, no bold, no headers, no bullet symbols, no asterisks.
 - Be concise. Give as much detail as the situation needs — simple status checks warrant one sentence, meal dosing discussions warrant full guidance.
+- BG awareness: if the context shows no live reading or a stale one, do NOT invent or assume a BG value. Ask the user to tell you the current number before giving any dosing guidance.
 - Dosing guidance: always say "enter X grams into the pump", never units.
 - For lows: fast carbs only, no insulin.
 - Flag anything uncertain or that needs Alexandra's input.
