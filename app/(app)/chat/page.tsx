@@ -7,6 +7,7 @@ interface ChatMsg {
   role: 'user' | 'assistant'
   content: string
   created_at: string
+  photo_url?: string | null
 }
 
 const QUICK_REPLIES = [
@@ -93,6 +94,7 @@ export default function ChatPage() {
   const [bg, setBg] = useState<{ value: number | null; trend: string | null } | null>(null)
   const [proposal, setProposal] = useState<string | null>(null)
   const [photo, setPhoto] = useState<Photo | null>(null)
+  const [lightbox, setLightbox] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const autoSentRef = useRef(false)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -133,8 +135,8 @@ export default function ChatPage() {
   const send = async (text: string, attachedPhoto?: Photo) => {
     const currentPhoto = attachedPhoto ?? photo
     if (!text.trim() && !currentPhoto || loading) return
-    const displayText = text.trim() || '📷 Photo'
-    const optimistic: ChatMsg = { id: Date.now().toString(), role: 'user', content: displayText, created_at: new Date().toISOString() }
+    const displayText = text.trim() || ''
+    const optimistic: ChatMsg = { id: Date.now().toString(), role: 'user', content: displayText, created_at: new Date().toISOString(), photo_url: currentPhoto?.preview ?? null }
     setMessages(prev => [...prev, optimistic])
     setInput('')
     setPhoto(null)
@@ -213,12 +215,21 @@ export default function ChatPage() {
         )}
         {messages.map((m) => (
           <div key={m.id} className={`flex w-full ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] min-w-0 rounded-2xl px-4 py-3 text-sm leading-relaxed break-words overflow-hidden ${
+            <div className={`max-w-[80%] min-w-0 rounded-2xl overflow-hidden ${
               m.role === 'user'
                 ? 'bg-white/10 text-white rounded-br-sm'
                 : 'bg-[#141414] text-gray-200 border border-white/5 rounded-bl-sm'
             }`}>
-              {m.content}
+              {m.photo_url && (
+                <button onClick={() => setLightbox(m.photo_url!)} className="block w-full">
+                  <img src={m.photo_url} alt="attached" className="w-full max-h-48 object-cover" />
+                </button>
+              )}
+              {(m.content && m.content !== '[photo]') && (
+                <p className="px-4 py-3 text-sm leading-relaxed break-words">
+                  {m.content.replace(/^\[photo\]\s*/, '')}
+                </p>
+              )}
             </div>
           </div>
         ))}
@@ -321,6 +332,16 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <button
+          onClick={() => setLightbox(null)}
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+        >
+          <img src={lightbox} alt="full size" className="max-w-full max-h-full object-contain" />
+        </button>
+      )}
     </div>
   )
 }

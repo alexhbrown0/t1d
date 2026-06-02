@@ -116,6 +116,21 @@ Rules:
 
   const today = now.toISOString().split('T')[0]
 
+  // Upload photo to storage if present
+  let photoUrl: string | null = null
+  if (photo_base64) {
+    const imgBuffer = Buffer.from(photo_base64, 'base64')
+    const ext = (photo_mime_type || 'image/jpeg').split('/')[1] || 'jpg'
+    const path = `${today}/${Date.now()}.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from('chat-photos')
+      .upload(path, imgBuffer, { contentType: photo_mime_type || 'image/jpeg', upsert: false })
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage.from('chat-photos').getPublicUrl(path)
+      photoUrl = urlData.publicUrl
+    }
+  }
+
   const storedContent = photo_base64
     ? `[photo] ${message || ''}`.trim()
     : message
@@ -124,15 +139,25 @@ Rules:
     session_date: today,
     role: 'user',
     content: storedContent,
+    photo_url: photoUrl,
   }).select().single()
 
   const { data: history } = await supabase
     .from('t1d_chat_log')
-    .select('role, content')
+    .select('role, content, created_at')
     .order('created_at', { ascending: false })
-    .limit(10)
+    .limit(20)
 
-  const historyMessages = (history ?? []).reverse()
+  const allHistory = (history ?? []).reverse()
+
+  // Drop messages from before a 90-minute gap so Claude doesn't treat old sessions as current context
+  let startIdx = 0
+  for (let i = allHistory.length - 2; i >= 0; i--) {
+    const gap = (new Date(allHistory[i + 1].created_at).getTime() - new Date(allHistory[i].created_at).getTime()) / 60000
+    if (gap > 90) { startIdx = i + 1; break }
+  }
+  const historyMessages = allHistory.slice(startIdx).slice(-10)
+
   // Build message array — inject vision content for the current message if a photo was attached
   const messages = historyMessages.map((m: { role: string; content: string }, idx: number) => {
     const isLast = idx === historyMessages.length - 1
