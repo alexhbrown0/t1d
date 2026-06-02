@@ -32,7 +32,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { message } = await req.json()
+  const { message, photo_base64, photo_mime_type } = await req.json()
   const supabase = createServerClient()
   const now = new Date()
   const sixHoursAgo = new Date(Date.now() - 6 * 3600000).toISOString()
@@ -116,10 +116,14 @@ Rules:
 
   const today = now.toISOString().split('T')[0]
 
+  const storedContent = photo_base64
+    ? `[photo] ${message || ''}`.trim()
+    : message
+
   const { data: userMsg } = await supabase.from('t1d_chat_log').insert({
     session_date: today,
     role: 'user',
-    content: message,
+    content: storedContent,
   }).select().single()
 
   const { data: history } = await supabase
@@ -128,10 +132,24 @@ Rules:
     .order('created_at', { ascending: false })
     .limit(10)
 
-  const messages = (history ?? []).reverse().map((m: { role: string; content: string }) => ({
-    role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
-    content: m.content,
-  }))
+  const historyMessages = (history ?? []).reverse()
+  // Build message array — inject vision content for the current message if a photo was attached
+  const messages = historyMessages.map((m: { role: string; content: string }, idx: number) => {
+    const isLast = idx === historyMessages.length - 1
+    if (isLast && m.role === 'user' && photo_base64) {
+      return {
+        role: 'user' as const,
+        content: [
+          { type: 'image' as const, source: { type: 'base64' as const, media_type: (photo_mime_type || 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: photo_base64 } },
+          { type: 'text' as const, text: message || 'What food do you see? Give me dosing guidance based on the current BG and context.' },
+        ],
+      }
+    }
+    return {
+      role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
+      content: m.content,
+    }
+  })
 
   const response = await claude.messages.create({
     model: 'claude-sonnet-4-6',

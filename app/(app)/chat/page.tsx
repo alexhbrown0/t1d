@@ -71,14 +71,37 @@ function NoteProposalCard({
   )
 }
 
+interface Photo {
+  preview: string
+  base64: string
+  mimeType: string
+}
+
+function toBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [bg, setBg] = useState<{ value: number | null; trend: string | null } | null>(null)
   const [proposal, setProposal] = useState<string | null>(null)
+  const [photo, setPhoto] = useState<Photo | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const autoSentRef = useRef(false)
+  const photoRef = useRef<HTMLInputElement>(null)
+
+  const handlePhotoFile = async (file: File) => {
+    const preview = URL.createObjectURL(file)
+    const base64 = await toBase64(file)
+    setPhoto({ preview, base64, mimeType: file.type || 'image/jpeg' })
+  }
 
   useEffect(() => {
     fetch('/api/t1d/chat').then(r => r.json()).then(data => {
@@ -107,18 +130,26 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, proposal])
 
-  const send = async (text: string) => {
-    if (!text.trim() || loading) return
-    const optimistic: ChatMsg = { id: Date.now().toString(), role: 'user', content: text, created_at: new Date().toISOString() }
+  const send = async (text: string, attachedPhoto?: Photo) => {
+    const currentPhoto = attachedPhoto ?? photo
+    if (!text.trim() && !currentPhoto || loading) return
+    const displayText = text.trim() || '📷 Photo'
+    const optimistic: ChatMsg = { id: Date.now().toString(), role: 'user', content: displayText, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, optimistic])
     setInput('')
+    setPhoto(null)
     setProposal(null)
     setLoading(true)
     try {
+      const body: Record<string, string> = { message: text.trim() || '' }
+      if (currentPhoto) {
+        body.photo_base64 = currentPhoto.base64
+        body.photo_mime_type = currentPhoto.mimeType
+      }
       const res = await fetch('/api/t1d/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify(body),
       })
       const { userMsg, assistantMsg, proposal: newProposal } = await res.json()
       setMessages(prev => [...prev.filter(m => m.id !== optimistic.id), userMsg, assistantMsg])
@@ -218,19 +249,53 @@ export default function ChatPage() {
         ))}
       </div>
 
+      {/* Photo preview */}
+      {photo && (
+        <div className="px-4 pb-1 flex-shrink-0">
+          <div className="relative inline-block">
+            <img src={photo.preview} alt="attached" className="h-20 rounded-xl object-cover border border-white/10" />
+            <button
+              onClick={() => setPhoto(null)}
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-800 border border-white/20 flex items-center justify-center text-gray-400 text-xs"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Input bar */}
       <div className="px-4 pb-4 pt-1 flex-shrink-0">
-        <div className="flex gap-3 items-center bg-[#141414] border border-white/10 rounded-2xl px-4 py-3">
+        <div className="flex gap-2 items-center bg-[#141414] border border-white/10 rounded-2xl px-3 py-3">
+          {/* Camera button */}
+          <button
+            onClick={() => photoRef.current?.click()}
+            disabled={loading}
+            className="text-gray-500 flex-shrink-0 active:text-teal-400 transition-colors"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+          </button>
+          <input
+            ref={photoRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = '' }}
+          />
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send(input)}
-            placeholder="Ask or send an update..."
+            placeholder={photo ? 'Add a note or just send…' : 'Ask or send an update…'}
             className="flex-1 min-w-0 bg-transparent text-base text-white placeholder-gray-600 outline-none"
           />
           <button
             onClick={() => send(input)}
-            disabled={!input.trim() || loading}
+            disabled={(!input.trim() && !photo) || loading}
             className="text-teal-400 disabled:text-gray-700 flex-shrink-0 transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
