@@ -200,8 +200,8 @@ export default function ChatPage() {
           </div>
         )}
         {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] min-w-0 rounded-2xl px-4 py-3 text-sm leading-relaxed break-words ${
+          <div key={m.id} className={`flex w-full ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] min-w-0 rounded-2xl px-4 py-3 text-sm leading-relaxed break-words overflow-hidden ${
               m.role === 'user'
                 ? 'bg-white/10 text-white rounded-br-sm'
                 : 'bg-[#141414] text-gray-200 border border-white/5 rounded-bl-sm'
@@ -236,7 +236,8 @@ export default function ChatPage() {
       </div>
 
       {/* Quick replies */}
-      <div className="px-4 pb-2 flex gap-2 overflow-x-auto flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
+      <div className="pb-2 flex-shrink-0 w-full overflow-hidden">
+      <div className="px-4 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
         {QUICK_REPLIES.map(r => (
           <button
             key={r}
@@ -247,6 +248,7 @@ export default function ChatPage() {
             {r}
           </button>
         ))}
+      </div>
       </div>
 
       {/* Photo preview */}
