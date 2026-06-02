@@ -226,7 +226,7 @@ export default function ChatPage() {
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send(input)}
             placeholder="Ask or send an update..."
-            className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder-gray-600 outline-none"
+            className="flex-1 min-w-0 bg-transparent text-base text-white placeholder-gray-600 outline-none"
           />
           <button
             onClick={() => send(input)}
