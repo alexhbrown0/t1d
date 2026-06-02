@@ -266,6 +266,16 @@ export default function ChatPage() {
         </div>
       )}
 
+      {/* File input — outside flex layout to prevent iOS capture attribute from adding width */}
+      <input
+        ref={photoRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: 1, height: 1, opacity: 0 }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = '' }}
+      />
+
       {/* Input bar */}
       <div className="px-4 pb-4 pt-1 flex-shrink-0">
         <div className="flex gap-2 items-center bg-[#141414] border border-white/10 rounded-2xl px-3 py-3">
@@ -280,14 +290,6 @@ export default function ChatPage() {
               <circle cx="12" cy="13" r="4" />
             </svg>
           </button>
-          <input
-            ref={photoRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = '' }}
-          />
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
