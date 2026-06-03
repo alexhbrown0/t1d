@@ -13,10 +13,11 @@ export function EngineLunchEntry() {
           <p className="text-sm font-semibold text-white">Pack Lunch</p>
           <p className="text-xs text-gray-500 mt-1">Take a photo or build manually</p>
         </div>
-        <Link href="/engine/lunch">
-          <button className="w-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold py-3 rounded-xl">
-            Start Lunch Setup
-          </button>
+        <Link
+          href="/engine/lunch"
+          className="block w-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold py-3 rounded-xl text-center"
+        >
+          Start Lunch Setup
         </Link>
       </div>
     </div>

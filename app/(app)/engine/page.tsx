@@ -22,7 +22,7 @@ export default function EnginePage() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+      <div className="flex w-full gap-1 bg-white/5 rounded-xl p-1">
         {TABS.map(t => (
           <button
             key={t}

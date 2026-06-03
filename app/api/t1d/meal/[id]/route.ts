@@ -16,9 +16,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'items_eaten is required' }, { status: 400 })
   }
 
-  const totalEatenCarbs = body.items_eaten.reduce((s, i) => s + i.carbs, 0)
-  const totalFat = body.items_eaten.reduce((s, i) => s + (i.fat ?? 0), 0)
-  const totalProtein = body.items_eaten.reduce((s, i) => s + (i.protein ?? 0), 0)
+  const totalEatenCarbs = body.items_eaten.reduce((s, i) => s + i.carbs * (i.qty_eaten ?? 0), 0)
+  const totalFat = body.items_eaten.reduce((s, i) => s + (i.fat ?? 0) * (i.qty_eaten ?? 0), 0)
+  const totalProtein = body.items_eaten.reduce((s, i) => s + (i.protein ?? 0) * (i.qty_eaten ?? 0), 0)
   const fpuCount = computeFpu(totalFat, totalProtein)
 
   const { data, error } = await supabase
