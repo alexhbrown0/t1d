@@ -11,12 +11,19 @@ interface ChatMsg {
 }
 
 const QUICK_REPLIES = [
+  'Plan lunch',
+  'Plan snack',
   'We gave him a juice box',
-  'Recess is 30 min early',
   'He just started eating',
   'He refused to eat',
   'Giving a correction now',
+  'Recess is 30 min early',
 ]
+
+const QUICK_REPLY_MESSAGES: Record<string, string> = {
+  'Plan lunch': "I'm planning Brooks's lunch. Give me carb estimates as I describe or photo what I'm packing — planning mode only, not dosing yet.",
+  'Plan snack': "I'm planning a snack for Brooks. Give me carb estimates only — planning mode, not dosing yet.",
+}
 
 function TrendArrow({ trend }: { trend: string | null }) {
   const arrows: Record<string, string> = {
@@ -452,7 +459,7 @@ export default function ChatPage() {
         {QUICK_REPLIES.map(r => (
           <button
             key={r}
-            onClick={() => send(r)}
+            onClick={() => send(QUICK_REPLY_MESSAGES[r] ?? r)}
             disabled={loading}
             className="whitespace-nowrap text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-gray-400 flex-shrink-0 active:bg-white/10"
           >
