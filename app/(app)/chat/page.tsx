@@ -128,6 +128,46 @@ function LogProposalCard({ proposal, onConfirm, onDismiss }: {
   )
 }
 
+interface LunchPlan {
+  items: { name: string; qty: string; carbs_g: number }[]
+  total_carbs_g: number
+  notes?: string | null
+}
+
+function LunchPlanCard({ plan, onSave, onDismiss }: {
+  plan: LunchPlan
+  onSave: () => void
+  onDismiss: () => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const save = async () => { setSaving(true); await onSave(); setSaving(false) }
+
+  return (
+    <div className="mx-1 mt-2 bg-amber-950/30 border border-amber-500/30 rounded-2xl p-4 space-y-3">
+      <p className="text-[10px] tracking-widest text-amber-400 font-semibold">SAVE TODAY'S LUNCH PLAN</p>
+      <div className="space-y-1">
+        {plan.items.map((item, i) => (
+          <div key={i} className="flex justify-between text-sm">
+            <span className="text-gray-300">{item.name} <span className="text-gray-500 text-xs">{item.qty}</span></span>
+            <span className="text-amber-400 font-medium text-xs">{item.carbs_g}g</span>
+          </div>
+        ))}
+        <div className="flex justify-between text-sm border-t border-white/10 pt-2 mt-2">
+          <span className="text-white font-semibold">Total</span>
+          <span className="text-amber-300 font-bold">{plan.total_carbs_g}g carbs</span>
+        </div>
+        {plan.notes && <p className="text-xs text-gray-500 italic">{plan.notes}</p>}
+      </div>
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving} className="flex-1 bg-amber-500/20 text-amber-400 text-xs font-semibold py-2 rounded-xl disabled:opacity-40 active:bg-amber-500/30">
+          {saving ? 'Saving…' : 'Save lunch plan'}
+        </button>
+        <button onClick={onDismiss} className="px-4 text-gray-500 text-xs py-2 rounded-xl active:bg-white/5">Dismiss</button>
+      </div>
+    </div>
+  )
+}
+
 interface RecipeProposal {
   name: string
   yield_count?: number | null
@@ -202,6 +242,7 @@ export default function ChatPage() {
   const [proposal, setProposal] = useState<string | null>(null)
   const [logProposal, setLogProposal] = useState<LogProposal | null>(null)
   const [recipeProposal, setRecipeProposal] = useState<RecipeProposal | null>(null)
+  const [lunchPlan, setLunchPlan] = useState<LunchPlan | null>(null)
   const [photos, setPhotos] = useState<Photo[]>([])
   const [lightbox, setLightbox] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -259,6 +300,7 @@ export default function ChatPage() {
     setProposal(null)
     setLogProposal(null)
     setRecipeProposal(null)
+    setLunchPlan(null)
     setLoading(true)
     try {
       const body: Record<string, unknown> = { message: text.trim() || '' }
@@ -270,11 +312,12 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const { userMsg, assistantMsg, proposal: newProposal, log_proposal: newLogProposal, recipe_proposal: newRecipeProposal } = await res.json()
+      const { userMsg, assistantMsg, proposal: newProposal, log_proposal: newLogProposal, recipe_proposal: newRecipeProposal, lunch_plan: newLunchPlan } = await res.json()
       setMessages(prev => [...prev.filter(m => m.id !== optimistic.id), userMsg, assistantMsg])
       if (newProposal) setProposal(newProposal)
       if (newLogProposal) setLogProposal(newLogProposal as LogProposal)
       if (newRecipeProposal) setRecipeProposal(newRecipeProposal as RecipeProposal)
+      if (newLunchPlan) setLunchPlan(newLunchPlan as LunchPlan)
     } finally {
       setLoading(false)
     }
@@ -314,6 +357,35 @@ export default function ChatPage() {
       created_at: new Date().toISOString(),
     }
     setMessages(prev => [...prev, confirmed])
+  }
+
+  const saveLunchPlan = async () => {
+    if (!lunchPlan) return
+    await fetch('/api/t1d/meal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        context: 'school_lunch',
+        source: 'chat',
+        entered_by: 'alexandra',
+        items: lunchPlan.items.map(item => ({
+          food_repo_id: null,
+          name: item.name,
+          qty_offered: 1,
+          qty_eaten: null,
+          carbs: item.carbs_g,
+          fat: null,
+          protein: null,
+        })),
+      }),
+    })
+    setLunchPlan(null)
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: `Lunch plan saved — ${lunchPlan.total_carbs_g}g total carbs. You can share this with the nurse when it's time.`,
+      created_at: new Date().toISOString(),
+    }])
   }
 
   const saveRecipe = async () => {
@@ -434,6 +506,13 @@ export default function ChatPage() {
             recipe={recipeProposal}
             onSave={saveRecipe}
             onDismiss={() => setRecipeProposal(null)}
+          />
+        )}
+        {lunchPlan && (
+          <LunchPlanCard
+            plan={lunchPlan}
+            onSave={saveLunchPlan}
+            onDismiss={() => setLunchPlan(null)}
           />
         )}
         {logProposal && (

@@ -5,6 +5,8 @@ import { getLatestEgvs } from '@/lib/dexcom/client'
 
 const SAVE_INTENT = /(save|log|add|write|capture|record|remember|keep).{0,60}(notes?|clinical|protocol|rules?|guidelines?|learnings?|engine)/i
 const RECIPE_SAVE_INTENT = /(save|add|store|keep).{0,40}(recipe|this recipe|as a recipe|to recipes)/i
+const LUNCH_PLAN_INTENT = /(plan|planning|pack|packing).{0,20}lunch/i
+const LUNCH_SAVE_INTENT = /(save|finalize|done|that'?s? (it|everything|all)|nothing else).{0,40}(lunch|that)/i
 
 // Detect when Claude's response contains a dosing or treatment recommendation
 const LOG_INTENT = /\b(enter|give|treat|administer|pre-bolus)\b.{0,80}\b(grams?|juice|gummy|gummies|glucose|tabs?|fast carbs?|pump|correction)\b/i
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
   midnight.setHours(0, 0, 0, 0)
   const midnightIso = midnight.toISOString()
 
-  const [egvs, bolusResult, bolusToday, lowResult, scheduleResult, paramsResult, recipesResult] = await Promise.all([
+  const [egvs, bolusResult, bolusToday, lowResult, scheduleResult, paramsResult, recipesResult, foodRepoResult] = await Promise.all([
     getLatestEgvs(5),
     supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u, bg_input_mgdl').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('glooko_bolus').select('timestamp').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(1),
@@ -60,12 +62,14 @@ export async function POST(req: NextRequest) {
     supabase.from('t1d_school_schedule').select('event_type, start_time, day_of_week').eq('active', true).eq('day_of_week', dayOfWeek).order('start_time'),
     supabase.from('t1d_engine_params').select('*').order('effective_from', { ascending: false }).limit(1),
     supabase.from('t1d_recipes').select('name, yield_count, yield_unit, carbs_per_piece, carbs_per_100g, typical_serving_g, typical_serving_description, gi_category, notes').eq('active', true),
+    supabase.from('t1d_food_repo').select('name, aliases, serving_size, serving_qty, carbs_g, fat_g, protein_g, category, notes').eq('active', true).order('name'),
   ])
 
   const params = paramsResult.data?.[0]
   const boluses = bolusResult.data ?? []
   const lows = lowResult.data ?? []
   const schedule = scheduleResult.data ?? []
+  const foodRepo = foodRepoResult.data ?? []
   const isFirstMealOfDay = (bolusToday.data ?? []).length === 0
   const recipes = recipesResult.data ?? []
 
@@ -121,6 +125,16 @@ export async function POST(req: NextRequest) {
           return `  • ${r.name}: ${macros}${anchor}${gi}${notes}`
         }).join('\n')}`
       : '',
+    foodRepo.length > 0
+      ? `Known foods (Brooks's usual items):\n${foodRepo.map(f => {
+          const carbs = `${f.carbs_g}g carbs`
+          const fat = f.fat_g != null ? `, ${f.fat_g}g fat` : ''
+          const protein = f.protein_g != null ? `, ${f.protein_g}g protein` : ''
+          const aliases = f.aliases?.length ? ` (also: ${f.aliases.join(', ')})` : ''
+          const notes = f.notes ? ` — ${f.notes}` : ''
+          return `  • ${f.name}${aliases}: ${carbs}${fat}${protein} per ${f.serving_qty > 1 ? f.serving_qty + ' ' : ''}${f.serving_size}${notes}`
+        }).join('\n')}`
+      : '',
   ].filter(Boolean).join('\n')
 
   const systemPrompt = `You are an AI assistant helping manage Brooks's Type 1 diabetes. Brooks is a child on Omnipod 5 with Fiasp insulin and Dexcom G7 CGM.
@@ -132,6 +146,7 @@ Rules:
 - Format: use a dash and a line break for each food item in a breakdown. Put a blank line between sections (breakdown, dosing recommendation, follow-up notes). No bold, no headers, no asterisks, no markdown beyond dashes for list items and blank lines for section separation.
 - Response length: match the situation. A carb estimate is 5-8 lines. A dosing recommendation adds 2-3 lines. Never run them together into a paragraph.
 - Carb-only vs. dosing mode: if the user asks what something is, wants to know the carbs, or is planning ahead — give the itemized breakdown and total, then stop. Do not add dosing math ("at ICR 15, enter X grams") unless they say they are eating right now, are about to dose, or explicitly ask for a recommendation. The mode is usually obvious: "what would this be?" = carb estimate only. "We're eating now" or "about to give him X" = full dosing guidance.
+- Lunch planning mode: if any message in this conversation contains "plan lunch", "planning lunch", "packing lunch", or similar, ALL messages in this conversation are in lunch planning mode until the user says they're eating. In lunch planning mode: NEVER ask for current blood sugar. Not even as a follow-up. Not even as a suggestion. Build the lunch item by item. After each addition, show the running list and carb tally. When the user seems done, ask "anything else?" before wrapping up. If known foods are listed in context, suggest relevant ones. After finalizing, tell them you can save it as today's lunch plan.
 - Food breakdowns: start with 1-3 sentences of reasoning — how you're estimating volume or density, what's taking up more space, any GI or absorption notes worth knowing. Then a blank line, then the itemized list: one dash per item as: - [item], ~[amount] — ~[X]g carbs. Total on its own line. Keep the reasoning — it's useful. Just always follow it with the clean line-by-line breakdown so the numbers are easy to scan.
 - BG awareness: when giving dosing guidance, use the live BG from context if it is fresh. If context shows no reading or a stale one, ask for the current number before completing the dosing recommendation — but only at that point, not during a carb-estimate-only response.
 - Saved recipes: if the user mentions a food that matches a saved recipe by name, always ask whether they mean the saved recipe or a different version (store-bought, restaurant, different preparation) before using the recipe's macros. Only use saved recipe numbers when the user confirms it — e.g. "the homemade ones", "from our recipe", or "yes that one". If they don't confirm, estimate using general nutrition knowledge instead.
@@ -310,11 +325,35 @@ ${fullConvo}`,
     } catch { /* ignore */ }
   }
 
+  // Detect lunch plan save intent — fires when user wraps up planning mode
+  const isLunchSession = LUNCH_PLAN_INTENT.test(message) || historyMessages.some(m => LUNCH_PLAN_INTENT.test(m.content))
+  let lunch_plan: Record<string, unknown> | null = null
+  if (isLunchSession && (LUNCH_SAVE_INTENT.test(message) || LUNCH_SAVE_INTENT.test(reply))) {
+    const lunchResult = await claude.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `From this lunch planning conversation, extract the finalized lunch. Return ONLY valid JSON.
+
+Schema: { "items": [{ "name": string, "qty": string, "carbs_g": number }], "total_carbs_g": number, "notes": string | null }
+
+Conversation:
+${fullConvo}`,
+      }],
+    })
+    try {
+      const raw = lunchResult.content[0].type === 'text' ? lunchResult.content[0].text.trim() : ''
+      lunch_plan = JSON.parse(raw.replace(/^```json\n?|\n?```$/g, ''))
+    } catch { /* ignore */ }
+  }
+
   return NextResponse.json({
     userMsg,
     assistantMsg,
     ...(proposal ? { proposal } : {}),
     ...(log_proposal ? { log_proposal } : {}),
     ...(recipe_proposal ? { recipe_proposal } : {}),
+    ...(lunch_plan ? { lunch_plan } : {}),
   })
 }
