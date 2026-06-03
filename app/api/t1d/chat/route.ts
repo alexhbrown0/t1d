@@ -36,7 +36,13 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { message, photo_base64, photo_mime_type } = await req.json()
+  const { message, photo_base64, photo_mime_type, photos: photosArr } = await req.json()
+  // Normalize to array — supports both legacy single-photo and new multi-photo payload
+  const allPhotos: { base64: string; mime_type: string }[] = photosArr
+    ? photosArr
+    : photo_base64
+      ? [{ base64: photo_base64, mime_type: photo_mime_type || 'image/jpeg' }]
+      : []
   const supabase = createServerClient()
   const now = new Date()
   const sixHoursAgo = new Date(Date.now() - 6 * 3600000).toISOString()
@@ -123,9 +129,11 @@ Current context:
 ${contextBlock}
 
 Rules:
-- Write in plain text only. No markdown, no bold, no headers, no bullet symbols, no asterisks.
+- Format: plain text only, no bold, no headers, no asterisks, no markdown symbols. You may use line breaks to separate food items in a breakdown — that is the one exception to avoid collapsing a multi-item meal into one number.
 - Be concise. Give as much detail as the situation needs — simple status checks warrant one sentence, meal dosing discussions warrant full guidance.
-- BG awareness: if the context shows no live reading or a stale one, do NOT invent or assume a BG value. Ask the user to tell you the current number before giving any dosing guidance.
+- Planning vs. dosing mode: if the user is describing something he's about to eat or asking for a carb estimate before committing to a dose (planning ahead, packing a lunch, previewing a snack), give a full itemized breakdown without demanding a current BG. A planning estimate is useful and valid on its own. Only ask for current BG when the user is ready to enter something into the pump right now.
+- Food breakdowns: when estimating a mixed meal or snack, list each component on its own line in this format: [item] — approx [amount] — ~[X]g carbs. Be specific and confident. "Graham cracker fish, roughly 15 pieces — ~8g carbs" not "crackers — varies." Show a total at the end. When working from a photo, state your visual estimate directly — "looks like about 10-15 pieces" — and note it's an estimate. Never collapse a multi-component meal to a single number without the breakdown.
+- BG awareness: if the context shows no live reading or a stale one, do NOT invent or assume a BG value. When actively dosing (not just planning), ask the user to tell you the current number.
 - Saved recipes: if the user mentions a food that matches a saved recipe by name, always ask whether they mean the saved recipe or a different version (store-bought, restaurant, different preparation) before using the recipe's macros. Only use saved recipe numbers when the user confirms it — e.g. "the homemade ones", "from our recipe", or "yes that one". If they don't confirm, estimate using general nutrition knowledge instead.
 - Dosing guidance: always say "enter X grams into the pump", never units.
 - For lows: fast carbs only, no insulin.
@@ -136,23 +144,27 @@ Rules:
 
   const today = now.toISOString().split('T')[0]
 
-  // Upload photo to storage if present
-  let photoUrl: string | null = null
-  if (photo_base64) {
-    const imgBuffer = Buffer.from(photo_base64, 'base64')
-    const ext = (photo_mime_type || 'image/jpeg').split('/')[1] || 'jpg'
-    const path = `${today}/${Date.now()}.${ext}`
+  // Upload all photos to storage
+  const photoUrls: string[] = []
+  for (let i = 0; i < allPhotos.length; i++) {
+    const p = allPhotos[i]
+    const imgBuffer = Buffer.from(p.base64, 'base64')
+    const ext = p.mime_type.split('/')[1] || 'jpg'
+    const path = `${today}/${Date.now()}-${i}.${ext}`
     const { error: uploadError } = await supabase.storage
       .from('chat-photos')
-      .upload(path, imgBuffer, { contentType: photo_mime_type || 'image/jpeg', upsert: false })
+      .upload(path, imgBuffer, { contentType: p.mime_type, upsert: false })
     if (!uploadError) {
       const { data: urlData } = supabase.storage.from('chat-photos').getPublicUrl(path)
-      photoUrl = urlData.publicUrl
+      photoUrls.push(urlData.publicUrl)
     }
   }
+  const photoUrl = photoUrls.length === 0 ? null
+    : photoUrls.length === 1 ? photoUrls[0]
+    : JSON.stringify(photoUrls)
 
-  const storedContent = photo_base64
-    ? `[photo] ${message || ''}`.trim()
+  const storedContent = allPhotos.length > 0
+    ? `[photo${allPhotos.length > 1 ? 's' : ''}] ${message || ''}`.trim()
     : message
 
   const { data: userMsg } = await supabase.from('t1d_chat_log').insert({
@@ -178,15 +190,18 @@ Rules:
   }
   const historyMessages = allHistory.slice(startIdx).slice(-10)
 
-  // Build message array — inject vision content for the current message if a photo was attached
+  // Build message array — inject vision content for the current message if photos were attached
   const messages = historyMessages.map((m: { role: string; content: string }, idx: number) => {
     const isLast = idx === historyMessages.length - 1
-    if (isLast && m.role === 'user' && photo_base64) {
+    if (isLast && m.role === 'user' && allPhotos.length > 0) {
       return {
         role: 'user' as const,
         content: [
-          { type: 'image' as const, source: { type: 'base64' as const, media_type: (photo_mime_type || 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: photo_base64 } },
-          { type: 'text' as const, text: message || 'What food do you see? Give me dosing guidance based on the current BG and context.' },
+          ...allPhotos.map(p => ({
+            type: 'image' as const,
+            source: { type: 'base64' as const, media_type: (p.mime_type || 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: p.base64 },
+          })),
+          { type: 'text' as const, text: message || 'What food do you see? List each item with estimated carbs, then give dosing guidance.' },
         ],
       }
     }

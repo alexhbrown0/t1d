@@ -195,7 +195,7 @@ export default function ChatPage() {
   const [proposal, setProposal] = useState<string | null>(null)
   const [logProposal, setLogProposal] = useState<LogProposal | null>(null)
   const [recipeProposal, setRecipeProposal] = useState<RecipeProposal | null>(null)
-  const [photo, setPhoto] = useState<Photo | null>(null)
+  const [photos, setPhotos] = useState<Photo[]>([])
   const [lightbox, setLightbox] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const autoSentRef = useRef(false)
@@ -204,8 +204,10 @@ export default function ChatPage() {
   const handlePhotoFile = async (file: File) => {
     const preview = URL.createObjectURL(file)
     const base64 = await toBase64(file)
-    setPhoto({ preview, base64, mimeType: file.type || 'image/jpeg' })
+    setPhotos(prev => [...prev, { preview, base64, mimeType: file.type || 'image/jpeg' }])
   }
+
+  const removePhoto = (idx: number) => setPhotos(prev => prev.filter((_, i) => i !== idx))
 
   useEffect(() => {
     fetch('/api/t1d/chat').then(r => r.json()).then(data => {
@@ -234,23 +236,27 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, proposal])
 
-  const send = async (text: string, attachedPhoto?: Photo) => {
-    const currentPhoto = attachedPhoto ?? photo
-    if (!text.trim() && !currentPhoto || loading) return
+  const send = async (text: string, attachedPhotos?: Photo[]) => {
+    const currentPhotos = attachedPhotos ?? photos
+    if (!text.trim() && currentPhotos.length === 0 || loading) return
     const displayText = text.trim() || ''
-    const optimistic: ChatMsg = { id: Date.now().toString(), role: 'user', content: displayText, created_at: new Date().toISOString(), photo_url: currentPhoto?.preview ?? null }
+    const previewUrl = currentPhotos.length === 1
+      ? currentPhotos[0].preview
+      : currentPhotos.length > 1
+        ? JSON.stringify(currentPhotos.map(p => p.preview))
+        : null
+    const optimistic: ChatMsg = { id: Date.now().toString(), role: 'user', content: displayText, created_at: new Date().toISOString(), photo_url: previewUrl }
     setMessages(prev => [...prev, optimistic])
     setInput('')
-    setPhoto(null)
+    setPhotos([])
     setProposal(null)
     setLogProposal(null)
     setRecipeProposal(null)
     setLoading(true)
     try {
-      const body: Record<string, string> = { message: text.trim() || '' }
-      if (currentPhoto) {
-        body.photo_base64 = currentPhoto.base64
-        body.photo_mime_type = currentPhoto.mimeType
+      const body: Record<string, unknown> = { message: text.trim() || '' }
+      if (currentPhotos.length > 0) {
+        body.photos = currentPhotos.map(p => ({ base64: p.base64, mime_type: p.mimeType }))
       }
       const res = await fetch('/api/t1d/chat', {
         method: 'POST',
@@ -371,26 +377,36 @@ export default function ChatPage() {
             <p className="text-gray-700 text-xs mt-1">Dosing, lows, activity, what to do next.</p>
           </div>
         )}
-        {messages.map((m) => (
-          <div key={m.id} className={`flex w-full ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] min-w-0 rounded-2xl overflow-hidden ${
-              m.role === 'user'
-                ? 'bg-white/10 text-white rounded-br-sm'
-                : 'bg-[#141414] text-gray-200 border border-white/5 rounded-bl-sm'
-            }`}>
-              {m.photo_url && (
-                <button onClick={() => setLightbox(m.photo_url!)} className="block w-full">
-                  <img src={m.photo_url} alt="attached" className="w-full max-h-48 object-cover" />
-                </button>
-              )}
-              {(m.content && m.content !== '[photo]') && (
-                <p className="px-4 py-3 text-sm leading-relaxed break-words">
-                  {m.content.replace(/^\[photo\]\s*/, '')}
-                </p>
-              )}
+        {messages.map((m) => {
+          const msgPhotoUrls: string[] = m.photo_url
+            ? (() => { try { const p = JSON.parse(m.photo_url); return Array.isArray(p) ? p : [m.photo_url] } catch { return [m.photo_url] } })()
+            : []
+          const bodyText = m.content?.replace(/^\[photos?\]\s*/, '') || ''
+          return (
+            <div key={m.id} className={`flex w-full ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] min-w-0 rounded-2xl overflow-hidden ${
+                m.role === 'user'
+                  ? 'bg-white/10 text-white rounded-br-sm'
+                  : 'bg-[#141414] text-gray-200 border border-white/5 rounded-bl-sm'
+              }`}>
+                {msgPhotoUrls.length > 0 && (
+                  <div className={msgPhotoUrls.length > 1 ? 'grid grid-cols-2 gap-px' : ''}>
+                    {msgPhotoUrls.map((url, i) => (
+                      <button key={i} onClick={() => setLightbox(url)} className="block w-full">
+                        <img src={url} alt="attached" className="w-full max-h-48 object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {(bodyText && bodyText !== '[photo]') && (
+                  <p className="px-4 py-3 text-sm leading-relaxed break-words whitespace-pre-wrap">
+                    {bodyText}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
         {loading && (
           <div className="flex justify-start">
             <div className="bg-[#141414] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3">
@@ -446,18 +462,20 @@ export default function ChatPage() {
       </div>
       </div>
 
-      {/* Photo preview */}
-      {photo && (
-        <div className="px-4 pb-1 flex-none">
-          <div className="relative inline-block">
-            <img src={photo.preview} alt="attached" className="h-20 rounded-xl object-cover border border-white/10" />
-            <button
-              onClick={() => setPhoto(null)}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-800 border border-white/20 flex items-center justify-center text-gray-400 text-xs"
-            >
-              ×
-            </button>
-          </div>
+      {/* Photo previews */}
+      {photos.length > 0 && (
+        <div className="px-4 pb-1 flex-none flex gap-2 flex-wrap">
+          {photos.map((p, i) => (
+            <div key={i} className="relative">
+              <img src={p.preview} alt="attached" className="h-20 w-20 rounded-xl object-cover border border-white/10" />
+              <button
+                onClick={() => removePhoto(i)}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-800 border border-white/20 flex items-center justify-center text-gray-400 text-xs"
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
@@ -478,23 +496,28 @@ export default function ChatPage() {
           <button
             onClick={() => photoRef.current?.click()}
             disabled={loading}
-            className="text-gray-500 flex-shrink-0 active:text-teal-400 transition-colors"
+            className="text-gray-500 flex-shrink-0 active:text-teal-400 transition-colors relative"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
               <circle cx="12" cy="13" r="4" />
             </svg>
+            {photos.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-teal-500 text-black text-[9px] font-bold flex items-center justify-center leading-none">
+                {photos.length}
+              </span>
+            )}
           </button>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send(input)}
-            placeholder={photo ? 'Add a note or just send…' : 'Ask or send an update…'}
+            placeholder={photos.length > 0 ? `${photos.length} photo${photos.length > 1 ? 's' : ''} ready — add a note or just send…` : 'Ask or send an update…'}
             className="flex-1 min-w-0 bg-transparent text-base text-white placeholder-gray-600 outline-none"
           />
           <button
             onClick={() => send(input)}
-            disabled={(!input.trim() && !photo) || loading}
+            disabled={(!input.trim() && photos.length === 0) || loading}
             className="text-teal-400 disabled:text-gray-700 flex-shrink-0 transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
