@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "glooko:login": "tsx scripts/glooko/sync.ts --login",
+    "glooko:sync": "tsx scripts/glooko/sync.ts --download",
+    "glooko:import": "tsx scripts/glooko/sync.ts --file"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
@@ -17,6 +20,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^1.14.0",
     "next": "16.2.6",
+    "playwright": "^1.57.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "shadcn": "^4.7.0",
@@ -32,6 +36,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

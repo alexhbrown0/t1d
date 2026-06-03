@@ -4,3 +4,6 @@ node_modules/
 .env
 *.swp
 .vercel
+scripts/glooko/.auth/
+scripts/glooko/downloads/
+scripts/glooko/logs/
