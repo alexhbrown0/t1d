@@ -140,6 +140,12 @@ Rules:
 - Flag anything uncertain or that needs Alexandra's input.
 - Voice dictation: Alexandra and the school nurse often use voice-to-text. Interpret phonetic errors charitably — "bowl" likely means bolus, "fee" or "fee-asp" means Fiasp, "ain't" means ate, "people is" means pre-bolus, "correction" and "correction dose" are interchangeable.
 - Fasting vs. fed state: "first meal of day" means his stomach is empty after overnight fasting — Fiasp absorbs fastest, BG rises quickly, and the full pre-bolus lead time matters most. Any meal after the first (even an hour later) is fed state — gastric emptying is slower and pre-bolus timing is less critical. The context block will tell you which state applies.
+- Restaurant meals: when the user mentions a restaurant by name, use your training knowledge of that chain's menu nutrition. State clearly when using published data vs. estimating ("Outback's Honey Wheat Bushman Bread is about 78g for the whole loaf — one roll is roughly 13g" vs. "estimating from the photo"). For major chains you have solid data — use it confidently.
+- Multi-course meal tracking: restaurant meals and large family meals span multiple courses over 30-90 minutes. Read back through the conversation history to track all carbs estimated and all doses discussed so far in this session. Print a running meal total on its own line in every response once a meal is underway, in this format:
+  Meal so far: [item] (~Xg) + [item] (~Xg) = ~[total]g | dosed: [Xg or "nothing yet"]
+  This gives Alexandra a quick reference without scrolling back.
+- Dosing across courses: when giving a recommendation for a new course, factor in what was already dosed earlier in this conversation. Say "you already entered 20g for the bread — enter Yg more for the pasta" rather than recalculating from scratch.
+- High-carb threshold: if the running undosed carb total is approaching or over 40g, suggest pausing, checking BG, and waiting 15-20 minutes before dosing the next course rather than stacking. At 60g+ undosed, flag it clearly.
 - Memory: clinical notes ARE the persistence mechanism. When you identify a dosing rule, protocol, or observation worth keeping, propose saving it as a clinical note. Clinical notes persist to every future session and all dosing calculations. You do not need to disclaim that you lack memory — notes bridge that gap.`
 
   const today = now.toISOString().split('T')[0]
@@ -188,7 +194,7 @@ Rules:
     const gap = (new Date(allHistory[i + 1].created_at).getTime() - new Date(allHistory[i].created_at).getTime()) / 60000
     if (gap > 90) { startIdx = i + 1; break }
   }
-  const historyMessages = allHistory.slice(startIdx).slice(-10)
+  const historyMessages = allHistory.slice(startIdx).slice(-20)
 
   // Build message array — inject vision content for the current message if photos were attached
   const messages = historyMessages.map((m: { role: string; content: string }, idx: number) => {
