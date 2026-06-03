@@ -141,10 +141,12 @@ Rules:
 - Voice dictation: Alexandra and the school nurse often use voice-to-text. Interpret phonetic errors charitably — "bowl" likely means bolus, "fee" or "fee-asp" means Fiasp, "ain't" means ate, "people is" means pre-bolus, "correction" and "correction dose" are interchangeable.
 - Fasting vs. fed state: "first meal of day" means his stomach is empty after overnight fasting — Fiasp absorbs fastest, BG rises quickly, and the full pre-bolus lead time matters most. Any meal after the first (even an hour later) is fed state — gastric emptying is slower and pre-bolus timing is less critical. The context block will tell you which state applies.
 - Restaurant meals: when the user mentions a restaurant by name, use your training knowledge of that chain's menu nutrition. State clearly when using published data vs. estimating ("Outback's Honey Wheat Bushman Bread is about 78g for the whole loaf — one roll is roughly 13g" vs. "estimating from the photo"). For major chains you have solid data — use it confidently.
-- Multi-course meal tracking: restaurant meals and large family meals span multiple courses over 30-90 minutes. Read back through the conversation history to track all carbs estimated and all doses discussed so far in this session. Print a running meal total on its own line in every response once a meal is underway, in this format:
+- Message timestamps: older messages in this conversation are prefixed with how long ago they were sent (e.g. "[45min ago]", "[2h 10min ago]"). Use these to understand what's still clinically relevant.
+- Multi-course meal tracking: for messages within the last 2 hours, read back through the conversation to build a running total of all carbs estimated and doses discussed. Print it on its own line in every response once a meal is underway:
   Meal so far: [item] (~Xg) + [item] (~Xg) = ~[total]g | dosed: [Xg or "nothing yet"]
-  This gives Alexandra a quick reference without scrolling back.
-- Dosing across courses: when giving a recommendation for a new course, factor in what was already dosed earlier in this conversation. Say "you already entered 20g for the bread — enter Yg more for the pasta" rather than recalculating from scratch.
+  Do not include food from messages older than 2 hours in this total — that was a separate meal. Fiasp clears in 2-3 hours so older doses don't carry forward either.
+- High-fat exception: if an earlier meal (even 2-4 hours ago) was high in fat or protein — pizza, fried food, creamy sauces, burgers — note that there may still be a fat-protein glucose rise in progress. That context is worth keeping even if it falls outside the 2-hour meal window.
+- Dosing across courses: factor in what was already dosed earlier in this conversation. Say "you already entered 20g for the bread — enter Yg more for the pasta" rather than recalculating from scratch.
 - High-carb threshold: if the running undosed carb total is approaching or over 40g, suggest pausing, checking BG, and waiting 15-20 minutes before dosing the next course rather than stacking. At 60g+ undosed, flag it clearly.
 - Memory: clinical notes ARE the persistence mechanism. When you identify a dosing rule, protocol, or observation worth keeping, propose saving it as a clinical note. Clinical notes persist to every future session and all dosing calculations. You do not need to disclaim that you lack memory — notes bridge that gap.`
 
@@ -197,7 +199,18 @@ Rules:
   const historyMessages = allHistory.slice(startIdx).slice(-20)
 
   // Build message array — inject vision content for the current message if photos were attached
-  const messages = historyMessages.map((m: { role: string; content: string }, idx: number) => {
+  // Prefix older messages with a relative timestamp so Claude can reason about what's still relevant
+  function timePrefix(isoTimestamp: string, isLast: boolean): string {
+    if (isLast) return ''
+    const minsAgoMsg = Math.floor((Date.now() - new Date(isoTimestamp).getTime()) / 60000)
+    if (minsAgoMsg < 10) return ''
+    if (minsAgoMsg < 60) return `[${minsAgoMsg}min ago] `
+    const h = Math.floor(minsAgoMsg / 60)
+    const m = minsAgoMsg % 60
+    return `[${h}h${m > 0 ? ` ${m}min` : ''} ago] `
+  }
+
+  const messages = historyMessages.map((m: { role: string; content: string; created_at: string }, idx: number) => {
     const isLast = idx === historyMessages.length - 1
     if (isLast && m.role === 'user' && allPhotos.length > 0) {
       return {
@@ -213,7 +226,7 @@ Rules:
     }
     return {
       role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
-      content: m.content,
+      content: timePrefix(m.created_at, isLast) + m.content,
     }
   })
 
