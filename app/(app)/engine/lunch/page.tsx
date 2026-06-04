@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { LunchBuilder } from '@/components/t1d/lunch-builder'
-import type { RecentItem } from '@/components/t1d/lunch-builder'
+import type { RecentItem, ItemStat } from '@/components/t1d/lunch-builder'
 import Link from 'next/link'
 import type { T1dFoodRepo, MealItem } from '@/types/health'
 
@@ -9,34 +9,72 @@ export const dynamic = 'force-dynamic'
 export default async function EngineLunchPage() {
   const supabase = createServerClient()
 
+  // After 1 PM we're packing for tomorrow
+  const now = new Date()
+  const packingForTomorrow = now.getHours() >= 13
+  const targetDate = new Date(now)
+  if (packingForTomorrow) targetDate.setDate(targetDate.getDate() + 1)
+  targetDate.setHours(0, 0, 0, 0)
+  const targetEnd = new Date(targetDate)
+  targetEnd.setDate(targetEnd.getDate() + 1)
+
+  // Timestamp to use when saving (target date at 7 AM so queries for that day find it)
+  const saveTimestamp = new Date(targetDate)
+  saveTimestamp.setHours(7, 0, 0, 0)
+
   const twoWeeksAgo = new Date()
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
 
-  const [foodRes, recentMealsRes] = await Promise.all([
+  const [foodRes, existingMealRes, recentMealsRes] = await Promise.all([
     supabase.from('t1d_food_repo').select('*').eq('active', true).order('name'),
+    // Load existing meal event for target date (so user can continue packing)
     supabase
       .from('t1d_meal_events')
-      .select('items_offered')
+      .select('*')
+      .eq('context', 'school_lunch')
+      .gte('timestamp', targetDate.toISOString())
+      .lt('timestamp', targetEnd.toISOString())
+      .order('timestamp', { ascending: false })
+      .limit(1),
+    // Historical meals for recent items + stats
+    supabase
+      .from('t1d_meal_events')
+      .select('timestamp, items_offered')
       .eq('context', 'school_lunch')
       .gte('timestamp', twoWeeksAgo.toISOString())
+      .lt('timestamp', targetDate.toISOString()) // exclude today/target
       .order('timestamp', { ascending: false })
       .limit(30),
   ])
 
   const foodRepo = (foodRes.data ?? []) as T1dFoodRepo[]
+  const existingMeal = existingMealRes.data?.[0] ?? null
+  const initialPacked = existingMeal
+    ? (existingMeal.items_offered as MealItem[]).map(i => ({
+        food_repo_id: i.food_repo_id,
+        name: i.name,
+        carbs: i.carbs,
+        fat: i.fat ?? null,
+        protein: i.protein ?? null,
+        qty: i.qty_offered,
+        serving_size: foodRepo.find(f => f.id === i.food_repo_id)?.serving_size ?? '1 serving',
+      }))
+    : []
 
-  // Tally item frequency across recent lunches
-  const tally = new Map<string, { count: number; item: RecentItem }>()
+  // Tally frequency + last served per item
+  const tally = new Map<string, { count: number; lastServed: string; item: RecentItem }>()
   for (const meal of recentMealsRes.data ?? []) {
     for (const item of (meal.items_offered as MealItem[]) ?? []) {
-      const existing = tally.get(item.name)
+      const key = item.food_repo_id ?? item.name
+      const repoMatch = foodRepo.find(f => f.id === item.food_repo_id || f.name === item.name)
+      const existing = tally.get(key)
       if (existing) {
         existing.count++
+        if (meal.timestamp > existing.lastServed) existing.lastServed = meal.timestamp
       } else {
-        // Try to match to food repo for accurate serving_size
-        const repoMatch = foodRepo.find(f => f.id === item.food_repo_id || f.name === item.name)
-        tally.set(item.name, {
+        tally.set(key, {
           count: 1,
+          lastServed: meal.timestamp,
           item: {
             food_repo_id: item.food_repo_id,
             name: item.name,
@@ -55,6 +93,17 @@ export default async function EngineLunchPage() {
     .slice(0, 10)
     .map(t => t.item)
 
+  // Stats map keyed by food_repo_id or name
+  const itemStats: Record<string, ItemStat> = {}
+  for (const [key, val] of tally.entries()) {
+    const daysAgo = Math.round((now.getTime() - new Date(val.lastServed).getTime()) / 86400000)
+    itemStats[key] = { daysAgo, timesServed: val.count }
+  }
+
+  const targetLabel = packingForTomorrow
+    ? `Tomorrow · ${targetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
+    : `Today · ${targetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
+
   return (
     <div className="px-4 pt-5 pb-6 space-y-4">
       <div className="flex items-center gap-3">
@@ -64,11 +113,20 @@ export default async function EngineLunchPage() {
           </svg>
         </Link>
         <div>
-          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">PACK LUNCH</p>
-          <p className="text-lg font-semibold text-white">Today&apos;s Lunch</p>
+          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">PACK LUNCH · {targetLabel.toUpperCase()}</p>
+          <p className="text-lg font-semibold text-white">
+            {existingMeal ? 'Continue Packing' : "Today's Lunch"}
+          </p>
         </div>
       </div>
-      <LunchBuilder foodRepo={foodRepo} recentItems={recentItems} />
+      <LunchBuilder
+        foodRepo={foodRepo}
+        recentItems={recentItems}
+        itemStats={itemStats}
+        initialPacked={initialPacked}
+        existingMealId={existingMeal?.id ?? null}
+        saveTimestamp={saveTimestamp.toISOString()}
+      />
     </div>
   )
 }

@@ -6,7 +6,7 @@ import type { T1dFoodRepo, MealItem } from '@/types/health'
 
 type Tab = 'items' | 'photo'
 
-interface PackedItem {
+export interface PackedItem {
   food_repo_id: string | null
   name: string
   carbs: number
@@ -25,43 +25,50 @@ export interface RecentItem {
   serving_size: string
 }
 
+export interface ItemStat {
+  daysAgo: number
+  timesServed: number
+}
+
 interface Props {
   foodRepo: T1dFoodRepo[]
   recentItems: RecentItem[]
+  itemStats: Record<string, ItemStat>
+  initialPacked: PackedItem[]
+  existingMealId: string | null
+  saveTimestamp: string
 }
 
-export function LunchBuilder({ foodRepo, recentItems }: Props) {
+export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, existingMealId, saveTimestamp }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('items')
-  const [packed, setPacked] = useState<PackedItem[]>([])
+  const [packed, setPacked] = useState<PackedItem[]>(initialPacked)
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [photoItems, setPhotoItems] = useState<PackedItem[] | null>(null)
-
-  // Qty input state — which item is being configured
   const [adding, setAdding] = useState<{ food: T1dFoodRepo | RecentItem; qty: string } | null>(null)
-
   const photoRef = useRef<HTMLInputElement>(null)
 
+  const statKey = (id: string | null, name: string) => id ?? name
   const isAlreadyPacked = (id: string | null, name: string) =>
     packed.some(p => (id && p.food_repo_id === id) || p.name === name)
 
   const openQtyInput = (food: T1dFoodRepo | RecentItem) => {
-    setAdding({ food, qty: '1' })
+    const id = 'id' in food ? food.id : food.food_repo_id
+    const existingPacked = packed.find(p => (id && p.food_repo_id === id) || p.name === food.name)
+    setAdding({ food, qty: existingPacked ? String(existingPacked.qty) : '1' })
   }
 
   const confirmAdd = () => {
     if (!adding) return
     const qty = parseFloat(adding.qty)
     if (!qty || qty <= 0) { setAdding(null); return }
-
     const f = adding.food
     const id = 'id' in f ? f.id : f.food_repo_id
     const carbs = 'carbs_g' in f ? f.carbs_g : f.carbs
     const fat = 'fat_g' in f ? (f.fat_g ?? null) : f.fat
     const protein = 'protein_g' in f ? (f.protein_g ?? null) : f.protein
-
     setPacked(prev => {
       const idx = prev.findIndex(p => (id && p.food_repo_id === id) || p.name === f.name)
       const item: PackedItem = { food_repo_id: id, name: f.name, carbs, fat, protein, qty, serving_size: f.serving_size }
@@ -73,7 +80,7 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
 
   const updatePackedQty = (index: number, raw: string) => {
     const qty = parseFloat(raw)
-    if (raw === '' || raw === '0') {
+    if (raw === '' || (!isNaN(qty) && qty <= 0)) {
       setPacked(prev => prev.filter((_, i) => i !== index))
     } else if (!isNaN(qty) && qty > 0) {
       setPacked(prev => prev.map((p, i) => i === index ? { ...p, qty } : p))
@@ -82,7 +89,6 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
 
   const removeItem = (index: number) => setPacked(prev => prev.filter((_, i) => i !== index))
 
-  // Photo handling
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -138,11 +144,26 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
         fat: p.fat,
         protein: p.protein,
       }))
-      await fetch('/api/t1d/meal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: 'school_lunch', items, source: 'manual', entered_by: 'alexandra' }),
-      })
+
+      if (existingMealId) {
+        await fetch(`/api/t1d/meal/${existingMealId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items_offered: items, entered_by: 'alexandra' }),
+        })
+      } else {
+        await fetch('/api/t1d/meal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            context: 'school_lunch',
+            items,
+            source: 'manual',
+            entered_by: 'alexandra',
+            timestamp: saveTimestamp,
+          }),
+        })
+      }
       router.push('/lunch')
     } finally {
       setSaving(false)
@@ -156,7 +177,7 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
       )
     : foodRepo
 
-  // ── Qty input card ─────────────────────────────────────────────────────────
+  // ── Qty input screen ────────────────────────────────────────────────────────
   if (adding) {
     const f = adding.food
     const carbs = 'carbs_g' in f ? f.carbs_g : f.carbs
@@ -198,10 +219,9 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
     )
   }
 
-  // ── Main UI ────────────────────────────────────────────────────────────────
+  // ── Main UI ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Tab bar */}
       <div className="flex w-full gap-1 bg-white/5 rounded-xl p-1">
         {(['items', 'photo'] as Tab[]).map(t => (
           <button
@@ -219,22 +239,30 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
       {/* ── Add Items tab ── */}
       {tab === 'items' && (
         <div className="space-y-3">
-          {/* Recent items */}
           {recentItems.length > 0 && !search && (
             <div className="space-y-1.5">
               <p className="text-[10px] tracking-widest text-gray-500 font-semibold">RECENT</p>
               <div className="flex flex-wrap gap-2">
                 {recentItems.map((item, i) => {
-                  const packed_ = isAlreadyPacked(item.food_repo_id, item.name)
+                  const key = statKey(item.food_repo_id, item.name)
+                  const stat = itemStats[key]
+                  const alreadyPacked = isAlreadyPacked(item.food_repo_id, item.name)
                   return (
                     <button
                       key={i}
                       onClick={() => openQtyInput(item)}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
-                        packed_ ? 'bg-teal-500/20 border-teal-500/40 text-teal-300' : 'bg-[#141414] border-white/10 text-gray-300'
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors text-left ${
+                        alreadyPacked
+                          ? 'bg-teal-500/20 border-teal-500/40 text-teal-300'
+                          : 'bg-[#141414] border-white/10 text-gray-300'
                       }`}
                     >
                       {item.name}
+                      {stat && (
+                        <span className="text-gray-600 font-normal ml-1.5">
+                          {stat.daysAgo === 0 ? 'today' : stat.daysAgo === 1 ? 'yesterday' : `${stat.daysAgo}d`}
+                        </span>
+                      )}
                     </button>
                   )
                 })}
@@ -242,7 +270,6 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
             </div>
           )}
 
-          {/* Search */}
           <input
             type="text"
             placeholder="Search all foods…"
@@ -251,15 +278,19 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
             className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/50"
           />
 
-          {/* Food list */}
           <div className="space-y-1.5 max-h-56 overflow-y-auto">
             {filtered.slice(0, 40).map(food => {
+              const key = statKey(food.id, food.name)
+              const stat = itemStats[key]
               const alreadyPacked = isAlreadyPacked(food.id, food.name)
               return (
                 <div key={food.id} className="bg-[#141414] rounded-xl border border-white/5 px-4 py-2.5 flex items-center justify-between">
                   <div className="min-w-0 flex-1 pr-3">
                     <p className="text-sm text-white truncate">{food.name}</p>
-                    <p className="text-[10px] text-gray-500">{food.carbs_g}g · {food.serving_size}</p>
+                    <p className="text-[10px] text-gray-500">
+                      {food.carbs_g}g · {food.serving_size}
+                      {stat && <span className="text-gray-600 ml-2">last {stat.daysAgo === 0 ? 'today' : stat.daysAgo === 1 ? 'yesterday' : `${stat.daysAgo}d ago`}</span>}
+                    </p>
                   </div>
                   <button
                     onClick={() => openQtyInput(food)}
@@ -289,14 +320,12 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
               <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
             </div>
           )}
-
           {analyzing && (
             <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-12 text-center space-y-2">
               <p className="text-sm text-white">Analyzing photo…</p>
               <p className="text-xs text-gray-500">Claude is identifying food items</p>
             </div>
           )}
-
           {photoItems && (
             <div className="space-y-3">
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">FOUND IN PHOTO</p>
@@ -339,7 +368,7 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
                   className="w-14 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-white text-sm text-center focus:outline-none focus:border-teal-500/50"
                 />
                 <p className="text-xs text-teal-400 w-12 text-right tabular-nums flex-shrink-0">{Math.round(item.carbs * item.qty)}g</p>
-                <button onClick={() => removeItem(i)} className="text-gray-600 hover:text-red-400 transition-colors">
+                <button onClick={() => removeItem(i)} className="text-gray-600 active:text-red-400 transition-colors">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
@@ -349,12 +378,11 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
           ))}
           <div className="px-4 py-1 flex justify-between">
             <span className="text-xs text-gray-600">Total</span>
-            <span className="text-sm font-bold text-white">{Math.round(totalCarbs)}g</span>
+            <span className="text-sm font-bold text-white tabular-nums">{Math.round(totalCarbs)}g</span>
           </div>
         </div>
       )}
 
-      {/* ── Save ── */}
       <button
         onClick={saveLunch}
         disabled={packed.length === 0 || saving}

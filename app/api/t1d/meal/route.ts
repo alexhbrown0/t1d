@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
     entered_by?: string
     photo_url?: string
     claude_analysis?: unknown
+    timestamp?: string
   }
 
   if (!body.context || !body.items || !body.source) {
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('t1d_meal_events')
     .insert({
-      timestamp: new Date().toISOString(),
+      timestamp: body.timestamp ?? new Date().toISOString(),
       context: body.context,
       items_offered: body.items,
       total_offered_carbs: totalCarbs,

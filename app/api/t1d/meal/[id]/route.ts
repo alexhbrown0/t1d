@@ -3,34 +3,52 @@ import { createServerClient } from '@/lib/supabase/server'
 import { computeFpu } from '@/lib/t1d/fpu'
 import type { MealItem } from '@/types/health'
 
-// PATCH /api/t1d/meal/[id] — nurse updates qty eaten after lunch
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServerClient()
   const { id } = await params
-  const body = await req.json() as { items_eaten: MealItem[]; entered_by?: string }
-
-  if (!body.items_eaten) {
-    return NextResponse.json({ error: 'items_eaten is required' }, { status: 400 })
+  const body = await req.json() as {
+    items_offered?: MealItem[]
+    items_eaten?: MealItem[]
+    entered_by?: string
   }
 
-  const totalEatenCarbs = body.items_eaten.reduce((s, i) => s + i.carbs * (i.qty_eaten ?? 0), 0)
-  const totalFat = body.items_eaten.reduce((s, i) => s + (i.fat ?? 0) * (i.qty_eaten ?? 0), 0)
-  const totalProtein = body.items_eaten.reduce((s, i) => s + (i.protein ?? 0) * (i.qty_eaten ?? 0), 0)
-  const fpuCount = computeFpu(totalFat, totalProtein)
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
-  const { data, error } = await supabase
-    .from('t1d_meal_events')
-    .update({
+  if (body.items_offered) {
+    const totalCarbs = body.items_offered.reduce((s, i) => s + i.carbs * i.qty_offered, 0)
+    const totalFat = body.items_offered.reduce((s, i) => s + (i.fat ?? 0) * i.qty_offered, 0)
+    const totalProtein = body.items_offered.reduce((s, i) => s + (i.protein ?? 0) * i.qty_offered, 0)
+    Object.assign(update, {
+      items_offered: body.items_offered,
+      total_offered_carbs: totalCarbs,
+      total_fat_g: totalFat,
+      total_protein_g: totalProtein,
+      fpu_count: computeFpu(totalFat, totalProtein),
+      source: 'manual',
+    })
+    if (body.entered_by) update.entered_by = body.entered_by
+  }
+
+  if (body.items_eaten) {
+    const totalEatenCarbs = body.items_eaten.reduce((s, i) => s + i.carbs * (i.qty_eaten ?? 0), 0)
+    const totalFat = body.items_eaten.reduce((s, i) => s + (i.fat ?? 0) * (i.qty_eaten ?? 0), 0)
+    const totalProtein = body.items_eaten.reduce((s, i) => s + (i.protein ?? 0) * (i.qty_eaten ?? 0), 0)
+    Object.assign(update, {
       items_eaten: body.items_eaten,
       total_eaten_carbs: totalEatenCarbs,
       total_fat_g: totalFat,
       total_protein_g: totalProtein,
-      fpu_count: fpuCount,
-      updated_at: new Date().toISOString(),
+      fpu_count: computeFpu(totalFat, totalProtein),
     })
+    if (body.entered_by) update.entered_by = body.entered_by
+  }
+
+  const { data, error } = await supabase
+    .from('t1d_meal_events')
+    .update(update)
     .eq('id', id)
     .select()
     .single()
