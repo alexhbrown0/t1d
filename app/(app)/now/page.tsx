@@ -79,7 +79,7 @@ export default async function NowPage() {
 
       {/* Weekday lunch tile */}
       {isWeekday && (
-        <Link href={lunchPhase === 'none' ? '/engine' : '/lunch'}>
+        <Link href={lunchPhase === 'none' ? '/engine/lunch' : '/lunch'}>
           <div className="bg-[#141414] rounded-2xl border border-teal-500/20 px-4 py-3.5 flex items-center gap-3 active:opacity-80">
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
               lunchPhase === 'done' ? 'bg-teal-500/20' : 'bg-teal-500/10'
