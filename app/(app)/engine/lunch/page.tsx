@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
 import { LunchBuilder } from '@/components/t1d/lunch-builder'
 import type { RecentItem, ItemStat } from '@/components/t1d/lunch-builder'
 import Link from 'next/link'
@@ -9,18 +10,8 @@ export const dynamic = 'force-dynamic'
 export default async function EngineLunchPage() {
   const supabase = createServerClient()
 
-  // After 1 PM we're packing for tomorrow
   const now = new Date()
-  const packingForTomorrow = now.getHours() >= 13
-  const targetDate = new Date(now)
-  if (packingForTomorrow) targetDate.setDate(targetDate.getDate() + 1)
-  targetDate.setHours(0, 0, 0, 0)
-  const targetEnd = new Date(targetDate)
-  targetEnd.setDate(targetEnd.getDate() + 1)
-
-  // Timestamp to use when saving (target date at 7 AM so queries for that day find it)
-  const saveTimestamp = new Date(targetDate)
-  saveTimestamp.setHours(7, 0, 0, 0)
+  const { packingForTomorrow, targetDate, targetEnd, saveTimestamp, targetLabel } = getLunchTargetDate()
 
   const twoWeeksAgo = new Date()
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
@@ -100,9 +91,7 @@ export default async function EngineLunchPage() {
     itemStats[key] = { daysAgo, timesServed: val.count }
   }
 
-  const targetLabel = packingForTomorrow
-    ? `Tomorrow · ${targetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
-    : `Today · ${targetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
+  const targetLabelFull = `${packingForTomorrow ? 'Tomorrow' : 'Today'} · ${targetLabel}`
 
   return (
     <div className="px-4 pt-5 pb-6 space-y-4">
@@ -113,7 +102,7 @@ export default async function EngineLunchPage() {
           </svg>
         </Link>
         <div>
-          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">PACK LUNCH · {targetLabel.toUpperCase()}</p>
+          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">PACK LUNCH · {targetLabelFull.toUpperCase()}</p>
           <p className="text-lg font-semibold text-white">
             {existingMeal ? 'Continue Packing' : "Today's Lunch"}
           </p>

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
+import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
 import { AppHeader } from '@/components/t1d/app-header'
 import { BgCard } from '@/components/t1d/bg-card'
 import { InsightTile } from '@/components/t1d/insight-tile'
@@ -14,12 +15,7 @@ export default async function NowPage() {
 
   const now = new Date()
   const isWeekday = now.getDay() >= 1 && now.getDay() <= 5
-  const packingForTomorrow = now.getHours() >= 13
-  const targetDate = new Date(now)
-  if (packingForTomorrow) targetDate.setDate(targetDate.getDate() + 1)
-  targetDate.setHours(0, 0, 0, 0)
-  const targetEnd = new Date(targetDate)
-  targetEnd.setDate(targetEnd.getDate() + 1)
+  const { packingForTomorrow, targetDate, targetEnd } = getLunchTargetDate()
   const todayDay = now.getDay()
   const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`
 
