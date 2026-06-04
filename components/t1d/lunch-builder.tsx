@@ -30,6 +30,45 @@ export interface ItemStat {
   timesServed: number
 }
 
+export interface LunchRecipe {
+  id: string
+  name: string
+  carbs_per_piece: number | null
+  fat_per_piece: number | null
+  protein_per_piece: number | null
+  yield_unit: string | null
+  carbs_per_100g: number | null
+  fat_per_100g: number | null
+  protein_per_100g: number | null
+  typical_serving_g: number | null
+  typical_serving_description: string | null
+}
+
+function recipeAsItem(r: LunchRecipe): RecentItem | null {
+  if (r.carbs_per_piece != null) {
+    return {
+      food_repo_id: null,
+      name: r.name,
+      carbs: r.carbs_per_piece,
+      fat: r.fat_per_piece ?? null,
+      protein: r.protein_per_piece ?? null,
+      serving_size: `1 ${r.yield_unit?.replace(/s$/, '') ?? 'piece'}`,
+    }
+  }
+  if (r.carbs_per_100g != null && r.typical_serving_g != null) {
+    const factor = r.typical_serving_g / 100
+    return {
+      food_repo_id: null,
+      name: r.name,
+      carbs: Math.round(r.carbs_per_100g * factor * 10) / 10,
+      fat: r.fat_per_100g != null ? Math.round(r.fat_per_100g * factor * 10) / 10 : null,
+      protein: r.protein_per_100g != null ? Math.round(r.protein_per_100g * factor * 10) / 10 : null,
+      serving_size: r.typical_serving_description ?? `${r.typical_serving_g}g`,
+    }
+  }
+  return null
+}
+
 interface Props {
   foodRepo: T1dFoodRepo[]
   recentItems: RecentItem[]
@@ -37,9 +76,10 @@ interface Props {
   initialPacked: PackedItem[]
   existingMealId: string | null
   saveTimestamp: string
+  recipes?: LunchRecipe[]
 }
 
-export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, existingMealId, saveTimestamp }: Props) {
+export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, existingMealId, saveTimestamp, recipes = [] }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('items')
   const [packed, setPacked] = useState<PackedItem[]>(initialPacked)
@@ -201,6 +241,10 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
       )
     : foodRepo
 
+  const filteredRecipes = search
+    ? recipes.filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
+    : []
+
   // ── Qty input screen ────────────────────────────────────────────────────────
   if (adding) {
     const f = adding.food
@@ -294,6 +338,32 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
             </div>
           )}
 
+          {recipes.length > 0 && !search && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] tracking-widest text-gray-500 font-semibold">RECIPES</p>
+              <div className="flex flex-wrap gap-2">
+                {recipes.map(r => {
+                  const item = recipeAsItem(r)
+                  if (!item) return null
+                  const alreadyPacked = isAlreadyPacked(null, r.name)
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => openQtyInput(item)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+                        alreadyPacked
+                          ? 'bg-teal-500/20 border-teal-500/40 text-teal-300'
+                          : 'bg-[#141414] border-teal-500/20 text-gray-300'
+                      }`}
+                    >
+                      {r.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           <input
             type="text"
             placeholder="Search all foods…"
@@ -303,6 +373,30 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
           />
 
           <div className="space-y-1.5 max-h-56 overflow-y-auto">
+            {filteredRecipes.map(r => {
+              const item = recipeAsItem(r)
+              if (!item) return null
+              const alreadyPacked = isAlreadyPacked(null, r.name)
+              return (
+                <div key={r.id} className="bg-[#141414] rounded-xl border border-teal-500/10 px-4 py-2.5 flex items-center justify-between">
+                  <div className="min-w-0 flex-1 pr-3">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-white truncate">{r.name}</p>
+                      <span className="text-[9px] text-teal-500 bg-teal-500/10 px-1.5 py-0.5 rounded flex-shrink-0">recipe</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500">{item.carbs}g · {item.serving_size}</p>
+                  </div>
+                  <button
+                    onClick={() => openQtyInput(item)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors ${
+                      alreadyPacked ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-white/10 text-white'
+                    }`}
+                  >
+                    {alreadyPacked ? 'Edit' : 'Add'}
+                  </button>
+                </div>
+              )
+            })}
             {filtered.slice(0, 40).map(food => {
               const key = statKey(food.id, food.name)
               const stat = itemStats[key]

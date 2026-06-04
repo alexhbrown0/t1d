@@ -42,17 +42,30 @@ export default function EnginePage() {
       {tab === 'TODAY' && <EngineToday />}
       {tab === 'LUNCH' && <EngineLunchEntry />}
       {tab === 'FOODS' && (
-        <Link href="/engine/foods">
-          <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-5 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-white">Food Repository</p>
-              <p className="text-xs text-gray-500 mt-0.5">Manage Brooks&apos;s known foods and carb counts</p>
+        <div className="space-y-3">
+          <Link href="/engine/foods">
+            <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-5 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Food Repository</p>
+                <p className="text-xs text-gray-500 mt-0.5">Manage Brooks&apos;s known foods and carb counts</p>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </div>
-        </Link>
+          </Link>
+          <Link href="/engine/recipes">
+            <div className="bg-[#141414] rounded-2xl border border-teal-500/20 px-5 py-5 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Saved Recipes</p>
+                <p className="text-xs text-gray-500 mt-0.5">Homemade foods with carb counts</p>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </div>
+          </Link>
+        </div>
       )}
       {tab === 'INSIGHTS' && (
         <div className="space-y-3">

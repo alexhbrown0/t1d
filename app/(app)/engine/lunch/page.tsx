@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
 import { LunchBuilder } from '@/components/t1d/lunch-builder'
-import type { RecentItem, ItemStat } from '@/components/t1d/lunch-builder'
+import type { RecentItem, ItemStat, LunchRecipe } from '@/components/t1d/lunch-builder'
 import Link from 'next/link'
 import type { T1dFoodRepo, MealItem } from '@/types/health'
 
@@ -16,7 +16,7 @@ export default async function EngineLunchPage() {
   const twoWeeksAgo = new Date()
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
 
-  const [foodRes, existingMealRes, recentMealsRes] = await Promise.all([
+  const [foodRes, existingMealRes, recipesRes, recentMealsRes] = await Promise.all([
     supabase.from('t1d_food_repo').select('*').eq('active', true).order('name'),
     // Load existing meal event for target date (so user can continue packing)
     supabase
@@ -27,6 +27,7 @@ export default async function EngineLunchPage() {
       .lt('timestamp', targetEnd.toISOString())
       .order('timestamp', { ascending: false })
       .limit(1),
+    supabase.from('t1d_recipes').select('id,name,carbs_per_piece,fat_per_piece,protein_per_piece,yield_unit,carbs_per_100g,fat_per_100g,protein_per_100g,typical_serving_g,typical_serving_description').eq('active', true).order('name'),
     // Historical meals for recent items + stats
     supabase
       .from('t1d_meal_events')
@@ -39,6 +40,7 @@ export default async function EngineLunchPage() {
   ])
 
   const foodRepo = (foodRes.data ?? []) as T1dFoodRepo[]
+  const recipes = (recipesRes.data ?? []) as LunchRecipe[]
   const existingMeal = existingMealRes.data?.[0] ?? null
   const initialPacked = existingMeal
     ? (existingMeal.items_offered as MealItem[]).map(i => ({
@@ -115,6 +117,7 @@ export default async function EngineLunchPage() {
         initialPacked={initialPacked}
         existingMealId={existingMeal?.id ?? null}
         saveTimestamp={saveTimestamp.toISOString()}
+        recipes={recipes}
       />
     </div>
   )

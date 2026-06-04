@@ -340,6 +340,19 @@ export default function FoodsPage() {
         </div>
       </div>
 
+      {/* Recipes link */}
+      <a href="/engine/recipes">
+        <div className="bg-[#141414] rounded-xl border border-teal-500/20 px-4 py-3 flex items-center justify-between active:opacity-70">
+          <div>
+            <p className="text-sm font-semibold text-white">Saved Recipes</p>
+            <p className="text-xs text-gray-500 mt-0.5">Homemade foods with carb counts</p>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </div>
+      </a>
+
       {/* Search */}
       <div className="flex items-center gap-3 bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
