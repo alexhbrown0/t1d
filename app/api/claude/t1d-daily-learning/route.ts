@@ -1,5 +1,7 @@
 import { getCentralDateStr, getCentralDayStartUTC, getCentralTime } from '@/lib/utils/central-time'
 import { NextRequest, NextResponse } from 'next/server'
+
+export const maxDuration = 300 // 5 minutes — analysis + Claude takes 60-90s
 import { createServerClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 
