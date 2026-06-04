@@ -42,8 +42,10 @@ export function LogEntries({ initialEntries }: { initialEntries: LogEntry[] }) {
     setDeletingId(entry.id)
     setConfirmId(null)
     try {
-      await deleteEntry(entry)
-      setEntries(prev => prev.filter(e => e.id !== entry.id))
+      const res = await deleteEntry(entry)
+      if (res?.ok) {
+        setEntries(prev => prev.filter(e => e.id !== entry.id))
+      }
     } finally {
       setDeletingId(null)
     }
