@@ -178,10 +178,10 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
               value={adding.qty}
               onChange={e => setAdding(a => a ? { ...a, qty: e.target.value } : null)}
               autoFocus
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-semibold text-center focus:outline-none focus:border-teal-500/50"
+              className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-semibold text-center focus:outline-none focus:border-teal-500/50"
             />
-            <div className="text-right">
-              <p className="text-2xl font-bold text-teal-400">{preview}g</p>
+            <div className="text-right w-20 flex-shrink-0">
+              <p className="text-2xl font-bold text-teal-400 tabular-nums">{preview}g</p>
               <p className="text-[10px] text-gray-500">carbs</p>
             </div>
           </div>
@@ -338,7 +338,7 @@ export function LunchBuilder({ foodRepo, recentItems }: Props) {
                   onChange={e => updatePackedQty(i, e.target.value)}
                   className="w-14 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-white text-sm text-center focus:outline-none focus:border-teal-500/50"
                 />
-                <p className="text-xs text-teal-400 w-8">{Math.round(item.carbs * item.qty)}g</p>
+                <p className="text-xs text-teal-400 w-12 text-right tabular-nums flex-shrink-0">{Math.round(item.carbs * item.qty)}g</p>
                 <button onClick={() => removeItem(i)} className="text-gray-600 hover:text-red-400 transition-colors">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
