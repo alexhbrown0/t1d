@@ -1,26 +1,12 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { DeviceStrip } from '@/components/t1d/device-strip'
+import { LogEntries } from '@/components/t1d/log-entries'
 import type { T1dDoseSession, T1dLowTreatment } from '@/types/health'
+import type { LogEntry } from '@/components/t1d/log-entries'
 
 export const dynamic = 'force-dynamic'
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-}
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
-}
-
-interface LogEntry {
-  id: string
-  type: 'bolus' | 'low' | 'activity'
-  timestamp: string
-  label: string
-  sub: string
-  color: string
-  dot: string
-}
 
 export default async function LogPage() {
   const supabase = createServerClient()
@@ -107,14 +93,6 @@ export default async function LogPage() {
     })),
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-  // Group by day label
-  const groups: Record<string, LogEntry[]> = {}
-  for (const entry of entries) {
-    const key = formatDate(entry.timestamp)
-    if (!groups[key]) groups[key] = []
-    groups[key].push(entry)
-  }
-
   return (
     <div className="px-4 pt-5 pb-4 space-y-4">
       {/* Header */}
@@ -154,33 +132,7 @@ export default async function LogPage() {
       </div>
 
       {/* Event log */}
-      {entries.length === 0 ? (
-        <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-8 text-center">
-          <p className="text-gray-600 text-sm">Nothing logged yet today</p>
-          <p className="text-gray-700 text-xs mt-1">Use the quick actions to log events</p>
-        </div>
-      ) : (
-        Object.entries(groups).map(([day, dayEntries]) => (
-          <div key={day} className="space-y-2">
-            <p className="text-[10px] tracking-widest text-gray-600 font-semibold">{day.toUpperCase()}</p>
-            {dayEntries.map(entry => (
-              <div
-                key={entry.id}
-                className="bg-[#141414] rounded-2xl border border-white/5 px-4 py-3 flex items-center gap-3"
-              >
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${entry.dot}`} />
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold ${entry.color}`}>{entry.label}</p>
-                  {entry.sub && (
-                    <p className="text-xs text-gray-500 mt-0.5">{entry.sub}</p>
-                  )}
-                </div>
-                <span className="text-xs text-gray-600 flex-shrink-0">{formatTime(entry.timestamp)}</span>
-              </div>
-            ))}
-          </div>
-        ))
-      )}
+      <LogEntries initialEntries={entries} />
     </div>
   )
 }
