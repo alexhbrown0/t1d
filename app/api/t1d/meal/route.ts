@@ -18,9 +18,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'context, items, and source are required' }, { status: 400 })
   }
 
-  const totalCarbs = body.items.reduce((s, i) => s + i.carbs, 0)
-  const totalFat = body.items.reduce((s, i) => s + (i.fat ?? 0), 0)
-  const totalProtein = body.items.reduce((s, i) => s + (i.protein ?? 0), 0)
+  const totalCarbs = body.items.reduce((s, i) => s + i.carbs * i.qty_offered, 0)
+  const totalFat = body.items.reduce((s, i) => s + (i.fat ?? 0) * i.qty_offered, 0)
+  const totalProtein = body.items.reduce((s, i) => s + (i.protein ?? 0) * i.qty_offered, 0)
   const fpuCount = computeFpu(totalFat, totalProtein)
 
   const { data, error } = await supabase
