@@ -53,11 +53,17 @@ export async function POST(req: NextRequest) {
   const dayOfWeek = ct.dayOfWeek
   const midnightIso = getCentralDayStartUTC().toISOString()
 
-  const [egvs, bolusResult, bolusToday, lowResult, scheduleResult, paramsResult, recipesResult, foodRepoResult] = await Promise.all([
+  const [egvs, bolusResult, bolusToday, lowResult, appDoseResult, mealResult, overrideResult, scheduleResult, paramsResult, recipesResult, foodRepoResult] = await Promise.all([
     getLatestEgvs(5),
     supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u, bg_input_mgdl').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('glooko_bolus').select('timestamp').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(1),
     supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
+    // App dose sessions (more current than Glooko's ~24h delay)
+    supabase.from('t1d_dose_sessions').select('timestamp, recommended_dose_grams, actual_dose_grams, actual_dose_timestamp, pump_suggested_units, engine_reasoning, context_snapshot').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
+    // Today's school lunch
+    supabase.from('t1d_meal_events').select('timestamp, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs, fpu_count').eq('context', 'school_lunch').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(1),
+    // Today's schedule overrides
+    supabase.from('t1d_daily_overrides').select('pe_cancelled, pe_start_time, lunch_start_time, notes').eq('override_date', getCentralDateStr()).limit(1),
     supabase.from('t1d_school_schedule').select('event_type, start_time, day_of_week').eq('active', true).eq('day_of_week', dayOfWeek).order('start_time'),
     supabase.from('t1d_engine_params').select('*').order('effective_from', { ascending: false }).limit(1),
     supabase.from('t1d_recipes').select('name, yield_count, yield_unit, carbs_per_piece, carbs_per_100g, typical_serving_g, typical_serving_description, gi_category, notes').eq('active', true),
@@ -67,6 +73,13 @@ export async function POST(req: NextRequest) {
   const params = paramsResult.data?.[0]
   const boluses = bolusResult.data ?? []
   const lows = lowResult.data ?? []
+  const appDoses = (appDoseResult.data ?? []) as Array<{
+    timestamp: string; recommended_dose_grams: number | null; actual_dose_grams: number | null
+    actual_dose_timestamp: string | null; pump_suggested_units: number | null
+    engine_reasoning: string | null; context_snapshot: Record<string, unknown> | null
+  }>
+  const todayMeal = mealResult.data?.[0] ?? null
+  const todayOverride = overrideResult.data?.[0] ?? null
   const schedule = scheduleResult.data ?? []
   const foodRepo = foodRepoResult.data ?? []
   const isFirstMealOfDay = (bolusToday.data ?? []).length === 0
@@ -104,12 +117,29 @@ export async function POST(req: NextRequest) {
       ? `BG (oldest→newest): ${bgSequence} | now ${bg} mg/dL, ${minsAgo}min ago, rate: ${rateStr}`
       : `BG: no live reading (last reading ${minsAgo != null ? `was ${minsAgo} minutes ago — too stale to use` : 'unavailable'})`,
     boluses.length > 0
-      ? `Boluses past 6h: ${boluses.map(b => `${fmtTime(b.timestamp)} ${b.insulin_delivered_u}U/${b.carbs_input_g ?? 0}g`).join(', ')}`
-      : 'No boluses past 6h',
+      ? `Pump boluses past 6h (Glooko, ~24h delay): ${boluses.map(b => `${fmtTime(b.timestamp)} ${b.insulin_delivered_u}U/${b.carbs_input_g ?? 0}g`).join(', ')}`
+      : 'No pump boluses in Glooko past 6h (24h delay — see app doses below)',
+    appDoses.length > 0
+      ? `App-logged doses past 6h:\n${appDoses.map(d => {
+          const isFollowup = d.context_snapshot?.is_followup
+          const tag = isFollowup ? '[follow-up] ' : ''
+          const status = d.actual_dose_grams != null
+            ? `confirmed ${d.actual_dose_grams}g${d.pump_suggested_units != null ? ` (${d.pump_suggested_units}u)` : ''}`
+            : `${d.recommended_dose_grams}g recommended — NOT YET CONFIRMED`
+          return `  ${fmtTime(d.timestamp)} ${tag}${status}`
+        }).join('\n')}`
+      : 'No app-logged doses past 6h',
     `IOB: ~${iob.toFixed(2)}U`,
     lows.length > 0
       ? `Lows past 6h: ${lows.map(l => `${fmtTime(l.timestamp)} ${l.bg_at_treatment}mg/dL → ${l.treatment_type ?? 'treated'} ${l.treatment_carbs_g ?? '?'}g`).join(', ')}`
       : 'No lows past 6h',
+    todayMeal
+      ? todayMeal.items_eaten
+        ? `School lunch today: ${todayMeal.total_offered_carbs ?? '?'}g packed, ${todayMeal.total_eaten_carbs ?? '?'}g eaten${todayMeal.fpu_count > 1.5 ? ` — HIGH FPU meal (${todayMeal.fpu_count?.toFixed(1)} FPU)` : ''}`
+        : `School lunch packed: ${todayMeal.total_offered_carbs ?? '?'}g — not eaten yet`
+      : 'No school lunch packed today',
+    todayOverride?.pe_cancelled ? 'PE CANCELLED today' :
+    todayOverride?.pe_start_time ? `PE moved to ${todayOverride.pe_start_time} today` : '',
     upcomingSchedule ? `Schedule today: ${upcomingSchedule}` : 'No upcoming schedule events',
     params ? `ICR: ${params.current_icr}, ISF: ${params.current_isf}, target: ${params.target_bg}, pre-bolus lead: ${params.pre_bolus_lead_min}min` : '',
     recipes.length > 0
