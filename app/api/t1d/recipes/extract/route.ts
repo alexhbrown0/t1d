@@ -33,7 +33,10 @@ Rules:
 - All numeric values should be rounded to 1 decimal place`
 
 function parseJson(raw: string) {
-  return JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim())
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start !== -1 && end > start) return JSON.parse(raw.slice(start, end + 1))
+  return JSON.parse(raw.trim())
 }
 
 export async function POST(req: NextRequest) {
