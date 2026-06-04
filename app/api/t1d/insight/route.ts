@@ -35,8 +35,8 @@ export async function GET() {
     // App dose sessions — what was logged through this app (more current than Glooko)
     supabase.from('t1d_dose_sessions').select('timestamp, recommended_dose_grams, actual_dose_grams, actual_dose_timestamp, pump_suggested_units, engine_reasoning, context_snapshot').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(3),
-    // Today's school lunch meal event
-    supabase.from('t1d_meal_events').select('timestamp, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs').eq('context', 'school_lunch').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(1),
+    // Today's meal events (lunch + snack)
+    supabase.from('t1d_meal_events').select('timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs').in('context', ['school_lunch', 'snack']).gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(3),
     supabase.from('t1d_school_schedule').select('*').eq('active', true).order('start_time'),
     // Today's overrides (PE cancelled, schedule changes)
     supabase.from('t1d_daily_overrides').select('pe_cancelled, pe_start_time, notes').eq('override_date', getCentralDateStr()).limit(1),
@@ -55,7 +55,9 @@ export async function GET() {
     context_snapshot: Record<string, unknown> | null
   }>
   const lows = lowResult.data ?? []
-  const todayMeal = mealResult.data?.[0] ?? null
+  const todayMeals = mealResult.data ?? []
+  const todayMeal = todayMeals.find((m: { context: string }) => m.context === 'school_lunch') ?? todayMeals[0] ?? null
+  const todaySnack = todayMeals.find((m: { context: string }) => m.context === 'snack') ?? null
   const schedule = scheduleResult.data ?? []
   const todayOverride = overrideResult.data?.[0] ?? null
   const params = paramsResult.data
@@ -96,11 +98,18 @@ export async function GET() {
     .sort((a, b) => a.minsUntil - b.minsUntil)
 
   // Meal event summary
-  const mealLine = todayMeal
-    ? todayMeal.items_eaten
-      ? `School lunch: ${todayMeal.total_offered_carbs ?? '?'}g packed, ${todayMeal.total_eaten_carbs ?? '?'}g eaten`
-      : `School lunch packed: ${todayMeal.total_offered_carbs ?? '?'}g total — not eaten yet`
-    : 'No school lunch packed today'
+  const mealLine = [
+    todayMeal
+      ? todayMeal.items_eaten
+        ? `School lunch: ${todayMeal.total_offered_carbs ?? '?'}g packed, ${todayMeal.total_eaten_carbs ?? '?'}g eaten`
+        : `School lunch packed: ${todayMeal.total_offered_carbs ?? '?'}g — not eaten yet`
+      : 'No school lunch packed today',
+    todaySnack
+      ? todaySnack.items_eaten
+        ? `Afternoon snack: ${todaySnack.total_offered_carbs ?? '?'}g, ${todaySnack.total_eaten_carbs ?? '?'}g eaten`
+        : `Afternoon snack packed: ${todaySnack.total_offered_carbs ?? '?'}g — not eaten yet`
+      : null,
+  ].filter(Boolean).join(' | ')
 
   // Override summary
   const overrideLine = todayOverride?.pe_cancelled

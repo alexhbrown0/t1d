@@ -22,24 +22,28 @@ const EVENT_COLORS: Record<string, string> = {
   pe: 'bg-green-500',
   recess: 'bg-yellow-500',
   lunch: 'bg-teal-500',
+  snack: 'bg-orange-400',
 }
 
 const EVENT_LABELS: Record<string, string> = {
   pe: 'PE',
   recess: 'Recess',
   lunch: 'Lunch',
+  snack: 'Snack',
 }
 
 const EVENT_BORDER: Record<string, string> = {
   pe: 'border-green-500/30 bg-green-500/5',
   recess: 'border-yellow-500/30 bg-yellow-500/5',
   lunch: 'border-teal-500/30 bg-teal-500/5',
+  snack: 'border-orange-400/30 bg-orange-400/5',
 }
 
 const EVENT_TEXT: Record<string, string> = {
   pe: 'text-green-400',
   recess: 'text-yellow-400',
   lunch: 'text-teal-400',
+  snack: 'text-orange-400',
 }
 
 export default async function SchedulePage() {
@@ -68,6 +72,7 @@ export default async function SchedulePage() {
   }, 0)
 
   const lunchEvent = schedule.find(e => e.event_type === 'lunch')
+  const snackEvents = schedule.filter(e => e.event_type === 'snack')
   const recessEvents = schedule.filter(e => e.event_type === 'recess')
   const recessMinutes = recessEvents.reduce((acc, e) => {
     const start = minutesSinceMidnight(e.start_time)
@@ -122,7 +127,7 @@ export default async function SchedulePage() {
           </div>
 
           {/* Stat chips */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <div className="bg-[#141414] rounded-xl border border-green-500/20 px-3 py-3 text-center">
               <p className="text-xs font-semibold text-green-400">{peMinutes}m</p>
               <p className="text-[10px] text-gray-600 mt-0.5">Active</p>
@@ -136,6 +141,12 @@ export default async function SchedulePage() {
                 {lunchEvent ? formatTime(lunchEvent.start_time) : '—'}
               </p>
               <p className="text-[10px] text-gray-600 mt-0.5">Lunch</p>
+            </div>
+            <div className="bg-[#141414] rounded-xl border border-orange-400/20 px-3 py-3 text-center">
+              <p className="text-xs font-semibold text-orange-400">
+                {snackEvents.length > 0 ? formatTime(snackEvents[0].start_time) : '—'}
+              </p>
+              <p className="text-[10px] text-gray-600 mt-0.5">Snack</p>
             </div>
           </div>
 

@@ -62,8 +62,8 @@ export async function POST(req: NextRequest) {
     supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g, notes').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(10),
     // All of today's app dose sessions (more current than Glooko)
     supabase.from('t1d_dose_sessions').select('timestamp, recommended_dose_grams, actual_dose_grams, actual_dose_timestamp, pump_suggested_units, engine_reasoning, context_snapshot').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(10),
-    // Today's school lunch
-    supabase.from('t1d_meal_events').select('timestamp, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs, fpu_count').eq('context', 'school_lunch').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(1),
+    // Today's meal events (lunch + snack)
+    supabase.from('t1d_meal_events').select('timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs, fpu_count').in('context', ['school_lunch', 'snack']).gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(3),
     // Today's schedule overrides
     supabase.from('t1d_daily_overrides').select('pe_cancelled, pe_start_time, lunch_start_time, notes').eq('override_date', getCentralDateStr()).limit(1),
     // Full day's schedule
@@ -81,7 +81,9 @@ export async function POST(req: NextRequest) {
     actual_dose_timestamp: string | null; pump_suggested_units: number | null
     engine_reasoning: string | null; context_snapshot: Record<string, unknown> | null
   }>
-  const todayMeal = mealResult.data?.[0] ?? null
+  const todayMeals = mealResult.data ?? []
+  const todayMeal = todayMeals.find((m: { context: string }) => m.context === 'school_lunch') ?? null
+  const todaySnack = todayMeals.find((m: { context: string }) => m.context === 'snack') ?? null
   const todayOverride = overrideResult.data?.[0] ?? null
   const schedule = scheduleResult.data ?? []
   const foodRepo = foodRepoResult.data ?? []
@@ -149,9 +151,14 @@ export async function POST(req: NextRequest) {
       : 'No lows logged today',
     todayMeal
       ? todayMeal.items_eaten
-        ? `School lunch: ${todayMeal.total_offered_carbs ?? '?'}g packed, ${todayMeal.total_eaten_carbs ?? '?'}g eaten${(todayMeal.fpu_count ?? 0) > 1.5 ? ` — HIGH fat/protein (${todayMeal.fpu_count?.toFixed(1)} FPU, watch for delayed rise)` : ''}`
+        ? `School lunch: ${todayMeal.total_offered_carbs ?? '?'}g packed, ${todayMeal.total_eaten_carbs ?? '?'}g eaten${(todayMeal.fpu_count ?? 0) > 1.5 ? ` — HIGH fat/protein (${todayMeal.fpu_count?.toFixed(1)} FPU)` : ''}`
         : `School lunch packed (${todayMeal.total_offered_carbs ?? '?'}g) — not eaten yet`
       : 'No school lunch packed today',
+    todaySnack
+      ? todaySnack.items_eaten
+        ? `Afternoon snack: ${todaySnack.total_offered_carbs ?? '?'}g packed, ${todaySnack.total_eaten_carbs ?? '?'}g eaten`
+        : `Afternoon snack packed (${todaySnack.total_offered_carbs ?? '?'}g) — not eaten yet`
+      : null,
     todayOverride?.pe_cancelled ? 'TODAY: PE CANCELLED — no activity reduction' :
     todayOverride?.pe_start_time ? `TODAY: PE moved to ${todayOverride.pe_start_time}` :
     todayOverride?.lunch_start_time ? `TODAY: Lunch moved to ${todayOverride.lunch_start_time}` : '',

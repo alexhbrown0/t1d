@@ -19,7 +19,7 @@ function formatTime(timeStr: string): string {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  pe: 'PE', lunch: 'Lunch', recess: 'Recess',
+  pe: 'PE', lunch: 'Lunch', recess: 'Recess', snack: 'Snack',
 }
 
 export function NextUpCard({ event }: { event: ScheduleEvent }) {
