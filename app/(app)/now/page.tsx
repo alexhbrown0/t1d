@@ -73,7 +73,7 @@ export default async function NowPage() {
   }
 
   return (
-    <div className="px-4 pt-3 pb-3 space-y-2.5">
+    <div className="px-4 pt-3 pb-3 space-y-3.5">
       <AppHeader />
       <BgCard egvs={egvs} />
 
