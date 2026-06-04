@@ -1,4 +1,4 @@
-import { getCentralDateStr, getCentralDayStartUTC } from '@/lib/utils/central-time'
+import { getCentralDateStr, getCentralDayStartUTC, getCentralTime } from '@/lib/utils/central-time'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
@@ -6,23 +6,20 @@ import Anthropic from '@anthropic-ai/sdk'
 const anthropic = new Anthropic()
 
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-US', {
-    hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago',
-  })
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago' })
 }
-
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Chicago',
-  })
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Chicago' })
+}
+function timeToMin(t: string) {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
 }
 
-// Triggered by Glooko ingest or nightly cron
+// Cron: runs at 8:35 PM Central (01:35 UTC) after Glooko's nightly sync
+// Also manually triggerable with cron secret
 export async function POST(req: NextRequest) {
-  const url = new URL(req.url)
-  const secret = req.headers.get('x-cron-secret') ?? url.searchParams.get('secret')
-  const force = url.searchParams.get('force') === 'true'
-
+  const secret = req.headers.get('x-cron-secret') ?? new URL(req.url).searchParams.get('secret')
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
@@ -30,86 +27,37 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
   const today = getCentralDateStr()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600000)
-  const todayMidnight = getCentralDayStartUTC()
   const yesterdayMidnight = getCentralDayStartUTC(-1)
 
-  // Wait for Glooko — only proceed if today's or yesterday's data is present
-  if (!force) {
-    const { data: glookoCheck } = await supabase
-      .from('glooko_bolus')
-      .select('id')
-      .gte('timestamp', yesterdayMidnight.toISOString())
-      .limit(1)
-      .maybeSingle()
+  // Verify Glooko data is present — always wait for it
+  const { data: glookoCheck } = await supabase
+    .from('glooko_bolus')
+    .select('id')
+    .gte('timestamp', yesterdayMidnight.toISOString())
+    .limit(1)
+    .maybeSingle()
 
-    if (!glookoCheck) {
-      return NextResponse.json({ skipped: true, reason: 'No Glooko data yet — will retry after sync' })
-    }
+  if (!glookoCheck) {
+    return NextResponse.json({ skipped: true, reason: 'Glooko not yet synced — no bolus data from yesterday/today' })
   }
 
-  // ── Gather all data ──────────────────────────────────────────────────────────
+  // ── Gather all data ───────────────────────────────────────────────────────────
 
   const [
-    egvsResult,
-    glookoBolusResult,
-    appDoseResult,
-    mealResult,
-    lowsResult,
-    outcomesResult,
-    paramsResult,
-    scheduleResult,
-    overridesResult,
-    insulinTotalsResult,
-    prevLearningResult,
+    egvsResult, glookoBolusResult, appDoseResult, mealResult,
+    lowsResult, paramsResult, scheduleResult, overridesResult,
+    insulinTotalsResult, prevLearningResult,
   ] = await Promise.all([
-    // 7 days of CGM
-    supabase.from('dexcom_egvs')
-      .select('system_time, value_mgdl')
-      .gte('system_time', sevenDaysAgo.toISOString())
-      .order('system_time'),
-    // 7 days of Glooko pump boluses (precise timing)
-    supabase.from('glooko_bolus')
-      .select('timestamp, carbs_input_g, insulin_delivered_u, carbs_ratio, bg_input_mgdl')
-      .gte('timestamp', sevenDaysAgo.toISOString())
-      .order('timestamp'),
-    // 7 days of app-logged dose sessions
-    supabase.from('t1d_dose_sessions')
-      .select('id, timestamp, actual_dose_timestamp, recommended_dose_grams, actual_dose_grams, pump_suggested_units, engine_reasoning, engine_confidence, low_treatment_carbs, starting_bg, meal_event_id, context_snapshot')
-      .gte('timestamp', sevenDaysAgo.toISOString())
-      .order('timestamp'),
-    // 7 days of meal events
-    supabase.from('t1d_meal_events')
-      .select('id, timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs, total_fat_g, total_protein_g, fpu_count')
-      .gte('timestamp', sevenDaysAgo.toISOString())
-      .order('timestamp'),
-    // 7 days of low treatments
-    supabase.from('t1d_low_treatments')
-      .select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g')
-      .gte('timestamp', sevenDaysAgo.toISOString())
-      .order('timestamp'),
-    // Recent dose outcomes
-    supabase.from('t1d_dose_outcomes')
-      .select('session_id, bg_at_1h, bg_at_2h, bg_at_3h, peak_bg, nadir_bg, tir_4h_pct, outcome_rating, computed_at')
-      .gte('computed_at', sevenDaysAgo.toISOString())
-      .order('computed_at', { ascending: false }),
-    // Current engine params
+    supabase.from('dexcom_egvs').select('system_time, value_mgdl').gte('system_time', sevenDaysAgo.toISOString()).order('system_time'),
+    supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u, carbs_ratio, bg_input_mgdl').gte('timestamp', sevenDaysAgo.toISOString()).order('timestamp'),
+    supabase.from('t1d_dose_sessions').select('id, timestamp, actual_dose_timestamp, recommended_dose_grams, actual_dose_grams, pump_suggested_units, starting_bg, meal_event_id, context_snapshot').gte('timestamp', sevenDaysAgo.toISOString()).order('timestamp'),
+    supabase.from('t1d_meal_events').select('id, timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs, total_fat_g, total_protein_g, fpu_count').gte('timestamp', sevenDaysAgo.toISOString()).order('timestamp'),
+    supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sevenDaysAgo.toISOString()).order('timestamp'),
     supabase.from('t1d_engine_params').select('*').order('effective_from', { ascending: false }).limit(1).single(),
-    // Full schedule
-    supabase.from('t1d_school_schedule').select('*').eq('active', true).order('start_time'),
-    // This week's overrides
+    supabase.from('t1d_school_schedule').select('*').eq('active', true).order('day_of_week').order('start_time'),
     supabase.from('t1d_daily_overrides').select('*').gte('override_date', sevenDaysAgo.toISOString().split('T')[0]),
-    // Glooko daily insulin totals
-    supabase.from('glooko_insulin_totals')
-      .select('timestamp, total_bolus_u, total_basal_u, total_insulin_u')
-      .gte('timestamp', sevenDaysAgo.toISOString())
-      .order('timestamp'),
-    // Last learning for week-over-week
-    supabase.from('t1d_engine_learnings')
-      .select('learning_date, claude_observations')
-      .lt('learning_date', today)
-      .order('learning_date', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from('glooko_insulin_totals').select('timestamp, total_bolus_u, total_basal_u, total_insulin_u').gte('timestamp', sevenDaysAgo.toISOString()).order('timestamp'),
+    supabase.from('t1d_engine_learnings').select('learning_date, claude_observations').lt('learning_date', today).order('learning_date', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   const egvs = egvsResult.data ?? []
@@ -117,244 +65,285 @@ export async function POST(req: NextRequest) {
   const appDoses = appDoseResult.data ?? []
   const meals = mealResult.data ?? []
   const lows = lowsResult.data ?? []
-  const outcomes = outcomesResult.data ?? []
   const params = paramsResult.data
   const schedule = scheduleResult.data ?? []
   const overrides = overridesResult.data ?? []
   const insulinTotals = insulinTotalsResult.data ?? []
   const prevLearning = prevLearningResult.data
 
-  // ── Compute post-dose BG outcomes for this week's app sessions ───────────────
+  // ── Per-meal analysis with activity context and BG trajectory ────────────────
 
-  for (const session of appDoses) {
-    const existingOutcome = outcomes.find(o => o.session_id === session.id)
-    if (existingOutcome) continue
+  type MealAnalysis = {
+    date: string
+    context: string
+    time: string
+    items_offered: string
+    carbs_offered: number
+    items_eaten: string | null
+    carbs_eaten: number | null
+    pump_carbs_entered: number
+    coverage_pct: number | null
+    pre_dose_bg: number | null
+    bg_30m: number | null
+    bg_1h: number | null
+    bg_2h: number | null
+    bg_3h: number | null
+    peak_bg: number | null
+    peak_at_min: number | null
+    outcome: string
+    activity_before: string[]
+    activity_after: string[]
+    override_note: string | null
+  }
 
-    const t = new Date(session.actual_dose_timestamp ?? session.timestamp).getTime()
-    const { data: postEgvs } = await supabase
-      .from('dexcom_egvs')
-      .select('system_time, value_mgdl')
-      .gte('system_time', new Date(t + 5 * 60000).toISOString())
-      .lte('system_time', new Date(t + 4 * 3600000).toISOString())
-      .order('system_time')
+  const mealAnalyses: MealAnalysis[] = []
 
-    if (!postEgvs || postEgvs.length < 3) continue
+  for (const meal of meals) {
+    const mealTs = new Date(meal.timestamp).getTime()
+    const mealDateStr = new Date(meal.timestamp).toISOString().split('T')[0]
 
-    const bgs = postEgvs.map(e => Number(e.value_mgdl)).filter(v => !isNaN(v))
-    const at1h = postEgvs.find(e => new Date(e.system_time).getTime() >= t + 55 * 60000)
-    const at2h = postEgvs.find(e => new Date(e.system_time).getTime() >= t + 115 * 60000)
-    const at3h = postEgvs.find(e => new Date(e.system_time).getTime() >= t + 175 * 60000)
-    const peak = Math.max(...bgs)
-    const nadir = Math.min(...bgs)
-    const inRange = bgs.filter(v => v >= 70 && v <= 180).length
-    const tirPct = bgs.length > 0 ? (inRange / bgs.length) * 100 : null
+    // Day of week for schedule lookup
+    const mealDow = new Date(meal.timestamp).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/Chicago' })
+    const mealDowNum = new Date(meal.timestamp).getDay()
+    const mealMinOfDay = parseInt(new Date(meal.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Chicago' }).replace(':', ''))
 
-    const rating = nadir < 70 ? 'low_alarm' : peak > 250 ? 'too_high' : peak > 180 ? 'high' : 'good'
+    // Activity context: what's on schedule for this day
+    const daySchedule = schedule.filter(s => s.day_of_week === mealDowNum)
+    const override = overrides.find(o => o.override_date === mealDateStr)
 
-    await supabase.from('t1d_dose_outcomes').upsert({
-      session_id: session.id,
-      bg_at_1h: at1h ? Number(at1h.value_mgdl) : null,
-      bg_at_2h: at2h ? Number(at2h.value_mgdl) : null,
-      bg_at_3h: at3h ? Number(at3h.value_mgdl) : null,
-      peak_bg: peak,
-      nadir_bg: nadir,
-      tir_4h_pct: tirPct,
-      outcome_rating: rating,
-    }, { onConflict: 'session_id' })
+    // Activity within 2h before and 3h after meal
+    const mealCentralMin = parseInt(new Date(meal.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Chicago' })) * 60 +
+      parseInt(new Date(meal.timestamp).toLocaleTimeString('en-US', { minute: '2-digit', timeZone: 'America/Chicago' }))
 
-    outcomes.push({
-      session_id: session.id,
-      bg_at_1h: at1h ? Number(at1h.value_mgdl) : null,
-      bg_at_2h: at2h ? Number(at2h.value_mgdl) : null,
-      bg_at_3h: at3h ? Number(at3h.value_mgdl) : null,
-      peak_bg: peak,
-      nadir_bg: nadir,
-      tir_4h_pct: tirPct,
-      outcome_rating: rating,
-      computed_at: new Date().toISOString(),
+    // Simpler: compute meal time in minutes since midnight (Central)
+    const mealTimeStr = new Date(meal.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Chicago' })
+    const [mh, mm] = mealTimeStr.split(':').map(Number)
+    const mealMins = (isNaN(mh) ? 12 : mh) * 60 + (isNaN(mm) ? 0 : mm)
+
+    const activityBefore = daySchedule.filter(s => {
+      if (s.event_type === 'lunch' || s.event_type === 'snack' || s.event_type === 'breakfast' || s.event_type === 'bedtime') return false
+      const end = timeToMin(s.end_time)
+      return end <= mealMins && end >= mealMins - 120 // ended within 2h before
+    })
+    const activityAfter = daySchedule.filter(s => {
+      if (s.event_type === 'lunch' || s.event_type === 'snack' || s.event_type === 'breakfast' || s.event_type === 'bedtime') return false
+      const start = timeToMin(s.start_time)
+      return start >= mealMins && start <= mealMins + 180 // starts within 3h after
+    })
+
+    // Apply overrides
+    const peActive = !override?.pe_cancelled && !override?.camp_cancelled
+
+    // Match Glooko bolus within ±45 min
+    const matchedBoluses = glookoBoluses.filter(b => Math.abs(new Date(b.timestamp).getTime() - mealTs) < 45 * 60000)
+    const pumpCarbs = matchedBoluses.reduce((s, b) => s + Number(b.carbs_input_g ?? 0), 0)
+    const coveragePct = meal.total_eaten_carbs && meal.total_eaten_carbs > 0 && pumpCarbs > 0
+      ? Math.round((pumpCarbs / meal.total_eaten_carbs) * 100) : null
+
+    // BG trajectory from dose time (+/- 30 min of meal)
+    const doseSession = appDoses.find(d => d.meal_event_id === meal.id)
+    const refTime = doseSession
+      ? new Date(doseSession.actual_dose_timestamp ?? doseSession.timestamp).getTime()
+      : mealTs
+
+    const postEgvs = egvs.filter(e => {
+      const t = new Date(e.system_time).getTime()
+      return t >= refTime - 5 * 60000 && t <= refTime + 4 * 3600000
+    })
+
+    const bgAt = (minOffset: number) => {
+      const target = refTime + minOffset * 60000
+      return postEgvs.find(e => new Date(e.system_time).getTime() >= target - 7 * 60000)
+    }
+
+    const bgs = postEgvs.map(e => Number(e.value_mgdl))
+    const peakBg = bgs.length > 0 ? Math.max(...bgs) : null
+    const peakIdx = peakBg ? bgs.indexOf(peakBg) : -1
+    const peakAtMin = peakIdx >= 0 ? Math.round((new Date(postEgvs[peakIdx].system_time).getTime() - refTime) / 60000) : null
+
+    // Pre-dose BG
+    const preBg = bgAt(-10)
+
+    // Outcome rating
+    const outcome = !peakBg ? 'unknown'
+      : bgs.some(v => v < 70) ? 'low'
+      : peakBg > 250 ? 'very_high'
+      : peakBg > 180 ? 'high'
+      : 'good'
+
+    // Format items
+    type Item = { name: string; carbs: number; qty_offered: number; qty_eaten?: number | null }
+    const offeredItems = (meal.items_offered as Item[] ?? [])
+    const eatenItems = (meal.items_eaten as Item[] ?? [])
+
+    const itemsOfferedStr = offeredItems.map(i => `${i.name} (${Math.round(i.carbs * i.qty_offered)}g)`).join(', ')
+    const itemsEatenStr = eatenItems.length > 0
+      ? eatenItems.map(i => {
+          const pct = i.qty_offered > 0 ? Math.round(((i.qty_eaten ?? 0) / i.qty_offered) * 100) : 0
+          return `${i.name} ${pct}%`
+        }).join(', ')
+      : null
+
+    const actBefore = activityBefore.map(s => `${s.event_type} (ended ${timeToMin(s.end_time)}min)`)
+    const actAfter = activityAfter.map(s => `${s.event_type} at ${s.start_time}${peActive ? '' : ' [CANCELLED]'}`)
+
+    mealAnalyses.push({
+      date: fmtDate(meal.timestamp),
+      context: meal.context,
+      time: fmtTime(meal.timestamp),
+      items_offered: itemsOfferedStr || 'unknown',
+      carbs_offered: meal.total_offered_carbs ?? 0,
+      items_eaten: itemsEatenStr,
+      carbs_eaten: meal.total_eaten_carbs,
+      pump_carbs_entered: pumpCarbs,
+      coverage_pct: coveragePct,
+      pre_dose_bg: preBg ? Number(preBg.value_mgdl) : null,
+      bg_30m: bgAt(30) ? Number(bgAt(30)!.value_mgdl) : null,
+      bg_1h: bgAt(60) ? Number(bgAt(60)!.value_mgdl) : null,
+      bg_2h: bgAt(120) ? Number(bgAt(120)!.value_mgdl) : null,
+      bg_3h: bgAt(180) ? Number(bgAt(180)!.value_mgdl) : null,
+      peak_bg: peakBg,
+      peak_at_min: peakAtMin,
+      outcome,
+      activity_before: actBefore,
+      activity_after: actAfter,
+      override_note: override ? (override.camp_cancelled ? 'NO CAMP' : override.notes) : null,
     })
   }
 
-  // ── Compute metrics ───────────────────────────────────────────────────────────
+  // ── Overall TIR ───────────────────────────────────────────────────────────────
 
-  // 1. Overall TIR (7 days)
   const allBgs = egvs.map(e => Number(e.value_mgdl)).filter(v => !isNaN(v))
   const tir = allBgs.length > 0 ? {
-    pct_low: Math.round(allBgs.filter(v => v < 70).length / allBgs.length * 100),
     pct_in_range: Math.round(allBgs.filter(v => v >= 70 && v <= 180).length / allBgs.length * 100),
+    pct_low: Math.round(allBgs.filter(v => v < 70).length / allBgs.length * 100),
     pct_high: Math.round(allBgs.filter(v => v > 180).length / allBgs.length * 100),
     avg_bg: Math.round(allBgs.reduce((a, b) => a + b, 0) / allBgs.length),
-    readings: allBgs.length,
   } : null
 
-  // 2. TIR by time of day (Central time)
-  const bgByHour: Record<number, number[]> = {}
+  // TIR by period
+  const periodBgs = { morning: [] as number[], afternoon: [] as number[], evening: [] as number[], overnight: [] as number[] }
   for (const e of egvs) {
-    const hour = new Date(e.system_time).toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Chicago' })
-    const h = parseInt(hour) % 24
-    if (!bgByHour[h]) bgByHour[h] = []
-    bgByHour[h].push(Number(e.value_mgdl))
+    const h = parseInt(new Date(e.system_time).toLocaleTimeString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/Chicago' })) % 24
+    const v = Number(e.value_mgdl)
+    if (h >= 6 && h < 12) periodBgs.morning.push(v)
+    else if (h >= 12 && h < 18) periodBgs.afternoon.push(v)
+    else if (h >= 18 && h < 24) periodBgs.evening.push(v)
+    else periodBgs.overnight.push(v)
   }
-  const avgByPeriod = {
-    morning_6_12: [6,7,8,9,10,11].flatMap(h => bgByHour[h] ?? []),
-    afternoon_12_18: [12,13,14,15,16,17].flatMap(h => bgByHour[h] ?? []),
-    evening_18_24: [18,19,20,21,22,23].flatMap(h => bgByHour[h] ?? []),
-    overnight_0_6: [0,1,2,3,4,5].flatMap(h => bgByHour[h] ?? []),
-  }
-  const periodStats = Object.entries(avgByPeriod).map(([period, vals]) => ({
-    period,
-    avg: vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null,
-    pct_in_range: vals.length > 0 ? Math.round(vals.filter(v => v >= 70 && v <= 180).length / vals.length * 100) : null,
+
+  const periodStats = Object.entries(periodBgs).map(([p, vals]) => ({
+    period: p, count: vals.length,
+    avg: vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null,
+    pct_ir: vals.length ? Math.round(vals.filter(v => v >= 70 && v <= 180).length / vals.length * 100) : null,
   }))
 
-  // 3. Dosing coverage: match meals to Glooko boluses by timing
-  const coverageData: Array<{ date: string; offered_g: number; eaten_g: number; dosed_g: number; coverage_pct: number; context: string }> = []
-  for (const meal of meals) {
-    if (!meal.total_eaten_carbs || meal.total_eaten_carbs < 5) continue
-    const mealTime = new Date(meal.timestamp).getTime()
-    // Find Glooko bolus within ±45 min of meal
-    const matchedBoluses = glookoBoluses.filter(b => {
-      const d = Math.abs(new Date(b.timestamp).getTime() - mealTime)
-      return d < 45 * 60000
-    })
-    const totalDosed = matchedBoluses.reduce((s, b) => s + Number(b.carbs_input_g ?? 0), 0)
-    coverageData.push({
-      date: fmtDate(meal.timestamp),
-      offered_g: meal.total_offered_carbs ?? 0,
-      eaten_g: meal.total_eaten_carbs,
-      dosed_g: totalDosed,
-      coverage_pct: totalDosed > 0 ? Math.round((totalDosed / meal.total_eaten_carbs) * 100) : 0,
-      context: meal.context,
-    })
-  }
-
-  // 4. Insulin timing: gap between dose session and Glooko bolus
-  const timingData: Array<{ date: string; app_recommended_at: string; pump_dosed_at: string; gap_min: number }> = []
-  for (const dose of appDoses) {
-    if (!dose.actual_dose_grams) continue
-    const doseTime = new Date(dose.actual_dose_timestamp ?? dose.timestamp).getTime()
-    const matchedBolus = glookoBoluses.find(b => Math.abs(new Date(b.timestamp).getTime() - doseTime) < 30 * 60000)
-    if (matchedBolus) {
-      const gapMin = Math.round((new Date(matchedBolus.timestamp).getTime() - doseTime) / 60000)
-      timingData.push({
-        date: fmtDate(dose.timestamp),
-        app_recommended_at: fmtTime(dose.timestamp),
-        pump_dosed_at: fmtTime(matchedBolus.timestamp),
-        gap_min: gapMin,
-      })
-    }
-  }
-
-  // 5. Outcome summary
-  const outcomeStats = {
-    good: outcomes.filter(o => o.outcome_rating === 'good').length,
-    high: outcomes.filter(o => o.outcome_rating === 'high' || o.outcome_rating === 'too_high').length,
-    low_alarm: outcomes.filter(o => o.outcome_rating === 'low_alarm').length,
-    total: outcomes.length,
-    avg_peak: outcomes.length > 0 ? Math.round(outcomes.reduce((s, o) => s + (o.peak_bg ?? 0), 0) / outcomes.length) : null,
-    avg_1h_bg: outcomes.filter(o => o.bg_at_1h).length > 0
-      ? Math.round(outcomes.filter(o => o.bg_at_1h).reduce((s, o) => s + (o.bg_at_1h ?? 0), 0) / outcomes.filter(o => o.bg_at_1h).length)
-      : null,
-    avg_2h_bg: outcomes.filter(o => o.bg_at_2h).length > 0
-      ? Math.round(outcomes.filter(o => o.bg_at_2h).reduce((s, o) => s + (o.bg_at_2h ?? 0), 0) / outcomes.filter(o => o.bg_at_2h).length)
-      : null,
-  }
-
-  // 6. Low treatment analysis
+  // Low treatment timing clusters
   const lowsByHour: Record<number, number> = {}
   for (const l of lows) {
-    const h = new Date(l.timestamp).getHours()
+    const h = parseInt(new Date(l.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/Chicago' })) % 24
     lowsByHour[h] = (lowsByHour[h] ?? 0) + 1
   }
-  const peakLowHour = Object.entries(lowsByHour).sort((a, b) => b[1] - a[1])[0]
 
-  // 7. Daily insulin totals
-  const avgDailyInsulin = insulinTotals.length > 0
-    ? Math.round(insulinTotals.reduce((s, t) => s + Number(t.total_insulin_u ?? 0), 0) / insulinTotals.length * 10) / 10
-    : null
+  // ── Build prompt ──────────────────────────────────────────────────────────────
 
-  // ── Build prompt ─────────────────────────────────────────────────────────────
+  const mealBlock = mealAnalyses.map(m => {
+    const cov = m.coverage_pct != null ? `${m.coverage_pct}% coverage (${m.pump_carbs_entered}g entered into pump)` : 'no pump match found'
+    const bg = [
+      m.pre_dose_bg ? `pre-dose ${m.pre_dose_bg}` : null,
+      m.bg_30m ? `30m: ${m.bg_30m}` : null,
+      m.bg_1h ? `1h: ${m.bg_1h}` : null,
+      m.bg_2h ? `2h: ${m.bg_2h}` : null,
+      m.bg_3h ? `3h: ${m.bg_3h}` : null,
+      m.peak_bg ? `peak ${m.peak_bg} at ${m.peak_at_min}min` : null,
+    ].filter(Boolean).join(' · ')
+    const act = [
+      m.activity_before.length ? `activity before: ${m.activity_before.join(', ')}` : null,
+      m.activity_after.length ? `activity after: ${m.activity_after.join(', ')}` : null,
+    ].filter(Boolean).join(' | ')
 
-  const prompt = `You are the dosing analyst for Brooks, a child with Type 1 diabetes on Omnipod 5 + Dexcom G7 + Fiasp.
+    return `${m.date} ${m.time} — ${m.context}
+  Offered: ${m.items_offered} (${m.carbs_offered}g)
+  Eaten: ${m.items_eaten ?? 'not recorded'} (${m.carbs_eaten ?? '?'}g)
+  Dosing: ${cov}
+  BG: ${bg || 'no CGM data'}
+  Activity: ${act || 'none on schedule'}
+  ${m.override_note ? `Override: ${m.override_note}` : ''}
+  Outcome: ${m.outcome}`
+  }).join('\n\n')
 
-Analyze the past 7 days of data and produce a comprehensive insight report. This is the baseline for all dosing decisions.
+  const prompt = `You are the T1D dosing analyst for Brooks, a child on Omnipod 5 (Fiasp) + Dexcom G7. This is your nightly analysis — the primary input for all dosing decisions and tweaks.
 
-Today: ${today}
-Previous insight (for comparison): ${prevLearning ? `${prevLearning.learning_date}: ${prevLearning.claude_observations?.slice(0, 200)}...` : 'None'}
+Date: ${today}
+${prevLearning ? `Last analysis (${prevLearning.learning_date}): ${prevLearning.claude_observations?.slice(0, 300)}...` : ''}
 
-## Current Engine Parameters
-${params ? `Pre-bolus: ${(params.pre_bolus_pct * 100).toFixed(0)}% · Lead time: ${params.pre_bolus_lead_min}min
+## CURRENT ENGINE PARAMETERS
+${params ? `Pre-bolus: ${(params.pre_bolus_pct * 100).toFixed(0)}% of carbs
 Follow-up coverage: ${(params.follow_up_coverage_pct * 100).toFixed(0)}%
-Activity reduction: ${(params.activity_reduction_pct * 100).toFixed(0)}% within ${params.activity_window_min}min
-ICR: ${params.current_icr} g/unit · ISF: ${params.current_isf} · DIA: ${params.current_dia}h · Target: ${params.target_bg} mg/dL
-Insulin: ${params.insulin_type}
-${params.clinical_notes ? `Clinical notes: ${params.clinical_notes}` : ''}` : 'Not available'}
+Activity reduction: ${(params.activity_reduction_pct * 100).toFixed(0)}% if activity within ${params.activity_window_min}min
+ICR: ${params.current_icr} g/unit · ISF: ${params.current_isf} · DIA: ${params.current_dia}h
+Target: ${params.target_bg} mg/dL · Insulin: ${params.insulin_type}
+${params.clinical_notes ? `Clinical notes:\n${params.clinical_notes}` : ''}` : 'Parameters not set'}
 
-## Time In Range (7 days, ${allBgs.length} readings)
-${tir ? `Overall: ${tir.pct_in_range}% in range (70-180) · ${tir.pct_low}% low · ${tir.pct_high}% high · avg ${tir.avg_bg} mg/dL` : 'No CGM data'}
-${periodStats.map(p => `${p.period}: avg ${p.avg ?? '?'} mg/dL, ${p.pct_in_range ?? '?'}% in range`).join('\n')}
+## TIME IN RANGE — 7 DAYS (${allBgs.length} readings)
+${tir ? `Overall: ${tir.pct_in_range}% in range · ${tir.pct_low}% low · ${tir.pct_high}% high · avg ${tir.avg_bg} mg/dL` : 'No CGM data'}
+${periodStats.map(p => `  ${p.period}: avg ${p.avg ?? '?'} mg/dL, ${p.pct_ir ?? '?'}% in range (${p.count} readings)`).join('\n')}
 
-## Post-Dose BG Outcomes (${outcomeStats.total} sessions)
-${outcomeStats.good} good / ${outcomeStats.high} high / ${outcomeStats.low_alarm} lows
-Avg peak: ${outcomeStats.avg_peak ?? '?'} mg/dL · Avg 1h BG: ${outcomeStats.avg_1h_bg ?? '?'} · Avg 2h BG: ${outcomeStats.avg_2h_bg ?? '?'}
-Individual sessions:
-${outcomes.slice(-7).map(o => {
-  const session = appDoses.find(d => d.id === o.session_id)
-  return `  ${session ? fmtDate(session.timestamp) : '?'}: peak ${o.peak_bg} / 1h ${o.bg_at_1h ?? '?'} / 2h ${o.bg_at_2h ?? '?'} → ${o.outcome_rating}`
-}).join('\n')}
+## MEAL-BY-MEAL ANALYSIS (last 7 days)
+For each meal: what was offered, what he ate, what % of eaten carbs were entered into the pump, and the full BG trajectory with activity context.
 
-## Dosing Coverage (carbs eaten vs entered into pump)
-${coverageData.length > 0 ? coverageData.map(c =>
-  `  ${c.date} (${c.context}): offered ${c.offered_g}g, eaten ${c.eaten_g}g, pump received ${c.dosed_g}g → ${c.coverage_pct}% coverage`
-).join('\n') : 'No matched meal-to-bolus data'}
-${coverageData.length > 0 ? `Average coverage: ${Math.round(coverageData.reduce((s, c) => s + c.coverage_pct, 0) / coverageData.length)}%` : ''}
+${mealBlock || 'No meal events recorded this week.'}
 
-## Insulin Timing (app recommendation → actual pump bolus)
-${timingData.length > 0 ? timingData.map(t => `  ${t.date}: app at ${t.app_recommended_at} → pump at ${t.pump_dosed_at} (${t.gap_min > 0 ? '+' : ''}${t.gap_min} min)`).join('\n') : 'No matched timing data'}
-${timingData.length > 0 ? `Average gap: ${Math.round(timingData.reduce((s, t) => s + t.gap_min, 0) / timingData.length)} min` : ''}
+## LOW TREATMENTS (${lows.length} total)
+${lows.map(l => `  ${fmtDate(l.timestamp)} ${fmtTime(l.timestamp)}: BG ${l.bg_at_treatment} → ${l.treatment_type} ${l.treatment_carbs_g ?? '?'}g`).join('\n') || 'None'}
+${Object.keys(lowsByHour).length > 0 ? `Most lows cluster at: ${Object.entries(lowsByHour).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([h, n]) => `${h}:00 (${n}x)`).join(', ')}` : ''}
 
-## Glooko Pump Boluses (7 days, raw pump data)
-${glookoBoluses.slice(-14).map(b => `  ${fmtDate(b.timestamp)} ${fmtTime(b.timestamp)}: ${b.insulin_delivered_u}U for ${b.carbs_input_g ?? 0}g (BG ${b.bg_input_mgdl ?? '?'} at dose)`).join('\n')}
+## GLOOKO PUMP DATA (raw, 7 days)
+${glookoBoluses.map(b => `  ${fmtDate(b.timestamp)} ${fmtTime(b.timestamp)}: ${b.insulin_delivered_u}U for ${b.carbs_input_g ?? 0}g${b.bg_input_mgdl ? ` (BG ${b.bg_input_mgdl})` : ''}`).join('\n') || 'None'}
 
-## Daily Insulin Totals
-${insulinTotals.map(t => `  ${fmtDate(t.timestamp)}: ${t.total_bolus_u}U bolus + ${t.total_basal_u}U basal = ${t.total_insulin_u}U total`).join('\n')}
-${avgDailyInsulin ? `Average: ${avgDailyInsulin}U/day` : ''}
+## DAILY INSULIN TOTALS
+${insulinTotals.map(t => `  ${fmtDate(t.timestamp)}: ${t.total_bolus_u}U bolus + ${t.total_basal_u}U basal = ${t.total_insulin_u}U`).join('\n') || 'None'}
 
-## Low Treatments (${lows.length} total)
-${lows.map(l => `  ${fmtDate(l.timestamp)} ${fmtTime(l.timestamp)}: BG ${l.bg_at_treatment} → ${l.treatment_type} ${l.treatment_carbs_g ?? '?'}g`).join('\n')}
-${peakLowHour ? `Most lows at: ${peakLowHour[0]}:00 (${peakLowHour[1]} occurrences)` : ''}
-
-## Schedule Context
-${schedule.filter(s => s.event_type !== 'bedtime').map(s => `  Day ${s.day_of_week}: ${s.event_type} ${s.start_time}-${s.end_time} (${s.activity_level ?? 'normal'})${s.notes ? ' — ' + s.notes : ''}`).join('\n')}
-
-## Daily Overrides This Week
-${overrides.length > 0 ? overrides.map(o => `  ${o.override_date}: ${o.camp_cancelled ? 'NO CAMP' : ''}${o.pe_cancelled ? ' PE cancelled' : ''}${o.notes ? ' ' + o.notes : ''}`).join('\n') : 'None'}
+## SCHEDULE CONTEXT
+${schedule.filter(s => ['pe', 'playground', 'swimming', 'recess'].includes(s.event_type)).map(s => `  Day ${s.day_of_week}: ${s.event_type} ${s.start_time}-${s.end_time} (${s.activity_level}) — ${s.notes ?? ''}`).join('\n')}
+${overrides.length > 0 ? `Overrides this week:\n${overrides.map(o => `  ${o.override_date}: ${o.camp_cancelled ? 'NO CAMP' : ''}${o.pe_cancelled ? ' activity cancelled' : ''}${o.notes ? ' ' + o.notes : ''}`).join('\n')}` : ''}
 
 ---
 
-Produce a comprehensive analysis. Reference specific numbers throughout. Be direct and honest about what the data shows.
+Analyze everything holistically. Focus on patterns across the week:
+1. Is dosing coverage consistent or are some meals systematically under/over-dosed?
+2. Does activity before/after meals affect outcomes in predictable ways?
+3. Are certain meal types (high fat/protein, lunch vs snack) producing different BG patterns?
+4. What's the relationship between what he ate vs what was entered into the pump?
+5. Are lows clustered around specific times or activities?
+6. What do the raw Glooko boluses tell us about timing (vs when the app recommended)?
+7. What specific changes — to engine parameters, dosing strategy, or meal planning — would improve outcomes?
+
+Reference specific meals and specific numbers. Be honest if data is incomplete.
 
 Return ONLY valid JSON:
 {
   "headline": "2-sentence executive summary of the week",
+  "tir_comment": "plain statement about time in range trend",
   "observations": [
-    {"topic": "Time in Range", "finding": "...", "evidence": "specific numbers"},
-    {"topic": "Post-meal control", "finding": "...", "evidence": "..."},
-    {"topic": "Dosing coverage", "finding": "...", "evidence": "..."},
-    {"topic": "Insulin timing", "finding": "...", "evidence": "..."},
-    {"topic": "Low treatments", "finding": "...", "evidence": "..."},
-    {"topic": "Activity impact", "finding": "...", "evidence": "..."}
+    {"topic": "Dosing coverage", "finding": "...", "evidence": "cite specific meals and percentages"},
+    {"topic": "Activity impact", "finding": "...", "evidence": "cite specific days/meals where activity preceded or followed"},
+    {"topic": "Meal content patterns", "finding": "...", "evidence": "..."},
+    {"topic": "Low timing", "finding": "...", "evidence": "..."},
+    {"topic": "BG trajectory patterns", "finding": "...", "evidence": "peak timing, 1h/2h trends"},
+    {"topic": "Insulin timing", "finding": "...", "evidence": "gap between app recommendation and pump"}
   ],
   "suggestions": [
-    {"param": "pre_bolus_pct", "current": 0.40, "suggested": 0.45, "confidence": "high", "rationale": "..."}
+    {"param": "pre_bolus_pct", "current": 0.40, "suggested": 0.45, "confidence": "high", "rationale": "cite the specific data that drove this"}
   ],
   "pump_setting_flag": null,
-  "data_quality": "note about what data is complete or missing",
-  "plain_summary": "3-4 paragraph plain English summary suitable for email"
+  "data_quality": "what data was available and what gaps exist",
+  "plain_summary": "3-4 paragraph plain text for email — readable, specific, actionable"
 }`
 
   let result: {
     headline: string
+    tir_comment: string
     observations: Array<{ topic: string; finding: string; evidence: string }>
     suggestions: Array<{ param: string; current: number; suggested: number; confidence: string; rationale: string }>
     pump_setting_flag: string | null
@@ -365,96 +354,95 @@ Return ONLY valid JSON:
   try {
     const msg = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: 3000,
       messages: [{ role: 'user', content: prompt }],
     })
     const raw = (msg.content[0] as { type: string; text: string }).text.trim()
     result = JSON.parse(raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, ''))
-  } catch (e) {
+  } catch {
     result = {
-      headline: 'Analysis unavailable — insufficient data.',
+      headline: 'Analysis unavailable.',
+      tir_comment: tir ? `${tir.pct_in_range}% in range this week.` : 'No CGM data.',
       observations: [],
       suggestions: [],
       pump_setting_flag: null,
-      data_quality: `${allBgs.length} CGM readings, ${glookoBoluses.length} pump boluses, ${meals.length} meal events available.`,
-      plain_summary: 'Could not generate analysis today.',
+      data_quality: `${allBgs.length} CGM readings, ${glookoBoluses.length} pump boluses, ${meals.length} meal events, ${lows.length} low treatments.`,
+      plain_summary: 'Could not generate analysis.',
     }
   }
 
-  // ── Save to DB ────────────────────────────────────────────────────────────────
+  // ── Save ──────────────────────────────────────────────────────────────────────
 
-  const obsText = result.observations.map(o => `${o.topic}: ${o.finding} (${o.evidence})`).join('\n\n')
+  const obsText = result.observations.map(o => `${o.topic}: ${o.finding} — ${o.evidence}`).join('\n\n')
 
   const { data: learning } = await supabase
     .from('t1d_engine_learnings')
     .upsert({
       learning_date: today,
-      claude_observations: `${result.headline}\n\n${obsText}`,
+      claude_observations: `${result.headline}\n\n${result.tir_comment}\n\n${obsText}`,
       claude_suggestions: result.suggestions,
     }, { onConflict: 'learning_date' })
     .select('id')
     .single()
 
-  // ── Send email ────────────────────────────────────────────────────────────────
+  // ── Email via Resend ──────────────────────────────────────────────────────────
 
   if (process.env.RESEND_API_KEY) {
-    const emailHtml = `
-<html><body style="font-family:sans-serif;background:#0a0a0a;color:#e5e5e5;padding:24px;max-width:600px;margin:0 auto">
-<h2 style="color:#2dd4bf;margin-bottom:4px">Brooks · T1D Insights</h2>
+    const emailHtml = `<html><body style="font-family:sans-serif;background:#0a0a0a;color:#e5e5e5;padding:24px;max-width:600px;margin:0 auto">
+<h2 style="color:#2dd4bf;margin-bottom:4px">Brooks · T1D Nightly Insights</h2>
 <p style="color:#6b7280;margin-top:0;font-size:13px">${fmtDate(today)} · 7-day analysis</p>
 
-<div style="background:#141414;border-radius:12px;padding:16px;margin:16px 0;border:1px solid #262626">
+<div style="background:#141414;border-radius:12px;padding:16px;margin:16px 0;border-left:3px solid #2dd4bf">
 <p style="margin:0;font-size:15px;line-height:1.6">${result.headline}</p>
 </div>
 
-${tir ? `<div style="background:#141414;border-radius:12px;padding:16px;margin:16px 0;border:1px solid #262626">
-<p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">TIME IN RANGE (7 days)</p>
-<p style="font-size:24px;font-weight:bold;margin:0;color:#2dd4bf">${tir.pct_in_range}%</p>
+${tir ? `<div style="background:#141414;border-radius:12px;padding:16px;margin:16px 0">
+<p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px">TIME IN RANGE</p>
+<p style="font-size:28px;font-weight:bold;margin:0;color:${tir.pct_in_range >= 70 ? '#2dd4bf' : '#f87171'}">${tir.pct_in_range}%</p>
 <p style="font-size:12px;color:#6b7280;margin:4px 0 0">in range (70-180) · ${tir.pct_low}% low · ${tir.pct_high}% high · avg ${tir.avg_bg} mg/dL</p>
+<p style="font-size:12px;color:#9ca3af;margin:4px 0 0">${result.tir_comment}</p>
 </div>` : ''}
 
-<div style="background:#141414;border-radius:12px;padding:16px;margin:16px 0;border:1px solid #262626">
-<p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 12px">OBSERVATIONS</p>
-${result.observations.map(o => `
-<div style="margin-bottom:12px">
-<p style="color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;margin:0 0 2px">${o.topic}</p>
+<div style="background:#141414;border-radius:12px;padding:16px;margin:16px 0">
+<p style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 14px">OBSERVATIONS</p>
+${result.observations.map(o => `<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #262626">
+<p style="color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;margin:0 0 3px">${o.topic}</p>
 <p style="margin:0;font-size:13px;line-height:1.5">${o.finding}</p>
-<p style="margin:2px 0 0;font-size:11px;color:#6b7280">${o.evidence}</p>
+<p style="margin:3px 0 0;font-size:11px;color:#6b7280;font-style:italic">${o.evidence}</p>
 </div>`).join('')}
 </div>
 
-${result.suggestions.length > 0 ? `<div style="background:#141414;border-radius:12px;padding:16px;margin:16px 0;border:1px solid #2dd4bf44">
+${result.suggestions.length > 0 ? `<div style="background:#141414;border-radius:12px;padding:16px;margin:16px 0;border-left:3px solid #2dd4bf44">
 <p style="color:#2dd4bf;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 12px">SUGGESTED TWEAKS</p>
-${result.suggestions.map(s => `
-<div style="margin-bottom:8px">
-<p style="margin:0;font-size:13px"><strong style="color:#2dd4bf">${s.param}</strong>: ${s.current} → ${s.suggested} <span style="color:#6b7280;font-size:11px">(${s.confidence} confidence)</span></p>
+${result.suggestions.map(s => `<div style="margin-bottom:10px">
+<p style="margin:0;font-size:13px"><strong>${s.param}</strong>: ${s.current} → <strong style="color:#2dd4bf">${s.suggested}</strong> <span style="color:#6b7280;font-size:11px">(${s.confidence} confidence)</span></p>
 <p style="margin:2px 0 0;font-size:12px;color:#9ca3af">${s.rationale}</p>
 </div>`).join('')}
+<p style="color:#6b7280;font-size:11px;margin:12px 0 0">Open Engine → Insights in the app to approve or reject.</p>
 </div>` : ''}
 
-<p style="color:#6b7280;font-size:11px;margin:24px 0 0">Open the Brooks app → Engine → Insights to approve or reject changes.</p>
+<div style="color:#6b7280;font-size:12px;margin:24px 0 0;padding-top:16px;border-top:1px solid #262626">
+<p style="margin:0">${result.data_quality}</p>
+</div>
 </body></html>`
 
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: 'Brooks T1D <onboarding@resend.dev>',
         to: 'alexhbrown0@gmail.com',
-        subject: `Brooks T1D Insights — ${today} · ${tir ? `${tir.pct_in_range}% TIR` : 'Weekly analysis'}`,
+        subject: `Brooks T1D · ${today} · ${tir ? `${tir.pct_in_range}% TIR` : 'Nightly Insights'}`,
         html: emailHtml,
       }),
-    }).catch(() => null) // don't fail if email fails
+    }).catch(() => null)
   }
 
   return NextResponse.json({
     learning_id: learning?.id,
     today,
-    tir: tir ? `${tir.pct_in_range}% in range` : 'no data',
-    outcomes_computed: outcomes.length,
+    meals_analyzed: mealAnalyses.length,
+    tir: tir ? `${tir.pct_in_range}% in range` : 'no CGM data',
     observations: result.observations.length,
     suggestions: result.suggestions.length,
     email_sent: !!process.env.RESEND_API_KEY,
