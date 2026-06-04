@@ -8,6 +8,15 @@ const SAVE_INTENT = /(save|log|add|write|capture|record|remember|keep).{0,60}(no
 const RECIPE_SAVE_INTENT = /(save|add|store|keep).{0,40}(recipe|this recipe|as a recipe|to recipes)/i
 const LUNCH_PLAN_INTENT = /(plan|planning|pack|packing).{0,20}lunch/i
 const LUNCH_SAVE_INTENT = /(save|finalize|done|that'?s? (it|everything|all)|nothing else).{0,40}(lunch|that)/i
+// More lenient: short closing phrases that start the message, only used when already in a lunch session
+const LUNCH_DONE_INTENT = /^(done|that'?s? ?(it|all|everything|good)|nothing else|no(thing| more)?|nope|save (it|that|the lunch))[.!]?\s*$/i
+
+function extractJson(raw: string): unknown {
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start !== -1 && end > start) return JSON.parse(raw.slice(start, end + 1))
+  return JSON.parse(raw.trim())
+}
 
 // Detect when Claude's response contains a dosing or treatment recommendation
 const LOG_INTENT = /\b(enter|give|treat|administer|pre-bolus)\b.{0,80}\b(grams?|juice|gummy|gummies|glucose|tabs?|fast carbs?|pump|correction)\b/i
@@ -346,8 +355,8 @@ ${fullConvo}`,
     })
     try {
       const raw = extractResult.content[0].type === 'text' ? extractResult.content[0].text.trim() : ''
-      const parsed = JSON.parse(raw.replace(/^```json\n?|\n?```$/g, ''))
-      if (parsed.type !== 'unknown') {
+      const parsed = extractJson(raw) as Record<string, unknown>
+      if (parsed && parsed.type !== 'unknown') {
         log_proposal = { ...parsed, timestamp: new Date().toISOString() }
       }
     } catch { /* ignore parse errors */ }
@@ -371,14 +380,14 @@ ${fullConvo}`,
     })
     try {
       const raw = recipeResult.content[0].type === 'text' ? recipeResult.content[0].text.trim() : ''
-      recipe_proposal = JSON.parse(raw.replace(/^```json\n?|\n?```$/g, ''))
+      recipe_proposal = extractJson(raw) as Record<string, unknown>
     } catch { /* ignore */ }
   }
 
   // Detect lunch plan save intent — fires when user wraps up planning mode
   const isLunchSession = LUNCH_PLAN_INTENT.test(message) || historyMessages.some(m => LUNCH_PLAN_INTENT.test(m.content))
   let lunch_plan: Record<string, unknown> | null = null
-  if (isLunchSession && (LUNCH_SAVE_INTENT.test(message) || LUNCH_SAVE_INTENT.test(reply))) {
+  if (isLunchSession && (LUNCH_SAVE_INTENT.test(message) || LUNCH_SAVE_INTENT.test(reply) || LUNCH_DONE_INTENT.test(message.trim()))) {
     const lunchResult = await claude.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
@@ -394,7 +403,7 @@ ${fullConvo}`,
     })
     try {
       const raw = lunchResult.content[0].type === 'text' ? lunchResult.content[0].text.trim() : ''
-      lunch_plan = JSON.parse(raw.replace(/^```json\n?|\n?```$/g, ''))
+      lunch_plan = extractJson(raw) as Record<string, unknown>
     } catch { /* ignore */ }
   }
 

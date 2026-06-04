@@ -282,7 +282,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, proposal])
+  }, [messages, proposal, lunchPlan, logProposal, recipeProposal])
 
   const send = async (text: string, attachedPhotos?: Photo[]) => {
     const currentPhotos = attachedPhotos ?? photos
