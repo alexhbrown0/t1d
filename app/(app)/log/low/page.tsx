@@ -18,6 +18,7 @@ export default function LogLowPage() {
   const [otherCarbs, setOtherCarbs] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     fetch('/api/t1d/bg-latest')
@@ -37,20 +38,32 @@ export default function LogLowPage() {
     otherLabel || 'Other'
 
   const submit = async () => {
-    if (!bg || totalCarbs === 0) return
+    if (totalCarbs === 0) { setError('Enter a carb amount first'); return }
+    setError('')
     setSubmitting(true)
-    await fetch('/api/t1d/low-treatments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        bg_at_treatment: parseFloat(bg),
-        treatment_type: type,
-        treatment_carbs_g: totalCarbs,
-        notes: notes || null,
-        source: 'manual',
-      }),
-    })
-    router.push('/now')
+    try {
+      const res = await fetch('/api/t1d/low-treatments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bg_at_treatment: bg ? parseFloat(bg) : null,
+          treatment_type: type,
+          treatment_carbs_g: totalCarbs,
+          notes: notes || null,
+          source: 'manual',
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setError(d.error ?? 'Failed to log — try again')
+        return
+      }
+      router.push('/now')
+    } catch {
+      setError('Network error — try again')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -179,9 +192,10 @@ export default function LogLowPage() {
           <p className="text-2xl font-bold text-white mt-1">{totalCarbs}g fast carbs</p>
           <p className="text-xs text-gray-500 mt-0.5">{treatmentLabel}</p>
         </div>
+        {error && <p className="text-xs text-red-400 text-center">{error}</p>}
         <button
           onClick={submit}
-          disabled={!bg || totalCarbs === 0 || submitting}
+          disabled={totalCarbs === 0 || submitting}
           className="w-full bg-red-500/20 border border-red-500/30 text-red-300 font-semibold py-4 rounded-2xl text-sm disabled:opacity-40"
         >
           {submitting ? 'Logging...' : `Log ${totalCarbs}g`}
