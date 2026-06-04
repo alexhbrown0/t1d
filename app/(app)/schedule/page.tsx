@@ -15,36 +15,44 @@ function minutesSinceMidnight(t: string) {
   return h * 60 + m
 }
 
-const SCHOOL_START = 8 * 60
-const SCHOOL_END = 15 * 60
-const SCHOOL_TOTAL = SCHOOL_END - SCHOOL_START
+const DAY_START = 6 * 60    // 6 AM
+const DAY_END   = 21 * 60   // 9 PM
+const DAY_TOTAL = DAY_END - DAY_START
 
 const EVENT_COLORS: Record<string, string> = {
-  pe: 'bg-green-500',
-  recess: 'bg-yellow-500',
-  lunch: 'bg-teal-500',
-  snack: 'bg-orange-400',
+  pe:        'bg-green-500',
+  recess:    'bg-yellow-500',
+  lunch:     'bg-teal-500',
+  snack:     'bg-orange-400',
+  breakfast: 'bg-purple-400',
+  bedtime:   'bg-indigo-400',
 }
 
 const EVENT_LABELS: Record<string, string> = {
-  pe: 'PE',
-  recess: 'Recess',
-  lunch: 'Lunch',
-  snack: 'Snack',
+  pe:        'PE',
+  recess:    'Recess',
+  lunch:     'Lunch',
+  snack:     'Snack',
+  breakfast: 'Breakfast',
+  bedtime:   'Bedtime',
 }
 
 const EVENT_BORDER: Record<string, string> = {
-  pe: 'border-green-500/30 bg-green-500/5',
-  recess: 'border-yellow-500/30 bg-yellow-500/5',
-  lunch: 'border-teal-500/30 bg-teal-500/5',
-  snack: 'border-orange-400/30 bg-orange-400/5',
+  pe:        'border-green-500/30 bg-green-500/5',
+  recess:    'border-yellow-500/30 bg-yellow-500/5',
+  lunch:     'border-teal-500/30 bg-teal-500/5',
+  snack:     'border-orange-400/30 bg-orange-400/5',
+  breakfast: 'border-purple-400/30 bg-purple-400/5',
+  bedtime:   'border-indigo-400/30 bg-indigo-400/5',
 }
 
 const EVENT_TEXT: Record<string, string> = {
-  pe: 'text-green-400',
-  recess: 'text-yellow-400',
-  lunch: 'text-teal-400',
-  snack: 'text-orange-400',
+  pe:        'text-green-400',
+  recess:    'text-yellow-400',
+  lunch:     'text-teal-400',
+  snack:     'text-orange-400',
+  breakfast: 'text-purple-400',
+  bedtime:   'text-indigo-400',
 }
 
 export default async function SchedulePage() {
@@ -102,17 +110,17 @@ export default async function SchedulePage() {
             <p className="text-[10px] tracking-widest text-gray-500 font-semibold mb-3">DAY OVERVIEW</p>
             <div className="relative h-6 bg-white/5 rounded-full overflow-hidden">
               {/* Current time indicator */}
-              {nowMinutes >= SCHOOL_START && nowMinutes <= SCHOOL_END && (
+              {nowMinutes >= DAY_START && nowMinutes <= DAY_END && (
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-white/60 z-10"
-                  style={{ left: `${((nowMinutes - SCHOOL_START) / SCHOOL_TOTAL) * 100}%` }}
+                  style={{ left: `${((nowMinutes - DAY_START) / DAY_TOTAL) * 100}%` }}
                 />
               )}
               {schedule.map(event => {
                 const start = minutesSinceMidnight(event.start_time)
                 const end = minutesSinceMidnight(event.end_time)
-                const left = ((start - SCHOOL_START) / SCHOOL_TOTAL) * 100
-                const width = ((end - start) / SCHOOL_TOTAL) * 100
+                const left = ((start - DAY_START) / DAY_TOTAL) * 100
+                const width = ((end - start) / DAY_TOTAL) * 100
                 return (
                   <div
                     key={event.id}
@@ -123,8 +131,8 @@ export default async function SchedulePage() {
               })}
             </div>
             <div className="flex justify-between mt-1">
-              <span className="text-[10px] text-gray-700">8 AM</span>
-              <span className="text-[10px] text-gray-700">3 PM</span>
+              <span className="text-[10px] text-gray-700">6 AM</span>
+              <span className="text-[10px] text-gray-700">9 PM</span>
             </div>
           </div>
 
