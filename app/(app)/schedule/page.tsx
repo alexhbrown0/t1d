@@ -20,39 +20,47 @@ const DAY_END   = 21 * 60   // 9 PM
 const DAY_TOTAL = DAY_END - DAY_START
 
 const EVENT_COLORS: Record<string, string> = {
-  pe:        'bg-green-500',
-  recess:    'bg-yellow-500',
-  lunch:     'bg-teal-500',
-  snack:     'bg-orange-400',
-  breakfast: 'bg-purple-400',
-  bedtime:   'bg-indigo-400',
+  pe:         'bg-green-500',
+  recess:     'bg-yellow-500',
+  playground: 'bg-lime-500',
+  swimming:   'bg-sky-400',
+  lunch:      'bg-teal-500',
+  snack:      'bg-orange-400',
+  breakfast:  'bg-purple-400',
+  bedtime:    'bg-indigo-400',
 }
 
 const EVENT_LABELS: Record<string, string> = {
-  pe:        'PE',
-  recess:    'Recess',
-  lunch:     'Lunch',
-  snack:     'Snack',
-  breakfast: 'Breakfast',
-  bedtime:   'Bedtime',
+  pe:         'PE',
+  recess:     'Recess',
+  playground: 'Playground',
+  swimming:   'Swimming',
+  lunch:      'Lunch',
+  snack:      'Snack',
+  breakfast:  'Breakfast',
+  bedtime:    'Bedtime',
 }
 
 const EVENT_BORDER: Record<string, string> = {
-  pe:        'border-green-500/30 bg-green-500/5',
-  recess:    'border-yellow-500/30 bg-yellow-500/5',
-  lunch:     'border-teal-500/30 bg-teal-500/5',
-  snack:     'border-orange-400/30 bg-orange-400/5',
-  breakfast: 'border-purple-400/30 bg-purple-400/5',
-  bedtime:   'border-indigo-400/30 bg-indigo-400/5',
+  pe:         'border-green-500/30 bg-green-500/5',
+  recess:     'border-yellow-500/30 bg-yellow-500/5',
+  playground: 'border-lime-500/30 bg-lime-500/5',
+  swimming:   'border-sky-400/30 bg-sky-400/5',
+  lunch:      'border-teal-500/30 bg-teal-500/5',
+  snack:      'border-orange-400/30 bg-orange-400/5',
+  breakfast:  'border-purple-400/30 bg-purple-400/5',
+  bedtime:    'border-indigo-400/30 bg-indigo-400/5',
 }
 
 const EVENT_TEXT: Record<string, string> = {
-  pe:        'text-green-400',
-  recess:    'text-yellow-400',
-  lunch:     'text-teal-400',
-  snack:     'text-orange-400',
-  breakfast: 'text-purple-400',
-  bedtime:   'text-indigo-400',
+  pe:         'text-green-400',
+  recess:     'text-yellow-400',
+  playground: 'text-lime-400',
+  swimming:   'text-sky-400',
+  lunch:      'text-teal-400',
+  snack:      'text-orange-400',
+  breakfast:  'text-purple-400',
+  bedtime:    'text-indigo-400',
 }
 
 export default async function SchedulePage() {

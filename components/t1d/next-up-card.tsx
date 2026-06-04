@@ -20,6 +20,8 @@ function formatTime(timeStr: string): string {
 
 const TYPE_LABEL: Record<string, string> = {
   pe: 'PE', lunch: 'Lunch', recess: 'Recess', snack: 'Snack',
+  playground: 'Playground', swimming: 'Swimming',
+  breakfast: 'Breakfast', bedtime: 'Bedtime',
 }
 
 export function NextUpCard({ event }: { event: ScheduleEvent }) {

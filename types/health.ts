@@ -346,7 +346,7 @@ export interface T1dSchoolSchedule {
   day_of_week: number
   start_time: string
   end_time: string
-  event_type: 'pe' | 'lunch' | 'snack' | 'breakfast' | 'recess' | 'bedtime'
+  event_type: 'pe' | 'lunch' | 'snack' | 'breakfast' | 'recess' | 'playground' | 'swimming' | 'bedtime'
   activity_level: 'high' | 'medium' | 'low' | 'rest' | 'normal' | null
   notes: string | null
   active: boolean
