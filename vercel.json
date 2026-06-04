@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/claude/t1d-daily-learning",
-      "schedule": "35 1 * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
