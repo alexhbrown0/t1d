@@ -7,7 +7,7 @@ import { EngineLunchEntry } from '@/components/t1d/engine-lunch-entry'
 import { EngineData } from '@/components/t1d/engine-data'
 import { EngineParams } from '@/components/t1d/engine-params'
 
-const TABS = ['TODAY', 'LUNCH', 'FOODS', 'DATA', 'ENGINE'] as const
+const TABS = ['TODAY', 'LUNCH', 'FOODS', 'INSIGHTS', 'ENGINE'] as const
 type Tab = typeof TABS[number]
 
 export default function EnginePage() {
@@ -54,7 +54,22 @@ export default function EnginePage() {
           </div>
         </Link>
       )}
-      {tab === 'DATA' && <EngineData />}
+      {tab === 'INSIGHTS' && (
+        <div className="space-y-3">
+          <Link href="/engine/learnings">
+            <div className="bg-[#141414] rounded-2xl border border-teal-500/20 px-5 py-5 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Nightly Insights</p>
+                <p className="text-xs text-gray-500 mt-0.5">Pattern analysis, dosing review, suggested tweaks</p>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </div>
+          </Link>
+          <EngineData />
+        </div>
+      )}
       {tab === 'ENGINE' && <EngineParams />}
     </div>
   )

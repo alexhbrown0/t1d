@@ -11,5 +11,13 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
   const summary = await importGlookoZip(supabase, buffer)
 
+  // Trigger nightly insights generation after Glooko data lands
+  // Fire-and-forget — don't block the response
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${req.headers.get('host')}`
+  fetch(`${baseUrl}/api/claude/t1d-daily-learning?force=false`, {
+    method: 'POST',
+    headers: { 'x-cron-secret': process.env.CRON_SECRET ?? '' },
+  }).catch(() => null)
+
   return NextResponse.json(summary)
 }
