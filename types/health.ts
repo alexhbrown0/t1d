@@ -241,10 +241,12 @@ export interface T1dEngineParams {
 export interface T1dDailyOverride {
   id: string
   override_date: string
+  camp_cancelled: boolean
   pe_cancelled: boolean
   pe_start_time: string | null
   pe_end_time: string | null
   lunch_start_time: string | null
+  snack_cancelled: boolean
   notes: string | null
   created_at: string
 }

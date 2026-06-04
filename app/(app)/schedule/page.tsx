@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
-import { getCentralTime } from '@/lib/utils/central-time'
-import type { T1dSchoolSchedule } from '@/types/health'
+import { getCentralTime, getCentralDateStr } from '@/lib/utils/central-time'
+import { ScheduleOverride } from '@/components/t1d/schedule-override'
+import type { T1dSchoolSchedule, T1dDailyOverride } from '@/types/health'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,14 +53,15 @@ export default async function SchedulePage() {
   const todayDay = ct.dayOfWeek
   const nowMinutes = ct.minutesSinceMidnight
 
-  const { data: scheduleData } = await supabase
-    .from('t1d_school_schedule')
-    .select('*')
-    .eq('day_of_week', todayDay)
-    .eq('active', true)
-    .order('start_time', { ascending: true })
+  const todayDate = getCentralDateStr()
+
+  const [{ data: scheduleData }, { data: overrideData }] = await Promise.all([
+    supabase.from('t1d_school_schedule').select('*').eq('day_of_week', todayDay).eq('active', true).order('start_time', { ascending: true }),
+    supabase.from('t1d_daily_overrides').select('*').eq('override_date', todayDate).limit(1).maybeSingle(),
+  ])
 
   const schedule: T1dSchoolSchedule[] = scheduleData ?? []
+  const override = (overrideData ?? null) as T1dDailyOverride | null
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const isWeekend = todayDay === 0 || todayDay === 6
@@ -149,6 +151,9 @@ export default async function SchedulePage() {
               <p className="text-[10px] text-gray-600 mt-0.5">Snack</p>
             </div>
           </div>
+
+          {/* Day override */}
+          <ScheduleOverride date={todayDate} initial={override} />
 
           {/* Timeline */}
           <div className="space-y-2">
