@@ -1,3 +1,4 @@
+import { getCentralDateStr } from '@/lib/utils/central-time'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { runDoseEngine } from '@/lib/t1d/engine'
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
   const { data: params } = await supabase
     .from('t1d_engine_params')
     .select('id')
-    .lte('effective_from', new Date().toISOString().split('T')[0])
+    .lte('effective_from', getCentralDateStr())
     .order('effective_from', { ascending: false })
     .limit(1)
     .single()

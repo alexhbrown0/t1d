@@ -1,13 +1,12 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { getCentralTime } from '@/lib/utils/central-time'
 import type { T1dSchoolSchedule } from '@/types/health'
 
 export const dynamic = 'force-dynamic'
 
 function formatTime(t: string) {
   const [h, m] = t.split(':').map(Number)
-  const d = new Date()
-  d.setHours(h, m)
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return new Date(0, 0, 0, h, m).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
 function minutesSinceMidnight(t: string) {
@@ -45,9 +44,9 @@ const EVENT_TEXT: Record<string, string> = {
 
 export default async function SchedulePage() {
   const supabase = createServerClient()
-  const now = new Date()
-  const todayDay = now.getDay()
-  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const ct = getCentralTime()
+  const todayDay = ct.dayOfWeek
+  const nowMinutes = ct.minutesSinceMidnight
 
   const { data: scheduleData } = await supabase
     .from('t1d_school_schedule')

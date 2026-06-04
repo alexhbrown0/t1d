@@ -1,9 +1,10 @@
 import type { T1dEngineParams, IcrSegment, DexcomEgv, MealItem, LearnedStrategy, SimilarFoodOutcome, T1dSchoolSchedule } from '@/types/health'
 import { computeFpu } from '@/lib/t1d/fpu'
+import { getCentralTime } from '@/lib/utils/central-time'
 
 export function resolveActiveIcr(params: T1dEngineParams, now = new Date()): number {
   if (!params.icr_segments?.length) return params.current_icr ?? 15
-  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const hhmm = getCentralTime(now).timeStr
   const match = params.icr_segments.find(s => hhmm >= s.start && hhmm < s.end)
   return match?.icr ?? params.current_icr ?? 15
 }

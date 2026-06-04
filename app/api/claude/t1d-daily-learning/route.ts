@@ -1,3 +1,4 @@
+import { getCentralDateStr } from '@/lib/utils/central-time'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServerClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = getCentralDateStr()
   const todayStart = `${today}T00:00:00Z`
   const todayEnd = `${today}T23:59:59Z`
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600000).toISOString()

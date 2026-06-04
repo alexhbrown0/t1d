@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { getCentralTime, getCentralDayStartUTC, getCentralDateStr, getCentralTimeDisplay } from '@/lib/utils/central-time'
 import { claude } from '@/lib/claude/client'
 import { getLatestEgvs } from '@/lib/dexcom/client'
 
@@ -48,11 +49,9 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient()
   const now = new Date()
   const sixHoursAgo = new Date(Date.now() - 6 * 3600000).toISOString()
-  const dayOfWeek = now.getDay()
-
-  const midnight = new Date(now)
-  midnight.setHours(0, 0, 0, 0)
-  const midnightIso = midnight.toISOString()
+  const ct = getCentralTime()
+  const dayOfWeek = ct.dayOfWeek
+  const midnightIso = getCentralDayStartUTC().toISOString()
 
   const [egvs, bolusResult, bolusToday, lowResult, scheduleResult, paramsResult, recipesResult, foodRepoResult] = await Promise.all([
     getLatestEgvs(5),
@@ -87,7 +86,7 @@ export async function POST(req: NextRequest) {
     return sum + Number(b.insulin_delivered_u ?? 0) * Math.max(0, 1 - elapsed / dia)
   }, 0)
 
-  const nowMins = now.getHours() * 60 + now.getMinutes()
+  const nowMins = ct.minutesSinceMidnight
   const upcomingSchedule = schedule
     .map(s => {
       const [h, m] = s.start_time.split(':').map(Number)
@@ -97,11 +96,10 @@ export async function POST(req: NextRequest) {
     .filter((_, i, arr) => i < 3)
     .join(', ')
 
-  const hour = now.getHours()
-  const mealPeriod = hour < 10 ? 'breakfast' : hour < 14 ? 'lunch' : hour < 17 ? 'afternoon' : 'dinner/evening'
+  const mealPeriod = ct.hour < 10 ? 'breakfast' : ct.hour < 14 ? 'lunch' : ct.hour < 17 ? 'afternoon' : 'dinner/evening'
 
   const contextBlock = [
-    `Time: ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}, ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayOfWeek]} — meal period: ${mealPeriod}${isFirstMealOfDay ? ' — FIRST MEAL OF DAY (fasting state, stomach empty, fast Fiasp absorption, full pre-bolus timing applies)' : ' — fed state (not first meal, stomach not empty, absorption slower than fasting)'}`,
+    `Time: ${getCentralTimeDisplay()}, ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayOfWeek]} — meal period: ${mealPeriod}${isFirstMealOfDay ? ' — FIRST MEAL OF DAY (fasting state, stomach empty, fast Fiasp absorption, full pre-bolus timing applies)' : ' — fed state (not first meal, stomach not empty, absorption slower than fasting)'}`,
     bg != null
       ? `BG (oldest→newest): ${bgSequence} | now ${bg} mg/dL, ${minsAgo}min ago, rate: ${rateStr}`
       : `BG: no live reading (last reading ${minsAgo != null ? `was ${minsAgo} minutes ago — too stale to use` : 'unavailable'})`,
@@ -165,7 +163,7 @@ Rules:
 - High-carb threshold: if the running undosed carb total is approaching or over 40g, suggest pausing, checking BG, and waiting 15-20 minutes before dosing the next course rather than stacking. At 60g+ undosed, flag it clearly.
 - Memory: clinical notes ARE the persistence mechanism. When you identify a dosing rule, protocol, or observation worth keeping, propose saving it as a clinical note. Clinical notes persist to every future session and all dosing calculations. You do not need to disclaim that you lack memory — notes bridge that gap.`
 
-  const today = now.toISOString().split('T')[0]
+  const today = getCentralDateStr()
 
   // Upload all photos to storage
   const photoUrls: string[] = []

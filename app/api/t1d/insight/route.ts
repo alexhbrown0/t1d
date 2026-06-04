@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { getCentralTime, getCentralDateStr, getCentralTimeDisplay } from '@/lib/utils/central-time'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic()
@@ -33,7 +34,7 @@ export async function GET() {
     supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u, bg_input_mgdl').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(3),
     supabase.from('t1d_school_schedule').select('*').eq('active', true).order('start_time'),
-    supabase.from('t1d_engine_params').select('current_dia, pre_bolus_lead_min, activity_reduction_pct, clinical_notes').lte('effective_from', now.toISOString().split('T')[0]).order('effective_from', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('t1d_engine_params').select('current_dia, pre_bolus_lead_min, activity_reduction_pct, clinical_notes').lte('effective_from', getCentralDateStr()).order('effective_from', { ascending: false }).limit(1).maybeSingle(),
   ])
 
   const egvs = egvsResult.data ?? []
@@ -62,8 +63,9 @@ export async function GET() {
   }, 0)
 
   // Upcoming schedule
-  const dayOfWeek = now.getDay()
-  const nowMins = now.getHours() * 60 + now.getMinutes()
+  const ct = getCentralTime()
+  const dayOfWeek = ct.dayOfWeek
+  const nowMins = ct.minutesSinceMidnight
   const upcoming = schedule
     .filter(s => s.day_of_week === dayOfWeek)
     .map(s => {
@@ -74,7 +76,7 @@ export async function GET() {
     .sort((a, b) => a.minsUntil - b.minsUntil)
 
   const lines: string[] = [
-    `Time: ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}, ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek]}`,
+    `Time: ${getCentralTimeDisplay()}, ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek]}`,
     bg != null
       ? `BG readings (oldest→newest): ${bgSequence} | current ${bg} mg/dL, ${minsAgo}min ago, rate of change: ${rateStr}`
       : 'BG: no recent data',

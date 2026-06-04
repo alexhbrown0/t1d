@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
+import { getCentralTime } from '@/lib/utils/central-time'
 import { AppHeader } from '@/components/t1d/app-header'
 import { BgCard } from '@/components/t1d/bg-card'
 import { InsightTile } from '@/components/t1d/insight-tile'
@@ -13,11 +14,11 @@ export const dynamic = 'force-dynamic'
 export default async function NowPage() {
   const supabase = createServerClient()
 
-  const now = new Date()
-  const isWeekday = now.getDay() >= 1 && now.getDay() <= 5
+  const ct = getCentralTime()
+  const isWeekday = ct.dayOfWeek >= 1 && ct.dayOfWeek <= 5
   const { packingForTomorrow, targetDate, targetEnd } = getLunchTargetDate()
-  const todayDay = now.getDay()
-  const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`
+  const todayDay = ct.dayOfWeek
+  const nowTime = `${ct.timeStr}:00`
 
   const [egvsResult, scheduleResult, lunchResult] = await Promise.all([
     supabase

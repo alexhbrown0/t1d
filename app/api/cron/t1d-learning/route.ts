@@ -1,3 +1,4 @@
+import { getCentralDateStr } from '@/lib/utils/central-time'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { claude } from '@/lib/claude/client'
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServerClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = getCentralDateStr()
   const todayStart = new Date(`${today}T00:00:00Z`)
   const todayEnd = new Date(`${today}T23:59:59Z`)
 

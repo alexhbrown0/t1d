@@ -1,3 +1,5 @@
+import { getCentralTime } from '@/lib/utils/central-time'
+
 interface ScheduleEvent {
   event_type: string
   start_time: string
@@ -6,18 +8,14 @@ interface ScheduleEvent {
 }
 
 function minutesUntil(timeStr: string): number {
-  const now = new Date()
+  const { minutesSinceMidnight } = getCentralTime()
   const [h, m] = timeStr.split(':').map(Number)
-  const then = new Date(now)
-  then.setHours(h, m, 0, 0)
-  return Math.max(0, Math.round((then.getTime() - now.getTime()) / 60000))
+  return Math.max(0, h * 60 + m - minutesSinceMidnight)
 }
 
 function formatTime(timeStr: string): string {
   const [h, m] = timeStr.split(':').map(Number)
-  const d = new Date()
-  d.setHours(h, m)
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return new Date(0, 0, 0, h, m).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
 const TYPE_LABEL: Record<string, string> = {

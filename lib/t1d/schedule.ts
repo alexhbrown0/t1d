@@ -1,9 +1,9 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { getCentralTime, getCentralDateStr } from '@/lib/utils/central-time'
 import type { T1dSchoolSchedule, T1dDailyOverride } from '@/types/health'
 
 function nowMinutes(): number {
-  const now = new Date()
-  return now.getHours() * 60 + now.getMinutes()
+  return getCentralTime().minutesSinceMidnight
 }
 
 function timeToMinutes(t: string): number {
@@ -16,7 +16,7 @@ async function getTodaySchedule(): Promise<T1dSchoolSchedule[]> {
   const { data, error } = await supabase
     .from('t1d_school_schedule')
     .select('*')
-    .eq('day_of_week', new Date().getDay())
+    .eq('day_of_week', getCentralTime().dayOfWeek)
     .eq('active', true)
     .order('start_time')
   if (error) throw new Error(error.message)
@@ -25,11 +25,10 @@ async function getTodaySchedule(): Promise<T1dSchoolSchedule[]> {
 
 async function getTodayOverride(): Promise<T1dDailyOverride | null> {
   const supabase = createServerClient()
-  const today = new Date().toISOString().split('T')[0]
   const { data } = await supabase
     .from('t1d_daily_overrides')
     .select('*')
-    .eq('override_date', today)
+    .eq('override_date', getCentralDateStr())
     .maybeSingle()
   return (data ?? null) as T1dDailyOverride | null
 }

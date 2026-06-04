@@ -1,3 +1,4 @@
+import { getCentralDayStartUTC, getCentralDateStr } from '@/lib/utils/central-time'
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { getLatestEgvs } from '@/lib/dexcom/client'
@@ -21,9 +22,8 @@ function inferPhase(
 
 export async function GET() {
   const supabase = createServerClient()
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const todayDate = todayStart.toISOString().split('T')[0]
+  const todayStart = getCentralDayStartUTC()
+  const todayDate = getCentralDateStr()
 
   const [mealRes, egvs, schedRes, overrideRes] = await Promise.all([
     supabase

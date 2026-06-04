@@ -19,6 +19,80 @@ export type GlookoCgmRow = {
   trend_rate: null
 }
 
+export type GlookoBgRow = {
+  timestamp: string
+  glucose_mgdl: number | null
+  manual_reading: boolean | null
+  serial_number: string | null
+}
+
+export type GlookoAlarmRow = {
+  timestamp: string
+  alarm_event: string | null
+  serial_number: string | null
+}
+
+export type GlookoBasalRow = {
+  timestamp: string
+  insulin_type: string | null
+  duration_minutes: number | null
+  percentage_pct: number | null
+  rate: number | null
+  insulin_delivered_u: number | null
+  serial_number: string | null
+}
+
+export type GlookoCarbsRow = {
+  timestamp: string
+  carbs_g: number | null
+}
+
+export type GlookoFoodRow = {
+  timestamp: string
+  name: string | null
+  carbs_g: number | null
+  fat: number | null
+  protein: number | null
+  calories: number | null
+  serving_quantity: number | null
+  num_servings: number | null
+}
+
+export type GlookoExerciseRow = {
+  timestamp: string
+  name: string | null
+  intensity: string | null
+  duration_minutes: number | null
+  calories_burned: number | null
+}
+
+export type GlookoMedicationRow = {
+  timestamp: string
+  name: string | null
+  value: string | null
+  medication_type: string | null
+}
+
+export type GlookoNoteRow = {
+  timestamp: string
+  value: string | null
+}
+
+export type GlookoManualInsulinRow = {
+  timestamp: string
+  name: string | null
+  value: number | null
+  insulin_type: string | null
+}
+
+export type GlookoInsulinTotalsRow = {
+  timestamp: string
+  total_bolus_u: number | null
+  total_insulin_u: number | null
+  total_basal_u: number | null
+  serial_number: string | null
+}
+
 const DEFAULT_TIMEZONE = 'America/Chicago'
 
 export function localToUtc(localStr: string, timezone = DEFAULT_TIMEZONE): string {
@@ -108,8 +182,106 @@ export function parseCgmCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoCgm
   return rows
 }
 
+export function parseBgCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoBgRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    glucose_mgdl: numberOrNull(cols[1]),
+    manual_reading: booleanMarkerOrNull(cols[2]),
+    serial_number: cols[3]?.trim() || null,
+  })).filter(row => row.timestamp && row.glucose_mgdl !== null)
+}
+
+export function parseAlarmsCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoAlarmRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    alarm_event: cols[1] || null,
+    serial_number: cols[2]?.trim() || null,
+  })).filter(row => row.timestamp && row.alarm_event)
+}
+
+export function parseBasalCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoBasalRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    insulin_type: cols[1] || null,
+    duration_minutes: numberOrNull(cols[2]),
+    percentage_pct: numberOrNull(cols[3]),
+    rate: numberOrNull(cols[4]),
+    insulin_delivered_u: numberOrNull(cols[5]),
+    serial_number: cols[6]?.trim() || null,
+  })).filter(row => row.timestamp)
+}
+
+export function parseCarbsCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoCarbsRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    carbs_g: numberOrNull(cols[1]),
+  })).filter(row => row.timestamp && row.carbs_g !== null)
+}
+
+export function parseFoodCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoFoodRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    name: cols[1] || null,
+    carbs_g: numberOrNull(cols[2]),
+    fat: numberOrNull(cols[3]),
+    protein: numberOrNull(cols[4]),
+    calories: numberOrNull(cols[5]),
+    serving_quantity: numberOrNull(cols[6]),
+    num_servings: numberOrNull(cols[7]),
+  })).filter(row => row.timestamp && row.name)
+}
+
+export function parseExerciseCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoExerciseRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    name: cols[1] || null,
+    intensity: cols[2] || null,
+    duration_minutes: numberOrNull(cols[3]),
+    calories_burned: numberOrNull(cols[4]),
+  })).filter(row => row.timestamp && row.name)
+}
+
+export function parseMedicationCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoMedicationRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    name: cols[1] || null,
+    value: cols[2] || null,
+    medication_type: cols[3] || null,
+  })).filter(row => row.timestamp && row.name)
+}
+
+export function parseNotesCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoNoteRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    value: cols[1] || null,
+  })).filter(row => row.timestamp && row.value)
+}
+
+export function parseManualInsulinCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoManualInsulinRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    name: cols[1] || null,
+    value: numberOrNull(cols[2]),
+    insulin_type: cols[3] || null,
+  })).filter(row => row.timestamp && row.name)
+}
+
+export function parseInsulinTotalsCsv(csv: string, timezone = DEFAULT_TIMEZONE): GlookoInsulinTotalsRow[] {
+  return parseDataRows(csv).map(cols => ({
+    timestamp: localToUtc(cols[0], timezone),
+    total_bolus_u: numberOrNull(cols[1]),
+    total_insulin_u: numberOrNull(cols[2]),
+    total_basal_u: numberOrNull(cols[3]),
+    serial_number: cols[4]?.trim() || null,
+  })).filter(row => row.timestamp)
+}
+
 function cleanCsvLines(csv: string) {
   return csv.replace(/^\uFEFF/, '').split('\n').map(line => line.trim()).filter(Boolean)
+}
+
+function parseDataRows(csv: string) {
+  return cleanCsvLines(csv).slice(2).map(parseCsvLine).filter(cols => cols[0])
 }
 
 function normalizeLocalTimestamp(value: string) {
@@ -164,4 +336,12 @@ function numberOrNull(value: string | undefined) {
   if (!value) return null
   const parsed = Number.parseFloat(value)
   return Number.isNaN(parsed) ? null : parsed
+}
+
+function booleanMarkerOrNull(value: string | undefined) {
+  if (!value) return null
+  const normalized = value.trim().toLowerCase()
+  if (['m', 'manual', 'true', 'yes', 'y', '1'].includes(normalized)) return true
+  if (['false', 'no', 'n', '0'].includes(normalized)) return false
+  return null
 }

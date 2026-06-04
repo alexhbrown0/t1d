@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { getCentralDateStr } from '@/lib/utils/central-time'
 
 export async function GET() {
   const supabase = createServerClient()

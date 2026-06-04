@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import Link from 'next/link'
+import { getCentralTime } from '@/lib/utils/central-time'
 import type { T1dMealEvent, T1dDoseSession, MealItem } from '@/types/health'
 
 type Phase = 'no_lunch' | 'packed' | 'pre_dose_ready' | 'eating' | 'followup_pending' | 'followup_ready' | 'complete'
@@ -174,10 +175,9 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   }
 
   // ── PE context ────────────────────────────────────────────────────────
-  const now = new Date()
-  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const { dayOfWeek: centralDay, minutesSinceMidnight: nowMin } = getCentralTime()
   const nextPe = data.override?.pe_cancelled ? null : data.schedule.find(
-    s => s.event_type === 'pe' && s.day_of_week === now.getDay() && timeToMinutes(s.start_time) > nowMin
+    s => s.event_type === 'pe' && s.day_of_week === centralDay && timeToMinutes(s.start_time) > nowMin
   )
   const peMin = nextPe ? timeToMinutes(nextPe.start_time) - nowMin : null
   const phase = data.phase
