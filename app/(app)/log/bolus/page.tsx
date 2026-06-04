@@ -23,12 +23,8 @@ interface RepoFood {
   category: string | null
 }
 
-const LOW_TREATMENT_OPTIONS = [
-  { label: 'None', carbs: 0 },
-  { label: '1 glucose tab', carbs: 4 },
-  { label: 'Half juice', carbs: 8 },
-  { label: 'Full juice', carbs: 15 },
-]
+const JUICE_CARBS = 15
+const GUMMY_CARBS = 5
 
 export default function LogBolusPage() {
   const router = useRouter()
@@ -44,6 +40,10 @@ export default function LogBolusPage() {
   const [foodRepo, setFoodRepo] = useState<RepoFood[]>([])
   const [librarySearch, setLibrarySearch] = useState('')
   const [pickingFood, setPickingFood] = useState<{ food: RepoFood; qty: string } | null>(null)
+  const [gummyCount, setGummyCount] = useState(1)
+  const [otherExpanded, setOtherExpanded] = useState(false)
+  const [otherLabel, setOtherLabel] = useState('')
+  const [otherCarbs, setOtherCarbs] = useState('')
 
   useEffect(() => {
     fetch('/api/t1d/bg-latest')
@@ -378,16 +378,90 @@ export default function LogBolusPage() {
 
           <p className="text-[10px] tracking-widest text-gray-500 font-semibold">FAST CARBS GIVEN BEFORE/DURING MEAL</p>
           <div className="space-y-2">
-            {LOW_TREATMENT_OPTIONS.map(opt => (
-              <button
-                key={opt.label}
-                onClick={() => getDose({ type: opt.label, carbs: opt.carbs })}
-                className="w-full bg-[#141414] border border-white/10 rounded-xl px-5 py-4 flex items-center justify-between active:bg-white/5"
-              >
-                <span className="text-sm text-white font-semibold">{opt.label}</span>
-                {opt.carbs > 0 && <span className="text-sm text-orange-400 font-bold">{opt.carbs}g fast carbs</span>}
-              </button>
-            ))}
+
+            {/* Juice */}
+            <div className="bg-[#141414] border border-white/10 rounded-xl px-4 py-3">
+              <p className="text-xs text-gray-500 font-semibold mb-2">Juice · {JUICE_CARBS}g per bottle</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => getDose({ type: 'Half juice', carbs: Math.round(JUICE_CARBS / 2) })}
+                  className="flex-1 bg-orange-500/10 border border-orange-500/20 text-orange-300 text-sm font-semibold py-2.5 rounded-lg active:opacity-70"
+                >
+                  Half · {Math.round(JUICE_CARBS / 2)}g
+                </button>
+                <button
+                  onClick={() => getDose({ type: 'Full juice', carbs: JUICE_CARBS })}
+                  className="flex-1 bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-semibold py-2.5 rounded-lg active:opacity-70"
+                >
+                  Full · {JUICE_CARBS}g
+                </button>
+              </div>
+            </div>
+
+            {/* Gummies */}
+            <div className="bg-[#141414] border border-white/10 rounded-xl px-4 py-3">
+              <p className="text-xs text-gray-500 font-semibold mb-2">Gummies · {GUMMY_CARBS}g each</p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-1">
+                  <button onClick={() => setGummyCount(c => Math.max(1, c - 1))} className="w-8 h-8 rounded-lg bg-white/5 text-white font-bold flex items-center justify-center">−</button>
+                  <span className="text-white font-semibold text-sm w-6 text-center tabular-nums">{gummyCount}</span>
+                  <button onClick={() => setGummyCount(c => c + 1)} className="w-8 h-8 rounded-lg bg-white/5 text-white font-bold flex items-center justify-center">+</button>
+                  <span className="text-gray-500 text-xs">= {gummyCount * GUMMY_CARBS}g</span>
+                </div>
+                <button
+                  onClick={() => getDose({ type: `${gummyCount} gumm${gummyCount === 1 ? 'y' : 'ies'}`, carbs: gummyCount * GUMMY_CARBS })}
+                  className="bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-semibold px-4 py-2.5 rounded-lg active:opacity-70"
+                >
+                  Use
+                </button>
+              </div>
+            </div>
+
+            {/* Other */}
+            <div className="bg-[#141414] border border-white/10 rounded-xl px-4 py-3">
+              {!otherExpanded ? (
+                <button onClick={() => setOtherExpanded(true)} className="w-full text-left text-sm text-gray-400 font-semibold">Other →</button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500 font-semibold">Other fast carbs</p>
+                  <input
+                    type="text"
+                    placeholder="What was given?"
+                    value={otherLabel}
+                    onChange={e => setOtherLabel(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-orange-500/40"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="Carbs (g)"
+                      value={otherCarbs}
+                      onChange={e => setOtherCarbs(e.target.value)}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-orange-500/40"
+                    />
+                    <button
+                      onClick={() => {
+                        const c = parseInt(otherCarbs)
+                        if (c > 0) getDose({ type: otherLabel || 'Other', carbs: c })
+                      }}
+                      disabled={!otherCarbs || parseInt(otherCarbs) <= 0}
+                      className="bg-orange-500/15 border border-orange-500/30 text-orange-300 text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-40"
+                    >
+                      Use
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* None */}
+            <button
+              onClick={() => getDose({ type: 'None', carbs: 0 })}
+              className="w-full bg-[#141414] border border-white/10 rounded-xl px-5 py-3.5 text-left text-sm text-gray-500 font-semibold active:bg-white/5"
+            >
+              None — dose without treatment
+            </button>
           </div>
         </div>
       )}
