@@ -85,30 +85,24 @@ export default function LearningsPage() {
   const [learnings, setLearnings] = useState<Learning[]>([])
   const [loading, setLoading] = useState(true)
   const [triggering, setTriggering] = useState(false)
+  const [triggerMsg, setTriggerMsg] = useState<string | null>(null)
   const [acted, setActed] = useState<Record<string, 'approved' | 'rejected'>>({})
 
-  useEffect(() => {
+  const loadLearnings = () => {
     fetch('/api/t1d/learnings')
       .then(r => r.json())
       .then(data => { setLearnings(data ?? []); setLoading(false) })
-  }, [])
+  }
+
+  useEffect(() => { loadLearnings() }, [])
 
   const triggerLearning = async () => {
     setTriggering(true)
-    const res = await fetch('/api/t1d/learnings/run', { method: 'POST' })
-    if (res.ok) {
-      const data = await res.json()
-      const newLearning: Learning = {
-        id: data.learning_id,
-        learning_date: new Date().toISOString().split('T')[0],
-        claude_observations: data.observations,
-        claude_suggestions: data.suggestions ?? [],
-        data_quality: data.data_quality,
-        action_taken: null,
-      }
-      setLearnings(prev => [newLearning, ...prev])
-    }
+    setTriggerMsg(null)
+    await fetch('/api/t1d/learnings/run', { method: 'POST' })
     setTriggering(false)
+    setTriggerMsg('Analysis running — takes ~60s. Page will refresh automatically.')
+    setTimeout(() => { setTriggerMsg(null); loadLearnings() }, 75000)
   }
 
   const approve = async (learningId: string, s: Suggestion) => {
@@ -151,6 +145,12 @@ export default function LearningsPage() {
           {triggering ? 'Running...' : 'Run now'}
         </button>
       </div>
+
+      {triggerMsg && (
+        <div className="bg-teal-500/5 border border-teal-500/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-teal-400">{triggerMsg}</p>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">
