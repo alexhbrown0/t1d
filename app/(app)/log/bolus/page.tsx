@@ -12,6 +12,17 @@ interface FoodItem {
   gi_category: 'high' | 'medium' | 'low' | null
 }
 
+interface RepoFood {
+  id: string
+  name: string
+  carbs_g: number
+  fat_g: number | null
+  protein_g: number | null
+  gi_category: 'high' | 'medium' | 'low' | null
+  serving_size: string
+  category: string | null
+}
+
 const LOW_TREATMENT_OPTIONS = [
   { label: 'None', carbs: 0 },
   { label: '1 glucose tab', carbs: 4 },
@@ -22,7 +33,7 @@ const LOW_TREATMENT_OPTIONS = [
 export default function LogBolusPage() {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [step, setStep] = useState<'capture' | 'items' | 'low_treatment' | 'dose'>('capture')
+  const [step, setStep] = useState<'capture' | 'library' | 'items' | 'low_treatment' | 'dose'>('capture')
   const [analyzing, setAnalyzing] = useState(false)
   const [items, setItems] = useState<FoodItem[]>([])
   const [mealGi, setMealGi] = useState<'high' | 'medium' | 'low' | null>(null)
@@ -30,6 +41,9 @@ export default function LogBolusPage() {
   const [submitting, setSubmitting] = useState(false)
   const [currentBg, setCurrentBg] = useState<{ value: number; trend: string } | null>(null)
   const [lowTreatment, setLowTreatment] = useState<{ type: string; carbs: number; label: string } | null>(null)
+  const [foodRepo, setFoodRepo] = useState<RepoFood[]>([])
+  const [librarySearch, setLibrarySearch] = useState('')
+  const [pickingFood, setPickingFood] = useState<{ food: RepoFood; qty: string } | null>(null)
 
   useEffect(() => {
     fetch('/api/t1d/bg-latest')
@@ -60,6 +74,30 @@ export default function LogBolusPage() {
     } finally {
       setAnalyzing(false)
     }
+  }
+
+  const openLibrary = async () => {
+    if (foodRepo.length === 0) {
+      const data = await fetch('/api/t1d/food-repo').then(r => r.json()).catch(() => [])
+      setFoodRepo(Array.isArray(data) ? data : [])
+    }
+    setLibrarySearch('')
+    setPickingFood(null)
+    setStep('library')
+  }
+
+  const confirmLibraryPick = () => {
+    if (!pickingFood) return
+    const qty = parseFloat(pickingFood.qty)
+    if (!qty || qty <= 0) { setPickingFood(null); return }
+    const f = pickingFood.food
+    setItems(prev => {
+      const idx = prev.findIndex(i => i.name === f.name)
+      const item: FoodItem = { name: f.name, qty, carbs: f.carbs_g, fat: f.fat_g ?? null, protein: f.protein_g ?? null, gi_category: f.gi_category }
+      if (idx >= 0) return prev.map((i, n) => n === idx ? { ...i, qty } : i)
+      return [...prev, item]
+    })
+    setPickingFood(null)
   }
 
   const addManualItem = () => {
@@ -129,7 +167,7 @@ export default function LogBolusPage() {
   return (
     <div className="px-4 pt-5 pb-4 space-y-5">
       <div className="flex items-center gap-3">
-        <button onClick={() => (step === 'capture' ? router.back() : setStep(step === 'dose' ? (isLowOrDropping ? 'low_treatment' : 'items') : step === 'low_treatment' ? 'items' : 'capture'))} className="text-gray-500">
+        <button onClick={() => (step === 'capture' ? router.back() : setStep(step === 'dose' ? (isLowOrDropping ? 'low_treatment' : 'items') : step === 'low_treatment' ? 'items' : step === 'library' ? 'capture' : 'capture'))} className="text-gray-500">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -176,13 +214,87 @@ export default function LogBolusPage() {
             </div>
           )}
           <div className="flex gap-3">
-            <button onClick={() => fileRef.current?.click()} className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 text-xs text-gray-400 font-semibold">
+            <button onClick={openLibrary} className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 text-xs text-gray-400 font-semibold">
               Pick from library
             </button>
             <button onClick={addManualItem} className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 text-xs text-gray-400 font-semibold">
               Skip · manual
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Library picker step */}
+      {step === 'library' && (
+        <div className="space-y-3">
+          {pickingFood ? (
+            <div className="bg-[#141414] rounded-2xl border border-blue-500/30 p-5 space-y-4">
+              <div>
+                <p className="text-[10px] tracking-widest text-blue-400 font-semibold">HOW MUCH?</p>
+                <p className="text-base font-semibold text-white mt-1">{pickingFood.food.name}</p>
+                <p className="text-xs text-gray-500">per {pickingFood.food.serving_size}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.5"
+                  min="0"
+                  value={pickingFood.qty}
+                  onChange={e => setPickingFood(p => p ? { ...p, qty: e.target.value } : null)}
+                  autoFocus
+                  className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-semibold text-center focus:outline-none focus:border-blue-500/50"
+                />
+                <div className="text-right w-20 flex-shrink-0">
+                  <p className="text-2xl font-bold text-blue-400 tabular-nums">
+                    {parseFloat(pickingFood.qty) > 0 ? Math.round(pickingFood.food.carbs_g * parseFloat(pickingFood.qty)) : 0}g
+                  </p>
+                  <p className="text-[10px] text-gray-500">carbs</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setPickingFood(null)} className="flex-1 bg-white/5 border border-white/10 text-gray-400 text-sm font-semibold py-3 rounded-xl">Cancel</button>
+                <button onClick={confirmLibraryPick} className="flex-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 font-bold py-3 rounded-xl">Add</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <input
+                type="text"
+                placeholder="Search foods…"
+                value={librarySearch}
+                onChange={e => setLibrarySearch(e.target.value)}
+                className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
+              />
+              <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                {foodRepo
+                  .filter(f => !librarySearch || f.name.toLowerCase().includes(librarySearch.toLowerCase()))
+                  .slice(0, 40)
+                  .map(food => (
+                    <div key={food.id} className="bg-[#141414] rounded-xl border border-white/5 px-4 py-2.5 flex items-center justify-between">
+                      <div className="min-w-0 flex-1 pr-3">
+                        <p className="text-sm text-white truncate">{food.name}</p>
+                        <p className="text-[10px] text-gray-500">{food.carbs_g}g · {food.serving_size}</p>
+                      </div>
+                      <button
+                        onClick={() => setPickingFood({ food, qty: '1' })}
+                        className="bg-white/10 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ))}
+              </div>
+              {items.length > 0 && (
+                <button
+                  onClick={() => setStep('items')}
+                  className="w-full bg-blue-500/20 border border-blue-500/30 text-blue-300 font-bold py-3.5 rounded-2xl text-sm"
+                >
+                  Done · {items.length} item{items.length !== 1 ? 's' : ''} added
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
 
