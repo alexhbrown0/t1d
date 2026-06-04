@@ -48,6 +48,11 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
   const [analyzing, setAnalyzing] = useState(false)
   const [photoItems, setPhotoItems] = useState<PackedItem[] | null>(null)
   const [adding, setAdding] = useState<{ food: T1dFoodRepo | RecentItem; qty: string } | null>(null)
+  const [editingPhotoIdx, setEditingPhotoIdx] = useState<number | null>(null)
+  const [editingPhotoQty, setEditingPhotoQty] = useState('')
+  const [chatInput, setChatInput] = useState('')
+  const [chatReply, setChatReply] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
   const photoRef = useRef<HTMLInputElement>(null)
 
   const statKey = (id: string | null, name: string) => id ?? name
@@ -113,6 +118,25 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
       setPhotoItems(items)
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  const sendChat = async () => {
+    if (!chatInput.trim() || !photoItems) return
+    setChatLoading(true)
+    const msg = chatInput.trim()
+    setChatInput('')
+    try {
+      const resp = await fetch('/api/t1d/lunch/refine-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: photoItems, message: msg }),
+      })
+      const data = await resp.json()
+      if (data.items) setPhotoItems(data.items)
+      if (data.reply) setChatReply(data.reply)
+    } finally {
+      setChatLoading(false)
     }
   }
 
@@ -329,17 +353,91 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
           {photoItems && (
             <div className="space-y-3">
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">FOUND IN PHOTO</p>
+
               {photoItems.map((item, i) => (
-                <div key={i} className="bg-[#141414] rounded-xl border border-white/5 px-4 py-3 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-white">{item.name}</p>
-                    <p className="text-xs text-gray-500">{Math.round(item.carbs * item.qty)}g carbs</p>
+                <div key={i}>
+                  <div
+                    className="bg-[#141414] rounded-xl border border-white/5 px-4 py-3 flex justify-between items-center cursor-pointer active:opacity-70"
+                    onClick={() => {
+                      if (editingPhotoIdx === i) { setEditingPhotoIdx(null) }
+                      else { setEditingPhotoIdx(i); setEditingPhotoQty(String(item.qty)) }
+                    }}
+                  >
+                    <div>
+                      <p className="text-sm text-white">{item.name}</p>
+                      <p className="text-xs text-gray-500">{Math.round(item.carbs * item.qty)}g carbs</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 tabular-nums">×{item.qty}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                    </div>
                   </div>
-                  <span className="text-xs text-gray-400">×{item.qty}</span>
+
+                  {editingPhotoIdx === i && (
+                    <div className="mt-1 bg-[#1a1a1a] rounded-xl border border-white/10 px-4 py-3 flex items-center gap-3">
+                      <p className="text-xs text-gray-400 flex-1">{item.serving_size}</p>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.5"
+                        value={editingPhotoQty}
+                        onChange={e => setEditingPhotoQty(e.target.value)}
+                        autoFocus
+                        className="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-white text-sm text-center focus:outline-none focus:border-teal-500/50"
+                      />
+                      <button
+                        onClick={() => {
+                          const qty = parseFloat(editingPhotoQty)
+                          if (qty > 0) setPhotoItems(p => p?.map((it, j) => j === i ? { ...it, qty } : it) ?? p)
+                          setEditingPhotoIdx(null)
+                        }}
+                        className="bg-teal-500 text-black text-xs font-bold px-3 py-1.5 rounded-lg"
+                      >
+                        Done
+                      </button>
+                      <button
+                        onClick={() => { setPhotoItems(p => p?.filter((_, j) => j !== i) ?? p); setEditingPhotoIdx(null) }}
+                        className="text-gray-600 active:text-red-400"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
+
+              {/* Inline chat for corrections */}
+              <div className="space-y-2">
+                {chatReply && (
+                  <div className="bg-teal-500/5 border border-teal-500/20 rounded-xl px-3 py-2">
+                    <p className="text-xs text-teal-300 leading-relaxed">{chatReply}</p>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !chatLoading) sendChat() }}
+                    placeholder="e.g. that's 2 sandwiches, not 1"
+                    className="flex-1 min-w-0 bg-[#141414] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/40"
+                  />
+                  <button
+                    onClick={sendChat}
+                    disabled={!chatInput.trim() || chatLoading}
+                    className="bg-white/10 text-white text-xs font-semibold px-3 py-2.5 rounded-xl disabled:opacity-40 flex-shrink-0"
+                  >
+                    {chatLoading ? '…' : 'Send'}
+                  </button>
+                </div>
+              </div>
+
               <div className="flex gap-3">
-                <button onClick={() => { setPhotoItems(null); if (photoRef.current) photoRef.current.value = '' }} className="flex-1 bg-white/5 border border-white/10 text-gray-400 text-sm py-3 rounded-xl">Retake</button>
+                <button onClick={() => { setPhotoItems(null); setChatReply(''); if (photoRef.current) photoRef.current.value = '' }} className="flex-1 bg-white/5 border border-white/10 text-gray-400 text-sm py-3 rounded-xl">Retake</button>
                 <button onClick={addPhotoItems} className="flex-1 bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold py-3 rounded-xl">Add to Lunch →</button>
               </div>
             </div>
