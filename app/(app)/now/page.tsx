@@ -14,8 +14,12 @@ export default async function NowPage() {
 
   const now = new Date()
   const isWeekday = now.getDay() >= 1 && now.getDay() <= 5
-  const todayStart = new Date(now)
-  todayStart.setHours(0, 0, 0, 0)
+  const packingForTomorrow = now.getHours() >= 13
+  const targetDate = new Date(now)
+  if (packingForTomorrow) targetDate.setDate(targetDate.getDate() + 1)
+  targetDate.setHours(0, 0, 0, 0)
+  const targetEnd = new Date(targetDate)
+  targetEnd.setDate(targetEnd.getDate() + 1)
   const todayDay = now.getDay()
   const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`
 
@@ -35,7 +39,8 @@ export default async function NowPage() {
           .from('t1d_meal_events')
           .select('id, total_offered_carbs, items_eaten')
           .eq('context', 'school_lunch')
-          .gte('timestamp', todayStart.toISOString())
+          .gte('timestamp', targetDate.toISOString())
+          .lt('timestamp', targetEnd.toISOString())
           .order('timestamp', { ascending: false })
           .limit(1)
       : Promise.resolve({ data: [] }),
@@ -96,14 +101,14 @@ export default async function NowPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-semibold tracking-widest text-teal-400">
-                SCHOOL LUNCH ·{' '}
+                {packingForTomorrow ? "TOMORROW'S LUNCH" : 'SCHOOL LUNCH'} ·{' '}
                 {lunchPhase === 'none' ? 'NOT PACKED' :
                  lunchPhase === 'packed' ? 'READY TO DOSE' :
                  lunchPhase === 'dosed' ? 'IN PROGRESS' : 'DONE'}
               </p>
               <p className="text-sm font-semibold text-white mt-0.5">
-                {lunchPhase === 'none' && 'Pack lunch for today'}
-                {lunchPhase === 'packed' && `${lunchCarbs ?? '—'}g packed · tap to dose`}
+                {lunchPhase === 'none' && `Pack lunch for ${packingForTomorrow ? 'tomorrow' : 'today'}`}
+                {lunchPhase === 'packed' && `${lunchCarbs ?? '—'}g packed${packingForTomorrow ? ' for tomorrow' : ''} · tap to dose`}
                 {lunchPhase === 'dosed' && 'Dose given · record what he ate'}
                 {lunchPhase === 'done' && 'Lunch complete ✓'}
               </p>
