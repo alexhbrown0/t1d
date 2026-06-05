@@ -2,7 +2,7 @@ import { getCentralTime, getCentralDayStartUTC } from '@/lib/utils/central-time'
 
 export function getLunchTargetDate() {
   const ct = getCentralTime()
-  const packingForTomorrow = ct.hour >= 13
+  const packingForTomorrow = ct.minutesSinceMidnight >= 19 * 60 + 30  // after 7:30 PM Central
   const dayOffset = packingForTomorrow ? 1 : 0
 
   const targetDate = getCentralDayStartUTC(dayOffset)

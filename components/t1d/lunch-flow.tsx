@@ -317,40 +317,17 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             </p>
           </div>
 
-          {eatenMode === 'idle' && (
-            <div className="bg-[#141414] rounded-2xl border border-white/5 p-5 space-y-3">
-              <p className="text-sm font-semibold text-white">He finished eating?</p>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Tell us what he ate to get the follow-up dose.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setEatenMode('manual')}
-                  className="flex-1 bg-white/5 border border-white/10 text-white text-sm font-semibold py-3.5 rounded-xl active:opacity-70"
-                >
-                  Enter manually
-                </button>
+          {(eatenMode === 'idle' || eatenMode === 'manual') && data.meal && (
+            <div className="bg-[#141414] rounded-2xl border border-white/5 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] tracking-widest text-gray-500 font-semibold">WHAT DID HE EAT?</p>
                 <button
                   onClick={() => photoRef.current?.click()}
-                  className="flex-1 bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold py-3.5 rounded-xl active:opacity-70"
+                  className="text-xs text-teal-400 bg-teal-500/10 border border-teal-500/20 px-3 py-1.5 rounded-full active:opacity-70"
                 >
                   Take photo
                 </button>
               </div>
-              <input
-                ref={photoRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handlePhotoChange}
-              />
-            </div>
-          )}
-
-          {eatenMode === 'manual' && data.meal && (
-            <div className="bg-[#141414] rounded-2xl border border-white/5 p-5 space-y-4">
-              <p className="text-[10px] tracking-widest text-gray-500 font-semibold">HOW MUCH DID HE EAT?</p>
               <div className="space-y-3">
                 {data.meal.items_offered.map(item => (
                   <div key={item.name} className="flex items-center justify-between">
@@ -378,10 +355,27 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                 disabled={loading}
                 className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
               >
-                {loading ? 'Calculating…' : 'Get Follow-up Dose →'}
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Calculating follow-up…
+                  </span>
+                ) : 'Get Follow-up Dose →'}
               </button>
             </div>
           )}
+
+          <input
+            ref={photoRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoChange}
+          />
 
           {eatenMode === 'photo_processing' && (
             <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-10 text-center space-y-2">
