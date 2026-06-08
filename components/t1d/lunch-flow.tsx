@@ -659,24 +659,61 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             <EatenSummary items={data.meal.items_eaten as MealItem[]} />
           )}
 
-          {data.followUpSession.recommended_dose_grams === 0 && !followOverrideDose ? (
+          {data.followUpSession.recommended_dose_grams === 0 ? (
             <div className="bg-[#141414] rounded-2xl border border-teal-500/20 p-5 space-y-3">
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">NO DOSE NEEDED RIGHT NOW</p>
               <p className="text-sm text-gray-300 leading-relaxed">{data.followUpSession.engine_reasoning}</p>
-              <button
-                onClick={handleConfirmFollowUp}
-                disabled={loading}
-                className="w-full bg-white/5 border border-white/10 text-gray-300 font-semibold py-3.5 rounded-xl disabled:opacity-50"
-              >
-                {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span> : 'Noted — done for now'}
-              </button>
+
+              {followOverrideDose ? (
+                <>
+                  <div className="border-t border-white/5 pt-3 space-y-3">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-bold text-white">{followOverrideDose}g</span>
+                      <span className="text-gray-500 text-sm">into pump</span>
+                    </div>
+                    <div>
+                      <label className="text-[10px] tracking-widest text-gray-500 font-semibold">
+                        INSULIN UNITS (what the pump showed)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={followUnits}
+                        onChange={e => setFollowUnits(e.target.value)}
+                        placeholder="e.g. 0.95"
+                        className="mt-2 w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-teal-500/50"
+                      />
+                    </div>
+                    <MinutesAgoPills value={followMinutesAgo} onChange={setFollowMinutesAgo} />
+                    <button
+                      onClick={handleConfirmFollowUp}
+                      disabled={loading}
+                      className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
+                    >
+                      {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span>
+                        : `Follow-up Given${followMinutesAgo > 0 ? ` (${followMinutesAgo}m ago)` : ''} ✓`}
+                    </button>
+                  </div>
+                  <button onClick={() => setFollowOverrideDose('')} className="text-[10px] text-gray-600 active:text-gray-400">
+                    ← Back to no dose
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleConfirmFollowUp}
+                  disabled={loading}
+                  className="w-full bg-white/5 border border-white/10 text-gray-300 font-semibold py-3.5 rounded-xl disabled:opacity-50"
+                >
+                  {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span> : 'Noted — done for now'}
+                </button>
+              )}
+
               {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => setFollowOverrideDose(String(g))} />}
             </div>
           ) : (
             <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
-              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">
-                {followOverrideDose && data.followUpSession.recommended_dose_grams === 0 ? 'DOSE NEEDED — UPDATED FROM CHAT' : 'FOLLOW-UP DOSE'}
-              </p>
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">FOLLOW-UP DOSE</p>
 
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-bold text-white">{followOverrideDose || data.followUpSession.recommended_dose_grams}g</span>
