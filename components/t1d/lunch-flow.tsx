@@ -521,37 +521,29 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           </div>
 
           <div className="bg-[#141414] rounded-2xl border border-white/5 p-5 space-y-4">
-            {/* Photo — primary input */}
-            <button
-              onClick={() => photoRef.current?.click()}
-              disabled={photoFilling}
-              className="w-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold py-3.5 rounded-xl active:opacity-70 disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {photoFilling ? (
-                <><Spinner /> Analyzing photo…</>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                  Take photo of the tray
-                </>
-              )}
-            </button>
-            <input
-              ref={photoRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handlePhotoChange}
-            />
+            {/* Submit at top — always visible, shows live total */}
+            {(() => {
+              const totalEaten = data.meal.items_offered.reduce((s, item) => {
+                const pct = eatenPcts[item.name] ?? 100
+                return s + item.carbs * item.qty_offered * pct / 100
+              }, 0)
+              return (
+                <button
+                  onClick={handleSubmitEaten}
+                  disabled={loading}
+                  className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2"><Spinner /> Calculating follow-up…</span>
+                  ) : `He ate ${Math.round(totalEaten)}g — Get Follow-up Dose →`}
+                </button>
+              )
+            })()}
 
             {/* Divider */}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-white/5" />
-              <span className="text-[10px] text-gray-600 font-semibold tracking-widest">HOW MUCH DID BROOKS EAT?</span>
+              <span className="text-[10px] text-gray-600 font-semibold tracking-widest">ADJUST IF NEEDED</span>
               <div className="flex-1 h-px bg-white/5" />
             </div>
 
@@ -589,15 +581,32 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               })}
             </div>
 
+            {/* Photo option — below items */}
             <button
-              onClick={handleSubmitEaten}
-              disabled={loading}
-              className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
+              onClick={() => photoRef.current?.click()}
+              disabled={photoFilling}
+              className="w-full bg-white/5 border border-white/10 text-gray-400 text-sm font-semibold py-3 rounded-xl active:opacity-70 disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2"><Spinner /> Calculating follow-up…</span>
-              ) : 'Get Follow-up Dose →'}
+              {photoFilling ? (
+                <><Spinner /> Analyzing photo…</>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  Use photo instead
+                </>
+              )}
             </button>
+            <input
+              ref={photoRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handlePhotoChange}
+            />
 
             <InlineAsk mealEventId={data.meal.id} />
           </div>
