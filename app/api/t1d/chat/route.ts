@@ -6,7 +6,7 @@ import { getLatestEgvs } from '@/lib/dexcom/client'
 
 const SAVE_INTENT = /(save|log|add|write|capture|record|remember|keep).{0,60}(notes?|clinical|protocol|rules?|guidelines?|learnings?|engine)/i
 const RECIPE_SAVE_INTENT = /(save|add|store|keep).{0,40}(recipe|this recipe|as a recipe|to recipes)/i
-const FOOD_SAVE_INTENT = /(add|save|store|put).{0,40}(food( list| repo| database| db)?|to (the )?(list|database|repo))|save (that|this) food/i
+const FOOD_SAVE_INTENT = /(add|save|store|remember|keep|put).{0,60}(food|to (the )?(list|database|repo|foods))|(save|add) (that|this|it)/i
 const LUNCH_PLAN_INTENT = /(plan|planning|pack|packing).{0,20}lunch/i
 const LUNCH_SAVE_INTENT = /(save|finalize|done|that'?s? (it|everything|all)|nothing else).{0,40}(lunch|that)/i
 // More lenient: short closing phrases that start the message, only used when already in a lunch session
@@ -421,7 +421,9 @@ ${fullConvo}`,
     try {
       const raw = foodResult.content[0].type === 'text' ? foodResult.content[0].text.trim() : ''
       food_proposal = extractJson(raw) as Record<string, unknown>
-    } catch { /* ignore */ }
+    } catch {
+      food_proposal = { name: '', serving_size: '1 serving', carbs_g: 0 }
+    }
   }
 
   // Detect lunch plan save intent — fires when user wraps up planning mode

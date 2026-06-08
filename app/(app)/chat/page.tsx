@@ -667,6 +667,19 @@ export default function ChatPage() {
       {/* Input bar */}
       <div className="px-4 pb-4 pt-1 flex-none">
         <div className="flex gap-2 items-center bg-[#141414] border border-white/10 rounded-2xl px-3 py-3">
+          {/* Add food button */}
+          <button
+            onClick={() => setFoodProposal({ name: '', serving_size: '1 serving', carbs_g: 0 })}
+            disabled={loading}
+            className="text-gray-500 flex-shrink-0 active:text-violet-400 transition-colors"
+            title="Add food to list"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z" />
+              <line x1="12" y1="8" x2="12" y2="16" />
+              <line x1="8" y1="12" x2="16" y2="12" />
+            </svg>
+          </button>
           {/* Camera button */}
           <button
             onClick={() => photoRef.current?.click()}
