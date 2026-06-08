@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   // Nothing meaningful left to cover
   if (remainingCarbs <= 2) {
-    const reasoning = `Pre-bolus of ${preBolusGiven}g covered the full meal (${totalEaten}g eaten). No follow-up dose needed.`
+    const reasoning = `Pre-bolus of ${totalGiven}g covered the full meal (${totalEaten}g eaten). No follow-up dose needed.`
     const { data: session } = await supabase
       .from('t1d_dose_sessions')
       .insert({
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
         is_followup: true,
         pre_bolus_session_id: pre_dose_session_id,
         total_eaten_carbs: totalEaten,
-        pre_bolus_given: preBolusGiven,
+        pre_bolus_given: totalGiven,
         remaining_carbs: remainingCarbs,
       },
       entered_by: 'followup',
