@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { T1dFoodRepo } from '@/types/health'
 
-const CATEGORIES = ['all', 'lunch', 'snack', 'fruit', 'dairy', 'protein', 'drink', 'treat'] as const
+const CATEGORIES = ['all', 'snack', 'bread', 'sweets', 'drink', 'meal', 'fruit', 'sides', 'vegetable', 'dairy', 'protein'] as const
 
 function FoodRow({
   food,
@@ -107,7 +107,7 @@ function FoodRow({
             onChange={e => setDraft(p => ({ ...p, category: e.target.value }))}
             className="block w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white mt-1 outline-none"
           >
-            {['lunch', 'snack', 'fruit', 'dairy', 'protein', 'drink', 'treat'].map(c => (
+            {['snack', 'bread', 'sweets', 'drink', 'meal', 'fruit', 'sides', 'vegetable', 'dairy', 'protein'].map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -258,7 +258,7 @@ function AddFoodForm({ onAdded }: { onAdded: (f: T1dFoodRepo) => void }) {
         <div>
           <label className="text-[10px] text-gray-500 font-semibold">CATEGORY</label>
           <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className="block w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white mt-1 outline-none">
-            {['lunch', 'snack', 'fruit', 'dairy', 'protein', 'drink', 'treat'].map(c => <option key={c} value={c}>{c}</option>)}
+            {['snack', 'bread', 'sweets', 'drink', 'meal', 'fruit', 'sides', 'vegetable', 'dairy', 'protein'].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div>
