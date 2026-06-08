@@ -63,10 +63,11 @@ export async function GET() {
   const params = paramsResult.data
 
   const latest = egvs[0]
-  const bg = latest?.value_mgdl ? Number(latest.value_mgdl) : null
   const minsAgo = latest ? Math.floor((Date.now() - new Date(latest.system_time).getTime()) / 60000) : null
-  const rate = rateOfChange(egvs)
-  const bgSequence = [...egvs].reverse().map(e => Math.round(Number(e.value_mgdl))).join(' → ')
+  const bgFresh = minsAgo != null && minsAgo <= 15
+  const bg = bgFresh && latest?.value_mgdl ? Number(latest.value_mgdl) : null
+  const rate = bgFresh ? rateOfChange(egvs) : null
+  const bgSequence = bgFresh ? [...egvs].reverse().map(e => Math.round(Number(e.value_mgdl))).join(' → ') : null
   const rateStr = rate != null ? `${rate > 0 ? '+' : ''}${rate.toFixed(1)} mg/dL/min` : 'rate unknown'
 
   // IOB: prefer app dose sessions (pump_suggested_units) over Glooko when more recent

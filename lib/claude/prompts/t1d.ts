@@ -116,6 +116,7 @@ export function buildDoseEngineUserContext(input: {
 }): string {
   const { meal, last5Egvs, scheduleNext2h, recentFastCarbs, foodPlaybooks, similarFoodOutcomes, recentBoluses, params, mealGiCategory, lowTreatmentCarbs, lowTreatmentType, startingBg, startingTrend } = input
 
+  const minsOld = (iso: string) => Math.round((Date.now() - new Date(iso).getTime()) / 60000)
   const egvsWithDelta = last5Egvs.map((egv, i) => {
     const prev = last5Egvs[i + 1]
     const delta =
@@ -125,7 +126,10 @@ export function buildDoseEngineUserContext(input: {
     return { ...egv, delta }
   })
 
-  const currentBg = egvsWithDelta[0]?.value_mgdl ?? 'unknown'
+  const latestEgv = egvsWithDelta[0]
+  const latestAge = latestEgv ? minsOld(latestEgv.system_time) : null
+  const bgStale = latestAge == null || latestAge > 15
+  const currentBg = !bgStale ? (latestEgv?.value_mgdl ?? 'unknown') : 'unavailable — reading is stale'
   const totalCarbs = meal.reduce((s, i) => s + i.carbs, 0)
   const totalFat = meal.reduce((s, i) => s + (i.fat ?? 0), 0)
   const totalProtein = meal.reduce((s, i) => s + (i.protein ?? 0), 0)
@@ -136,16 +140,23 @@ export function buildDoseEngineUserContext(input: {
 
   const lines: string[] = []
 
-  lines.push('## Last 5 CGM readings (newest first)')
-  if (egvsWithDelta.length === 0) {
-    lines.push('  No CGM data available')
-  } else {
-    for (const egv of egvsWithDelta) {
-      const deltaStr = egv.delta != null ? ` (Δ${egv.delta >= 0 ? '+' : ''}${egv.delta} from prior)` : ''
-      lines.push(`  ${fmt(egv.system_time)}: ${egv.value_mgdl ?? 'N/A'} mg/dL${deltaStr}`)
+  if (egvsWithDelta.length === 0 || bgStale) {
+    lines.push('## CGM — NO LIVE READING')
+    if (latestAge != null) {
+      lines.push(`  Last reading was ${latestAge} minutes ago — too stale to dose on.`)
+    } else {
+      lines.push('  No CGM data in database.')
     }
+    lines.push('  Ask the caregiver for the current BG before making any dosing recommendation.')
+  } else {
+    lines.push('## Last 5 CGM readings (newest first)')
+    for (const egv of egvsWithDelta) {
+      const ageStr = `${minsOld(egv.system_time)}min ago`
+      const deltaStr = egv.delta != null ? ` (Δ${egv.delta >= 0 ? '+' : ''}${egv.delta})` : ''
+      lines.push(`  ${fmt(egv.system_time)} (${ageStr}): ${egv.value_mgdl ?? 'N/A'} mg/dL${deltaStr}`)
+    }
+    lines.push(`Current BG: ${currentBg} mg/dL (${latestAge}min ago)`)
   }
-  lines.push(`Current BG: ${currentBg} mg/dL`)
 
   lines.push('\n## Schedule — next 2 hours')
   if (scheduleNext2h.length === 0) {

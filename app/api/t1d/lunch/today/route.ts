@@ -47,7 +47,9 @@ export async function GET() {
   ])
 
   const meal = (mealRes.data?.[0] as T1dMealEvent) ?? null
-  const bg = egvs[0] ? { value_mgdl: egvs[0].value_mgdl, trend: egvs[0].trend } : null
+  const egv = egvs[0]
+  const bgAge = egv ? Date.now() - new Date(egv.system_time).getTime() : Infinity
+  const bg = egv && bgAge <= 15 * 60 * 1000 ? { value_mgdl: egv.value_mgdl, trend: egv.trend } : null
 
   let session: T1dDoseSession | null = null
   let followUp: T1dDoseSession | null = null
