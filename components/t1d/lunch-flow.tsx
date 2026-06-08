@@ -52,11 +52,12 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   )
 }
 
-function InlineAsk({ mealEventId }: { mealEventId: string }) {
+function InlineAsk({ mealEventId, onSuggestDose }: { mealEventId: string; onSuggestDose?: (grams: number) => void }) {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [photos, setPhotos] = useState<{ base64: string; mimeType: string }[]>([])
   const [reply, setReply] = useState<string | null>(null)
+  const [suggestedDose, setSuggestedDose] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const photoRef = useRef<HTMLInputElement>(null)
 
@@ -84,6 +85,7 @@ function InlineAsk({ mealEventId }: { mealEventId: string }) {
       })
       const data = await res.json()
       if (data.reply) setReply(data.reply)
+      if (data.suggested_dose_grams != null) setSuggestedDose(data.suggested_dose_grams)
     } finally {
       setLoading(false)
       setInput('')
@@ -102,9 +104,17 @@ function InlineAsk({ mealEventId }: { mealEventId: string }) {
   return (
     <div className="space-y-2 pt-1 border-t border-white/5">
       {reply && (
-        <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl px-3 py-2.5 space-y-1">
+        <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl px-3 py-2.5 space-y-2">
           <p className="text-xs text-teal-300 leading-relaxed">{reply}</p>
-          <button onClick={() => { setReply(null); setOpen(false) }} className="text-[10px] text-teal-700">Dismiss</button>
+          {suggestedDose != null && onSuggestDose && (
+            <button
+              onClick={() => { onSuggestDose(suggestedDose); setSuggestedDose(null); setReply(null); setOpen(false) }}
+              className="w-full bg-teal-500/20 border border-teal-500/40 text-teal-300 text-xs font-semibold py-2 rounded-lg active:opacity-70"
+            >
+              Use {suggestedDose}g instead
+            </button>
+          )}
+          <button onClick={() => { setReply(null); setSuggestedDose(null); setOpen(false) }} className="text-[10px] text-teal-700">Dismiss</button>
         </div>
       )}
       {photos.length > 0 && (
@@ -159,6 +169,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const [followUnits, setFollowUnits] = useState('')
   const [manualBg, setManualBg] = useState('')
   const [manualTrend, setManualTrend] = useState('')
+  const [overrideDose, setOverrideDose] = useState('')
   const [eatenPcts, setEatenPcts] = useState<Record<string, EatenPct>>({})
   const [photoFilling, setPhotoFilling] = useState(false)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -198,7 +209,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          actual_dose_grams: data.session.recommended_dose_grams,
+          actual_dose_grams: overrideDose ? parseFloat(overrideDose) : data.session.recommended_dose_grams,
           pump_suggested_units: preUnits ? parseFloat(preUnits) : undefined,
           entered_by: 'alexandra',
         }),
@@ -403,19 +414,20 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
             <p className="text-[10px] tracking-widest text-teal-400 font-semibold">FIRST DOSE</p>
 
-            <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-bold text-white">{data.session.recommended_dose_grams}g</span>
-              <span className="text-gray-500 text-sm">into pump</span>
-            </div>
+            <PreDoseAmount
+              recommended={data.session.recommended_dose_grams ?? 0}
+              override={overrideDose}
+              onOverride={setOverrideDose}
+            />
 
             {data.session.engine_reasoning && (
-              <p className="text-xs text-gray-400 leading-relaxed">{data.session.engine_reasoning}</p>
+              <CollapsedReasoning text={data.session.engine_reasoning} />
             )}
 
             <div className="bg-black/40 rounded-xl p-3 font-mono text-xs text-teal-300 space-y-1">
               <p>1. Tap Bolus on Omnipod 5</p>
               <p>2. Select Manual</p>
-              <p>3. Enter <span className="font-bold text-white">{data.session.recommended_dose_grams}g carbs</span></p>
+              <p>3. Enter <span className="font-bold text-white">{overrideDose || data.session.recommended_dose_grams}g carbs</span></p>
               <p>4. Note the units the pump suggests below</p>
             </div>
 
@@ -444,7 +456,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               ) : 'Dose Given ✓'}
             </button>
 
-            {data.meal && <InlineAsk mealEventId={data.meal.id} />}
+            {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => { setOverrideDose(String(g)) }} />}
           </div>
         </>
       )}
@@ -672,6 +684,64 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           </Link>
         </div>
       )}
+    </div>
+  )
+}
+
+function PreDoseAmount({ recommended, override, onOverride }: {
+  recommended: number
+  override: string
+  onOverride: (v: string) => void
+}) {
+  const [adjusting, setAdjusting] = useState(false)
+  const display = override ? parseFloat(override) : recommended
+
+  if (adjusting) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-baseline gap-2">
+          <input
+            type="number"
+            inputMode="decimal"
+            step="1"
+            value={override || recommended}
+            onChange={e => onOverride(e.target.value)}
+            autoFocus
+            className="w-28 bg-black/40 border border-teal-500/40 rounded-xl px-3 py-2 text-4xl font-bold text-white focus:outline-none"
+          />
+          <span className="text-gray-500 text-sm">g into pump</span>
+          <button onClick={() => setAdjusting(false)} className="text-xs text-gray-500 ml-auto">Done</button>
+        </div>
+        <p className="text-[10px] text-gray-600">Engine recommended {recommended}g</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="text-5xl font-bold text-white">{display}g</span>
+      <span className="text-gray-500 text-sm">into pump</span>
+      {override && <span className="text-[10px] text-amber-400 ml-1">(adjusted from {recommended}g)</span>}
+      <button onClick={() => setAdjusting(true)} className="text-xs text-gray-600 ml-auto active:text-gray-400">Adjust</button>
+    </div>
+  )
+}
+
+function CollapsedReasoning({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const firstSentence = text.split(/\.\s+/)[0] + '.'
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-gray-400 leading-relaxed">
+        {expanded ? text : firstSentence}
+      </p>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="text-[10px] text-teal-600 active:text-teal-400"
+      >
+        {expanded ? 'Show less' : 'Full reasoning →'}
+      </button>
     </div>
   )
 }

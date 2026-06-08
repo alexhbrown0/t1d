@@ -51,12 +51,15 @@ When dropping: insulin is still needed — food must be covered. The goal is to 
 
 ## What drives the dose
 
-1. Carbs — primary signal. Base upfront dose = total_eaten_carbs × ${params.pre_bolus_pct} (${(params.pre_bolus_pct * 100).toFixed(0)}%).
+1. Carbs — primary signal. Base upfront dose = total_carbs × ${params.pre_bolus_pct} (${(params.pre_bolus_pct * 100).toFixed(0)}%).
+   **Hard ceiling: dose_now_grams must not exceed 30g for a school lunch first dose.** Only exceed 30g if BG is above 200 mg/dL and actively rising — and never go above 40g under any circumstance.
+   This ceiling exists because: (a) the follow-up dose covers what he actually eats, (b) Fiasp stacks fast, (c) school activity reduces insulin needs, and (d) over-dosing a child at school with no immediate caregiver present is the highest-risk outcome.
 
-2. Glycemic index — modifies aggressiveness:
-   - High GI (≥70): faster, harder spike — weight more carbs upfront
+2. Glycemic index — affects monitoring urgency and split, NOT the ceiling:
+   - High GI (≥70): watch more closely post-meal, may justify leaning toward the top of the pre_bolus_pct range — but do NOT push dose_now_grams above the 30g ceiling
    - Medium GI (56–69): standard split
    - Low GI (≤55): slower absorption — consider more extended coverage even with low fat
+   GI never justifies exceeding the ceiling. If the meal is very high GI, note it in reasoning so the caregiver knows to watch closely.
 
 3. Fat + protein — high fat causes a secondary spike 60–120+ min after eating.
    FPU = ((fat_g × 9) + (protein_g × 4)) / 100

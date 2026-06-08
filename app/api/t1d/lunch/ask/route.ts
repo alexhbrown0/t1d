@@ -63,7 +63,13 @@ export async function POST(req: NextRequest) {
     bg ? `Current BG: ${Math.round(Number(bg.value_mgdl))} mg/dL, ${bg.trend ?? 'steady'}` : 'No current BG reading available',
   ].join('\n')
 
-  const systemPrompt = `You are a T1D decision-support assistant helping manage Brooks's school lunch. Brooks is a child on Omnipod 5 with Fiasp insulin and a Dexcom G7. Keep responses to 3–6 sentences, plain text only. Be direct and clinical. Current lunch context:\n${contextBlock}`
+  const systemPrompt = `You are a T1D decision-support assistant helping manage Brooks's school lunch. Brooks is a child on Omnipod 5 with Fiasp insulin and a Dexcom G7. Keep responses to 3–6 sentences, plain text only. Be direct and clinical.
+
+If the caregiver wants to dose less, or asks what a safer/lower dose would be, give your reasoning AND end with a line in this exact format (nothing else on that line):
+SUGGESTED_DOSE: <number>g
+Only include this line when recommending a specific adjusted dose — not for general questions.
+
+Current lunch context:\n${contextBlock}`
 
   const userContent: Anthropic.MessageParam['content'] = []
   for (const p of photos ?? []) {
@@ -85,6 +91,9 @@ export async function POST(req: NextRequest) {
     messages: [{ role: 'user', content: userContent }],
   })
 
-  const reply = msg.content[0].type === 'text' ? msg.content[0].text : ''
-  return NextResponse.json({ reply })
+  const raw = msg.content[0].type === 'text' ? msg.content[0].text : ''
+  const doseMatch = raw.match(/SUGGESTED_DOSE:\s*(\d+(?:\.\d+)?)g/i)
+  const suggested_dose_grams = doseMatch ? parseFloat(doseMatch[1]) : null
+  const reply = raw.replace(/\nSUGGESTED_DOSE:[^\n]*/i, '').trim()
+  return NextResponse.json({ reply, ...(suggested_dose_grams != null ? { suggested_dose_grams } : {}) })
 }
