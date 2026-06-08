@@ -158,16 +158,33 @@ export async function POST(req: NextRequest) {
     lows.length > 0
       ? `Low treatments today:\n${lows.map(l => `  ${fmtTime(l.timestamp)} — BG ${l.bg_at_treatment ?? '?'} → ${l.treatment_type ?? 'treated'} ${l.treatment_carbs_g ?? '?'}g${l.notes ? ` (${l.notes})` : ''}`).join('\n')}`
       : 'No lows logged today',
-    todayMeal
-      ? todayMeal.items_eaten
-        ? `School lunch: ${todayMeal.total_offered_carbs ?? '?'}g packed, ${todayMeal.total_eaten_carbs ?? '?'}g eaten${(todayMeal.fpu_count ?? 0) > 1.5 ? ` — HIGH fat/protein (${todayMeal.fpu_count?.toFixed(1)} FPU)` : ''}`
-        : `School lunch packed (${todayMeal.total_offered_carbs ?? '?'}g) — not eaten yet`
-      : 'No school lunch packed today',
-    todaySnack
-      ? todaySnack.items_eaten
-        ? `Afternoon snack: ${todaySnack.total_offered_carbs ?? '?'}g packed, ${todaySnack.total_eaten_carbs ?? '?'}g eaten`
-        : `Afternoon snack packed (${todaySnack.total_offered_carbs ?? '?'}g) — not eaten yet`
-      : null,
+    (() => {
+      if (!todayMeal) return 'No school lunch packed today'
+      const offered = (todayMeal.items_offered as Array<{ name: string; carbs: number; qty_offered: number; fat?: number; protein?: number }>) ?? []
+      const eaten = (todayMeal.items_eaten as Array<{ name: string; carbs: number; qty_offered: number; qty_eaten: number | null }> | null)
+      if (eaten) {
+        const itemLines = offered.map(o => {
+          const e = eaten.find(i => i.name === o.name)
+          const qtyEaten = e?.qty_eaten ?? o.qty_offered
+          const pct = o.qty_offered > 0 ? Math.round((qtyEaten / o.qty_offered) * 100) : 0
+          const carbsEaten = Math.round(o.carbs * qtyEaten)
+          return `  ${o.name}: ${pct}% eaten — ${carbsEaten}g carbs`
+        }).join('\n')
+        const fpuNote = (todayMeal.fpu_count ?? 0) > 1.5 ? ` — HIGH fat/protein (${(todayMeal.fpu_count as number).toFixed(1)} FPU)` : ''
+        return `School lunch — ${todayMeal.total_eaten_carbs ?? '?'}g actually eaten (of ${todayMeal.total_offered_carbs ?? '?'}g packed)${fpuNote}:\n${itemLines}`
+      }
+      const itemLines = offered.map(o => `  ${o.name}: ${Math.round(o.carbs * o.qty_offered)}g`).join('\n')
+      return `School lunch packed (${todayMeal.total_offered_carbs ?? '?'}g) — not yet eaten:\n${itemLines}`
+    })(),
+    (() => {
+      if (!todaySnack) return null
+      const offered = (todaySnack.items_offered as Array<{ name: string; carbs: number; qty_offered: number }>) ?? []
+      const eaten = (todaySnack.items_eaten as Array<{ name: string; carbs: number; qty_offered: number; qty_eaten: number | null }> | null)
+      if (eaten) {
+        return `Afternoon snack: ${todaySnack.total_eaten_carbs ?? '?'}g eaten (of ${todaySnack.total_offered_carbs ?? '?'}g packed)`
+      }
+      return `Afternoon snack packed (${todaySnack.total_offered_carbs ?? '?'}g) — not yet eaten`
+    })(),
     todayOverride?.pe_cancelled ? 'TODAY: PE CANCELLED — no activity reduction' :
     todayOverride?.pe_start_time ? `TODAY: PE moved to ${todayOverride.pe_start_time}` :
     todayOverride?.lunch_start_time ? `TODAY: Lunch moved to ${todayOverride.lunch_start_time}` : '',
