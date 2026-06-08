@@ -161,7 +161,11 @@ export function buildDoseEngineUserContext(input: {
     } else {
       lines.push('  No CGM data in database.')
     }
-    lines.push('  Ask the caregiver for the current BG before making any dosing recommendation.')
+    if (startingBg != null) {
+      lines.push(`  Caregiver-reported BG: ${startingBg} mg/dL${startingTrend ? ` (${startingTrend})` : ''}. Use this as the current BG.`)
+    } else {
+      lines.push('  Ask the caregiver for the current BG before making any dosing recommendation.')
+    }
   } else {
     lines.push('## Last 5 CGM readings (newest first)')
     for (const egv of egvsWithDelta) {
@@ -203,9 +207,8 @@ export function buildDoseEngineUserContext(input: {
     }
   }
 
-  if (lowTreatmentCarbs != null || startingBg != null) {
+  if (lowTreatmentCarbs != null) {
     lines.push('\n## Low treatment at mealtime')
-    if (startingBg != null) lines.push(`  BG at meal start: ${startingBg} mg/dL${startingTrend ? `, ${startingTrend}` : ''}`)
     if (lowTreatmentCarbs != null && lowTreatmentCarbs > 0) {
       lines.push(`  Fast carbs given: ${lowTreatmentType ?? 'treatment'} (${lowTreatmentCarbs}g) — factor this into your assessment per clinical notes`)
     } else if (lowTreatmentCarbs === 0) {
