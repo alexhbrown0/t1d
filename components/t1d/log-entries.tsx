@@ -2,6 +2,11 @@
 
 import { useState } from 'react'
 
+export interface LinkedDose {
+  text: string
+  time?: string | null
+}
+
 export interface LogEntry {
   id: string
   type: 'bolus' | 'low' | 'activity' | 'meal'
@@ -11,7 +16,7 @@ export interface LogEntry {
   color: string
   dot: string
   mealItems?: string[]
-  linkedDoses?: string[]
+  linkedDoses?: LinkedDose[]
   sourceTag?: string
 }
 
@@ -101,7 +106,12 @@ export function LogEntries({ initialEntries }: { initialEntries: LogEntry[] }) {
                   {entry.linkedDoses && entry.linkedDoses.length > 0 && (
                     <div className="pl-4 pt-1 border-t border-white/5 space-y-0.5">
                       {entry.linkedDoses.map((dose, i) => (
-                        <p key={i} className="text-xs text-blue-400">{dose}</p>
+                        <p key={i} className="text-xs text-blue-400">
+                          {dose.text}
+                          {dose.time && (
+                            <span className="text-blue-400/50 ml-1">{formatTime(dose.time)}</span>
+                          )}
+                        </p>
                       ))}
                     </div>
                   )}

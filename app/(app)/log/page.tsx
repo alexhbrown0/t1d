@@ -2,7 +2,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { DeviceStrip } from '@/components/t1d/device-strip'
 import { LogEntries } from '@/components/t1d/log-entries'
 import type { T1dDoseSession, T1dLowTreatment } from '@/types/health'
-import type { LogEntry } from '@/components/t1d/log-entries'
+import type { LogEntry, LinkedDose } from '@/components/t1d/log-entries'
 
 export const dynamic = 'force-dynamic'
 
@@ -106,15 +106,12 @@ export default async function LogPage() {
         mealItems = itemsOffered.map(i => `${i.name} · ${Math.round(i.carbs * i.qty_offered)}g packed`)
       }
 
-      const linkedDoses = linkedSessions.map((s, idx) => {
+      const linkedDoses: LinkedDose[] = linkedSessions.map((s, idx) => {
         const tag = idx === 0 ? 'Pre-bolus' : 'Follow-up'
         const grams = s.actual_dose_grams ?? s.recommended_dose_grams ?? 0
         const units = s.pump_suggested_units != null ? ` · ${s.pump_suggested_units}u` : ''
-        const time = s.actual_dose_timestamp
-          ? ` · ${new Date(s.actual_dose_timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-          : ''
         const confirmed = s.actual_dose_grams != null ? '' : ' (unconfirmed)'
-        return `${tag}: ${grams}g${units}${time}${confirmed}`
+        return { text: `${tag}: ${grams}g${units}${confirmed}`, time: s.actual_dose_timestamp }
       })
 
       const totalCarbs = m.total_eaten_carbs != null
