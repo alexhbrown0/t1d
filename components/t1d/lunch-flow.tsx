@@ -52,8 +52,32 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   )
 }
 
+const MINUTES_AGO_OPTIONS = [0, 5, 10, 15, 20] as const
+
+function MinutesAgoPills({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10px] tracking-widest text-gray-500 font-semibold">WHEN WAS IT GIVEN?</p>
+      <div className="flex gap-1.5">
+        {MINUTES_AGO_OPTIONS.map(m => (
+          <button
+            key={m}
+            onClick={() => onChange(m)}
+            className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-colors ${
+              value === m
+                ? 'bg-teal-500/20 border border-teal-500/40 text-teal-300'
+                : 'bg-white/5 border border-white/10 text-gray-400'
+            }`}
+          >
+            {m === 0 ? 'Just now' : `${m}m ago`}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function InlineAsk({ mealEventId, onSuggestDose }: { mealEventId: string; onSuggestDose?: (grams: number) => void }) {
-  const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [photos, setPhotos] = useState<{ base64: string; mimeType: string }[]>([])
   const [reply, setReply] = useState<string | null>(null)
@@ -85,7 +109,10 @@ function InlineAsk({ mealEventId, onSuggestDose }: { mealEventId: string; onSugg
       })
       const data = await res.json()
       if (data.reply) setReply(data.reply)
-      if (data.suggested_dose_grams != null) setSuggestedDose(data.suggested_dose_grams)
+      if (data.suggested_dose_grams != null) {
+        setSuggestedDose(data.suggested_dose_grams)
+        if (onSuggestDose) onSuggestDose(data.suggested_dose_grams)
+      }
     } finally {
       setLoading(false)
       setInput('')
@@ -93,28 +120,15 @@ function InlineAsk({ mealEventId, onSuggestDose }: { mealEventId: string; onSugg
     }
   }
 
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} className="w-full text-center text-xs text-teal-600 py-2 active:text-teal-400">
-        Ask a question about this dose →
-      </button>
-    )
-  }
-
   return (
-    <div className="space-y-2 pt-1 border-t border-white/5">
+    <div className="pt-3 border-t border-white/5 space-y-2">
       {reply && (
-        <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl px-3 py-2.5 space-y-2">
+        <div className="bg-[#0f1f1e] border border-teal-500/20 rounded-xl px-3 py-2.5 space-y-2">
           <p className="text-xs text-teal-300 leading-relaxed">{reply}</p>
-          {suggestedDose != null && onSuggestDose && (
-            <button
-              onClick={() => { onSuggestDose(suggestedDose); setSuggestedDose(null); setReply(null); setOpen(false) }}
-              className="w-full bg-teal-500/20 border border-teal-500/40 text-teal-300 text-xs font-semibold py-2 rounded-lg active:opacity-70"
-            >
-              Use {suggestedDose}g instead
-            </button>
+          {suggestedDose != null && (
+            <p className="text-[10px] text-teal-600">Dose above updated to {suggestedDose}g</p>
           )}
-          <button onClick={() => { setReply(null); setSuggestedDose(null); setOpen(false) }} className="text-[10px] text-teal-700">Dismiss</button>
+          <button onClick={() => { setReply(null); setSuggestedDose(null) }} className="text-[10px] text-gray-600 active:text-gray-400">Dismiss</button>
         </div>
       )}
       {photos.length > 0 && (
@@ -130,9 +144,9 @@ function InlineAsk({ mealEventId, onSuggestDose }: { mealEventId: string; onSugg
           ))}
         </div>
       )}
-      <div className="flex gap-2 items-center">
-        <button onClick={() => photoRef.current?.click()} className="text-gray-500 flex-shrink-0 active:text-teal-400">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <div className="flex gap-2 items-center bg-black/30 border border-white/10 rounded-xl px-3 py-2">
+        <button onClick={() => photoRef.current?.click()} className="text-gray-600 flex-shrink-0 active:text-teal-400">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
             <circle cx="12" cy="13" r="4" />
           </svg>
@@ -142,16 +156,16 @@ function InlineAsk({ mealEventId, onSuggestDose }: { mealEventId: string; onSugg
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !loading && send()}
-          placeholder="Ask about this dose…"
-          className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/40"
+          placeholder="BG now? Any concerns? Ask anything…"
+          className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder:text-gray-600 outline-none"
         />
         <button
           onClick={send}
           disabled={(!input.trim() && photos.length === 0) || loading}
-          className="text-teal-400 disabled:text-gray-700 flex-shrink-0 transition-colors"
+          className="text-teal-500 disabled:text-gray-700 flex-shrink-0 transition-colors"
         >
           {loading ? <Spinner /> : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
             </svg>
           )}
@@ -170,6 +184,9 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const [manualBg, setManualBg] = useState('')
   const [manualTrend, setManualTrend] = useState('')
   const [overrideDose, setOverrideDose] = useState('')
+  const [followOverrideDose, setFollowOverrideDose] = useState('')
+  const [preMinutesAgo, setPreMinutesAgo] = useState(0)
+  const [followMinutesAgo, setFollowMinutesAgo] = useState(0)
   const [eatenPcts, setEatenPcts] = useState<Record<string, EatenPct>>({})
   const [photoFilling, setPhotoFilling] = useState(false)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -223,6 +240,9 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           actual_dose_grams: overrideDose ? parseFloat(overrideDose) : data.session.recommended_dose_grams,
           pump_suggested_units: preUnits ? parseFloat(preUnits) : undefined,
           entered_by: 'alexandra',
+          actual_dose_timestamp: preMinutesAgo > 0
+            ? new Date(Date.now() - preMinutesAgo * 60000).toISOString()
+            : undefined,
         }),
       })
       setPreUnits('')
@@ -316,12 +336,16 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          actual_dose_grams: data.followUpSession.recommended_dose_grams,
+          actual_dose_grams: followOverrideDose ? parseFloat(followOverrideDose) : data.followUpSession.recommended_dose_grams,
           pump_suggested_units: followUnits ? parseFloat(followUnits) : undefined,
           entered_by: 'alexandra',
+          actual_dose_timestamp: followMinutesAgo > 0
+            ? new Date(Date.now() - followMinutesAgo * 60000).toISOString()
+            : undefined,
         }),
       })
       setFollowUnits('')
+      setFollowOverrideDose('')
       await refresh()
     } finally {
       setLoading(false)
@@ -494,6 +518,8 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               />
             </div>
 
+            <MinutesAgoPills value={preMinutesAgo} onChange={setPreMinutesAgo} />
+
             <button
               onClick={handleConfirmPre}
               disabled={loading}
@@ -501,7 +527,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span>
-              ) : 'Dose Given ✓'}
+              ) : `Dose Given${preMinutesAgo > 0 ? ` (${preMinutesAgo}m ago)` : ''} ✓`}
             </button>
 
             {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => { setOverrideDose(String(g)) }} />}
@@ -652,8 +678,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">FOLLOW-UP DOSE</p>
 
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold text-white">{data.followUpSession.recommended_dose_grams}g</span>
+                <span className="text-5xl font-bold text-white">{followOverrideDose || data.followUpSession.recommended_dose_grams}g</span>
                 <span className="text-gray-500 text-sm">into pump</span>
+                {followOverrideDose && (
+                  <span className="text-xs text-teal-400">(updated)</span>
+                )}
               </div>
 
               {data.followUpSession.engine_reasoning && (
@@ -675,6 +704,8 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                 />
               </div>
 
+              <MinutesAgoPills value={followMinutesAgo} onChange={setFollowMinutesAgo} />
+
               <button
                 onClick={handleConfirmFollowUp}
                 disabled={loading}
@@ -682,10 +713,10 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span>
-                ) : 'Follow-up Given ✓'}
+                ) : `Follow-up Given${followMinutesAgo > 0 ? ` (${followMinutesAgo}m ago)` : ''} ✓`}
               </button>
 
-              {data.meal && <InlineAsk mealEventId={data.meal.id} />}
+              {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => setFollowOverrideDose(String(g))} />}
             </div>
           )}
         </>

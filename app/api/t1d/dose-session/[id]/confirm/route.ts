@@ -14,6 +14,7 @@ export async function POST(
     actual_dose_grams: number
     pump_suggested_units?: number
     entered_by?: string
+    actual_dose_timestamp?: string
   }
 
   if (body.actual_dose_grams == null) {
@@ -24,7 +25,7 @@ export async function POST(
     .from('t1d_dose_sessions')
     .update({
       actual_dose_grams: body.actual_dose_grams,
-      actual_dose_timestamp: new Date().toISOString(),
+      actual_dose_timestamp: body.actual_dose_timestamp ?? new Date().toISOString(),
       pump_suggested_units: body.pump_suggested_units ?? null,
       entered_by: body.entered_by ?? null,
     })
