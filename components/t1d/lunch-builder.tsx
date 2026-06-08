@@ -372,7 +372,11 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
             className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/50"
           />
 
-          <div className="space-y-1.5 max-h-56 overflow-y-auto">
+          {!search && (
+            <p className="text-[10px] text-gray-600 text-center">Search to browse all foods</p>
+          )}
+
+          {search && <div className="space-y-1.5">
             {filteredRecipes.map(r => {
               const item = recipeAsItem(r)
               if (!item) return null
@@ -421,7 +425,7 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
                 </div>
               )
             })}
-          </div>
+          </div>}
         </div>
       )}
 
