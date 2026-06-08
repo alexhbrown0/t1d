@@ -821,12 +821,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             ) : 'Check if another dose is needed →'}
           </button>
 
-          <Link
-            href={`/chat?q=${encodeURIComponent("How did Brooks's lunch go today?")}`}
-            className="block text-center text-xs text-teal-400"
-          >
-            Review with assistant →
-          </Link>
+          {data.meal && <InlineAsk mealEventId={data.meal.id} />}
         </div>
       )}
     </div>
