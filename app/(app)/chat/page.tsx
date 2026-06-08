@@ -570,9 +570,9 @@ export default function ChatPage() {
         ref={photoRef}
         type="file"
         accept="image/*"
-        capture="environment"
+        multiple
         style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: 1, height: 1, opacity: 0 }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = '' }}
+        onChange={e => { Array.from(e.target.files ?? []).forEach(f => handlePhotoFile(f)); e.target.value = '' }}
       />
 
       {/* Input bar */}

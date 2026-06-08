@@ -4,12 +4,15 @@ import { useState } from 'react'
 
 export interface LogEntry {
   id: string
-  type: 'bolus' | 'low' | 'activity'
+  type: 'bolus' | 'low' | 'activity' | 'meal'
   timestamp: string
   label: string
   sub: string
   color: string
   dot: string
+  mealItems?: string[]
+  linkedDoses?: string[]
+  sourceTag?: string
 }
 
 function formatTime(iso: string) {
@@ -75,40 +78,68 @@ export function LogEntries({ initialEntries }: { initialEntries: LogEntry[] }) {
           {dayEntries.map(entry => {
             const isConfirming = confirmId === entry.id
             const isDeleting = deletingId === entry.id
-            return (
-              <div
-                key={entry.id}
-                className="bg-[#141414] rounded-2xl border border-white/5 px-4 py-3 flex items-center gap-3"
-              >
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${entry.dot}`} />
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold ${entry.color}`}>{entry.label}</p>
-                  {entry.sub && <p className="text-xs text-gray-500 mt-0.5">{entry.sub}</p>}
-                </div>
-                <span className="text-xs text-gray-600 flex-shrink-0">{formatTime(entry.timestamp)}</span>
-                <button
-                  onClick={() => handleDelete(entry)}
-                  disabled={isDeleting}
-                  className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-                    isConfirming
-                      ? 'bg-red-500/20 text-red-400'
-                      : 'text-gray-700 active:text-red-400'
-                  } disabled:opacity-30`}
-                >
-                  {isDeleting ? (
-                    <div className="w-3 h-3 rounded-full border border-gray-600 border-t-transparent animate-spin" />
-                  ) : isConfirming ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                    </svg>
+            return entry.type === 'meal' ? (
+                <div key={entry.id} className="bg-[#141414] rounded-2xl border border-teal-500/15 px-4 py-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${entry.dot}`} />
+                      <p className={`text-sm font-semibold ${entry.color}`}>{entry.label}</p>
+                      {entry.sourceTag && (
+                        <span className="text-[9px] text-gray-600 bg-white/5 px-1.5 py-0.5 rounded">{entry.sourceTag}</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-600">{formatTime(entry.timestamp)}</span>
+                  </div>
+                  {entry.sub && <p className="text-xs text-gray-500 pl-4">{entry.sub}</p>}
+                  {entry.mealItems && entry.mealItems.length > 0 && (
+                    <div className="pl-4 space-y-0.5">
+                      {entry.mealItems.map((item, i) => (
+                        <p key={i} className="text-xs text-gray-400">{item}</p>
+                      ))}
+                    </div>
                   )}
-                </button>
-              </div>
-            )
+                  {entry.linkedDoses && entry.linkedDoses.length > 0 && (
+                    <div className="pl-4 pt-1 border-t border-white/5 space-y-0.5">
+                      {entry.linkedDoses.map((dose, i) => (
+                        <p key={i} className="text-xs text-blue-400">{dose}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  key={entry.id}
+                  className="bg-[#141414] rounded-2xl border border-white/5 px-4 py-3 flex items-center gap-3"
+                >
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${entry.dot}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold ${entry.color}`}>{entry.label}</p>
+                    {entry.sub && <p className="text-xs text-gray-500 mt-0.5">{entry.sub}</p>}
+                  </div>
+                  <span className="text-xs text-gray-600 flex-shrink-0">{formatTime(entry.timestamp)}</span>
+                  <button
+                    onClick={() => handleDelete(entry)}
+                    disabled={isDeleting}
+                    className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                      isConfirming
+                        ? 'bg-red-500/20 text-red-400'
+                        : 'text-gray-700 active:text-red-400'
+                    } disabled:opacity-30`}
+                  >
+                    {isDeleting ? (
+                      <div className="w-3 h-3 rounded-full border border-gray-600 border-t-transparent animate-spin" />
+                    ) : isConfirming ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              )
           })}
         </div>
       ))}

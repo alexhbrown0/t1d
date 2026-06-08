@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { claude } from '@/lib/claude/client'
-import type { MealItem } from '@/types/health'
 
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get('content-type') ?? ''
@@ -28,7 +27,7 @@ export async function POST(req: NextRequest) {
     .eq('id', mealId)
     .single()
 
-  const packed: MealItem[] = meal?.items_offered ?? []
+  const packed: Array<{ name: string; carbs: number; qty_offered: number }> = meal?.items_offered ?? []
   const packedDesc = packed.length
     ? packed.map(i => `- ${i.name}: packed ${i.qty_offered} × ${i.carbs}g carbs each`).join('\n')
     : '(no items known)'
@@ -59,19 +58,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to parse Claude response' }, { status: 500 })
   }
 
-  const items_eaten: MealItem[] = packed.map(item => {
+  const items = packed.map(item => {
     const match = parsed.items?.find(p =>
       item.name.toLowerCase().includes(p.name.toLowerCase().slice(0, 6)) ||
       p.name.toLowerCase().includes(item.name.toLowerCase().slice(0, 6))
     )
     const fracRemaining = match?.fraction_remaining ?? 0
-    const qtyEaten = Math.round(item.qty_offered * (1 - fracRemaining) * 10) / 10
-    return { ...item, qty_eaten: qtyEaten }
+    const eaten_pct = Math.min(100, Math.max(0, Math.round((1 - fracRemaining) * 4) * 25))
+    return { name: item.name, eaten_pct }
   })
 
-  const total_remaining_carbs = Math.round(
-    items_eaten.reduce((s, i) => s + i.carbs * (i.qty_offered - (i.qty_eaten ?? 0)), 0)
-  )
-
-  return NextResponse.json({ items_eaten, total_remaining_carbs, notes: parsed.notes ?? null })
+  return NextResponse.json({ items, notes: parsed.notes ?? null })
 }
