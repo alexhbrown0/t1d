@@ -65,8 +65,9 @@ export default async function NowPage() {
       .order('created_at', { ascending: true })
 
     const all = (sessions ?? []) as Pick<T1dDoseSession, 'actual_dose_grams'>[]
-    const anyConfirmed = all.some(s => s.actual_dose_grams != null)
+    const firstConfirmed = all.length > 0 && all[0].actual_dose_grams != null
     const lastConfirmed = all.length > 0 && all[all.length - 1].actual_dose_grams != null
+    const eatingRecorded = meal.items_eaten != null
 
     if (lastConfirmed) {
       const totalDosed = all.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
@@ -78,7 +79,11 @@ export default async function NowPage() {
       } else {
         lunchPhase = 'done'
       }
-    } else if (anyConfirmed) {
+    } else if (firstConfirmed && eatingRecorded) {
+      lunchPhase = 'needs_followup'
+      const totalDosed = all.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
+      lunchUncovered = Math.max(0, Math.round((meal.total_eaten_carbs ?? 0) - totalDosed))
+    } else if (firstConfirmed) {
       lunchPhase = 'dosed'
     } else {
       lunchPhase = 'packed'
