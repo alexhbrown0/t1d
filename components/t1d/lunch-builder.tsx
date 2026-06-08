@@ -256,7 +256,6 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
           <div>
             <p className="text-[10px] tracking-widest text-teal-400 font-semibold">HOW MUCH?</p>
             <p className="text-base font-semibold text-white mt-1">{f.name}</p>
-            <p className="text-xs text-gray-500">per {f.serving_size}</p>
           </div>
           <div className="flex items-center gap-3">
             <input
@@ -267,11 +266,11 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
               value={adding.qty}
               onChange={e => setAdding(a => a ? { ...a, qty: e.target.value } : null)}
               autoFocus
-              className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-semibold text-center focus:outline-none focus:border-teal-500/50"
+              className="w-24 flex-shrink-0 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-semibold text-center focus:outline-none focus:border-teal-500/50"
             />
-            <div className="text-right w-20 flex-shrink-0">
-              <p className="text-2xl font-bold text-teal-400 tabular-nums">{preview}g</p>
-              <p className="text-[10px] text-gray-500">carbs</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-gray-300">× {f.serving_size}</p>
+              <p className="text-2xl font-bold text-teal-400 tabular-nums mt-0.5">{preview}g <span className="text-sm font-normal text-gray-500">carbs</span></p>
             </div>
           </div>
           <div className="flex gap-3">
@@ -325,12 +324,11 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
                           : 'bg-[#141414] border-white/10 text-gray-300'
                       }`}
                     >
-                      {item.name}
-                      {stat && (
-                        <span className="text-gray-600 font-normal ml-1.5">
-                          {stat.daysAgo === 0 ? 'today' : stat.daysAgo === 1 ? 'yesterday' : `${stat.daysAgo}d`}
-                        </span>
-                      )}
+                      <span>{item.name}</span>
+                      <span className="text-gray-600 font-normal ml-1.5">
+                        {item.carbs}g/{item.serving_size}
+                        {stat && ` · ${stat.daysAgo === 0 ? 'today' : stat.daysAgo === 1 ? 'yesterday' : `${stat.daysAgo}d`}`}
+                      </span>
                     </button>
                   )
                 })}
