@@ -659,11 +659,10 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             <EatenSummary items={data.meal.items_eaten as MealItem[]} />
           )}
 
-          {data.followUpSession.recommended_dose_grams === 0 ? (
+          {data.followUpSession.recommended_dose_grams === 0 && !followOverrideDose ? (
             <div className="bg-[#141414] rounded-2xl border border-teal-500/20 p-5 space-y-3">
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">NO DOSE NEEDED RIGHT NOW</p>
               <p className="text-sm text-gray-300 leading-relaxed">{data.followUpSession.engine_reasoning}</p>
-              <p className="text-xs text-gray-600">You can check again later from the lunch summary if BG rises.</p>
               <button
                 onClick={handleConfirmFollowUp}
                 disabled={loading}
@@ -671,18 +670,17 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               >
                 {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span> : 'Noted — done for now'}
               </button>
-              {data.meal && <InlineAsk mealEventId={data.meal.id} />}
+              {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => setFollowOverrideDose(String(g))} />}
             </div>
           ) : (
             <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
-              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">FOLLOW-UP DOSE</p>
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">
+                {followOverrideDose && data.followUpSession.recommended_dose_grams === 0 ? 'DOSE NEEDED — UPDATED FROM CHAT' : 'FOLLOW-UP DOSE'}
+              </p>
 
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-bold text-white">{followOverrideDose || data.followUpSession.recommended_dose_grams}g</span>
                 <span className="text-gray-500 text-sm">into pump</span>
-                {followOverrideDose && (
-                  <span className="text-xs text-teal-400">(updated)</span>
-                )}
               </div>
 
               {data.followUpSession.engine_reasoning && (
