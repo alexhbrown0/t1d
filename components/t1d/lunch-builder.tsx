@@ -326,7 +326,7 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
                     >
                       <span>{item.name}</span>
                       <span className="text-gray-600 font-normal ml-1.5">
-                        {item.carbs}g/{item.serving_size}
+                        {item.serving_size ? `${item.carbs}g per ${item.serving_size}` : `${item.carbs}g carbs`}
                         {stat && ` · ${stat.daysAgo === 0 ? 'today' : stat.daysAgo === 1 ? 'yesterday' : `${stat.daysAgo}d`}`}
                       </span>
                     </button>

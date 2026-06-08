@@ -59,7 +59,12 @@ export default async function EngineLunchPage() {
   for (const meal of recentMealsRes.data ?? []) {
     for (const item of (meal.items_offered as MealItem[]) ?? []) {
       const key = item.food_repo_id ?? item.name
-      const repoMatch = foodRepo.find(f => f.id === item.food_repo_id || f.name === item.name)
+      const repoMatch = foodRepo.find(f =>
+        f.id === item.food_repo_id ||
+        f.name.toLowerCase() === item.name.toLowerCase() ||
+        f.name.toLowerCase().includes(item.name.toLowerCase()) ||
+        item.name.toLowerCase().includes(f.name.toLowerCase().slice(0, 8))
+      )
       const existing = tally.get(key)
       if (existing) {
         existing.count++
@@ -74,7 +79,7 @@ export default async function EngineLunchPage() {
             carbs: repoMatch?.carbs_g ?? item.carbs,
             fat: repoMatch?.fat_g ?? item.fat,
             protein: repoMatch?.protein_g ?? item.protein,
-            serving_size: repoMatch?.serving_size ?? '1 serving',
+            serving_size: repoMatch?.serving_size ?? '',
           },
         })
       }
