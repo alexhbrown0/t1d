@@ -6,6 +6,7 @@ import { getLatestEgvs } from '@/lib/dexcom/client'
 
 const SAVE_INTENT = /(save|log|add|write|capture|record|remember|keep).{0,60}(notes?|clinical|protocol|rules?|guidelines?|learnings?|engine)/i
 const RECIPE_SAVE_INTENT = /(save|add|store|keep).{0,40}(recipe|this recipe|as a recipe|to recipes)/i
+const FOOD_SAVE_INTENT = /(add|save|store|put).{0,40}(food( list| repo| database| db)?|to (the )?(list|database|repo))|save (that|this) food/i
 const LUNCH_PLAN_INTENT = /(plan|planning|pack|packing).{0,20}lunch/i
 const LUNCH_SAVE_INTENT = /(save|finalize|done|that'?s? (it|everything|all)|nothing else).{0,40}(lunch|that)/i
 // More lenient: short closing phrases that start the message, only used when already in a lunch session
@@ -401,6 +402,28 @@ ${fullConvo}`,
     } catch { /* ignore */ }
   }
 
+  // Detect food-save intent — fires when user asks to add a food to the repo
+  let food_proposal: Record<string, unknown> | null = null
+  if (FOOD_SAVE_INTENT.test(message)) {
+    const foodResult = await claude.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: `From this conversation, extract the food the user wants to add to their food database. Return ONLY valid JSON.
+
+Schema: { "name": string, "serving_size": string, "carbs_g": number, "fat_g": number | null, "protein_g": number | null, "gi_category": "high" | "medium" | "low" | null, "category": "lunch" | "snack" | "fruit" | "dairy" | "protein" | "drink" | "treat" | null }
+
+Conversation:
+${fullConvo}`,
+      }],
+    })
+    try {
+      const raw = foodResult.content[0].type === 'text' ? foodResult.content[0].text.trim() : ''
+      food_proposal = extractJson(raw) as Record<string, unknown>
+    } catch { /* ignore */ }
+  }
+
   // Detect lunch plan save intent — fires when user wraps up planning mode
   const isLunchSession = LUNCH_PLAN_INTENT.test(message) || historyMessages.some(m => LUNCH_PLAN_INTENT.test(m.content))
   let lunch_plan: Record<string, unknown> | null = null
@@ -430,6 +453,7 @@ ${fullConvo}`,
     ...(proposal ? { proposal } : {}),
     ...(log_proposal ? { log_proposal } : {}),
     ...(recipe_proposal ? { recipe_proposal } : {}),
+    ...(food_proposal ? { food_proposal } : {}),
     ...(lunch_plan ? { lunch_plan } : {}),
   })
 }

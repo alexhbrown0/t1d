@@ -219,6 +219,70 @@ function RecipeProposalCard({ recipe, onSave, onDismiss }: {
   )
 }
 
+interface FoodProposal {
+  name: string
+  serving_size: string
+  carbs_g: number
+  fat_g?: number | null
+  protein_g?: number | null
+  gi_category?: string | null
+  category?: string | null
+}
+
+function FoodProposalCard({ food, onSave, onDismiss }: {
+  food: FoodProposal
+  onSave: (f: FoodProposal) => void
+  onDismiss: () => void
+}) {
+  const [draft, setDraft] = useState(food)
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    await onSave(draft)
+    setSaving(false)
+  }
+
+  return (
+    <div className="mx-1 mt-2 bg-violet-950/30 border border-violet-500/30 rounded-2xl p-4 space-y-3">
+      <p className="text-[10px] tracking-widest text-violet-400 font-semibold">ADD TO FOOD LIST</p>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2">
+          <label className="text-[10px] text-gray-500 font-semibold">NAME</label>
+          <input
+            value={draft.name}
+            onChange={e => setDraft(p => ({ ...p, name: e.target.value }))}
+            className="block w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white mt-1 outline-none"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-gray-500 font-semibold">SERVING SIZE</label>
+          <input
+            value={draft.serving_size}
+            onChange={e => setDraft(p => ({ ...p, serving_size: e.target.value }))}
+            className="block w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white mt-1 outline-none"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-gray-500 font-semibold">CARBS (g)</label>
+          <input
+            type="number"
+            value={draft.carbs_g}
+            onChange={e => setDraft(p => ({ ...p, carbs_g: parseFloat(e.target.value) || 0 }))}
+            className="block w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white mt-1 outline-none"
+          />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving || !draft.name || !draft.carbs_g} className="flex-1 bg-violet-500/20 text-violet-400 text-xs font-semibold py-2 rounded-xl disabled:opacity-40 active:bg-violet-500/30">
+          {saving ? 'Saving…' : 'Save to food list'}
+        </button>
+        <button onClick={onDismiss} className="px-4 text-gray-500 text-xs py-2 rounded-xl active:bg-white/5">Dismiss</button>
+      </div>
+    </div>
+  )
+}
+
 interface Photo {
   preview: string
   base64: string
@@ -242,6 +306,7 @@ export default function ChatPage() {
   const [proposal, setProposal] = useState<string | null>(null)
   const [logProposal, setLogProposal] = useState<LogProposal | null>(null)
   const [recipeProposal, setRecipeProposal] = useState<RecipeProposal | null>(null)
+  const [foodProposal, setFoodProposal] = useState<FoodProposal | null>(null)
   const [lunchPlan, setLunchPlan] = useState<LunchPlan | null>(null)
   const [photos, setPhotos] = useState<Photo[]>([])
   const [lightbox, setLightbox] = useState<string | null>(null)
@@ -300,6 +365,7 @@ export default function ChatPage() {
     setProposal(null)
     setLogProposal(null)
     setRecipeProposal(null)
+    setFoodProposal(null)
     setLunchPlan(null)
     setLoading(true)
     try {
@@ -312,11 +378,12 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const { userMsg, assistantMsg, proposal: newProposal, log_proposal: newLogProposal, recipe_proposal: newRecipeProposal, lunch_plan: newLunchPlan } = await res.json()
+      const { userMsg, assistantMsg, proposal: newProposal, log_proposal: newLogProposal, recipe_proposal: newRecipeProposal, food_proposal: newFoodProposal, lunch_plan: newLunchPlan } = await res.json()
       setMessages(prev => [...prev.filter(m => m.id !== optimistic.id), userMsg, assistantMsg])
       if (newProposal) setProposal(newProposal)
       if (newLogProposal) setLogProposal(newLogProposal as LogProposal)
       if (newRecipeProposal) setRecipeProposal(newRecipeProposal as RecipeProposal)
+      if (newFoodProposal) setFoodProposal(newFoodProposal as FoodProposal)
       if (newLunchPlan) setLunchPlan(newLunchPlan as LunchPlan)
     } finally {
       setLoading(false)
@@ -400,6 +467,21 @@ export default function ChatPage() {
       id: Date.now().toString(),
       role: 'assistant',
       content: `Recipe saved: ${recipeProposal.name}. I'll use it for dosing whenever you mention it.`,
+      created_at: new Date().toISOString(),
+    }])
+  }
+
+  const saveFood = async (f: FoodProposal) => {
+    await fetch('/api/t1d/food-repo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...f, serving_qty: 1, category: f.category ?? 'snack' }),
+    })
+    setFoodProposal(null)
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: `${f.name} added to the food list (${f.carbs_g}g carbs per ${f.serving_size}).`,
       created_at: new Date().toISOString(),
     }])
   }
@@ -506,6 +588,13 @@ export default function ChatPage() {
             recipe={recipeProposal}
             onSave={saveRecipe}
             onDismiss={() => setRecipeProposal(null)}
+          />
+        )}
+        {foodProposal && (
+          <FoodProposalCard
+            food={foodProposal}
+            onSave={saveFood}
+            onDismiss={() => setFoodProposal(null)}
           />
         )}
         {lunchPlan && (
