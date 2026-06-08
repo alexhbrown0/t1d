@@ -110,8 +110,11 @@ export default async function LogPage() {
         const tag = idx === 0 ? 'Pre-bolus' : 'Follow-up'
         const grams = s.actual_dose_grams ?? s.recommended_dose_grams ?? 0
         const units = s.pump_suggested_units != null ? ` · ${s.pump_suggested_units}u` : ''
+        const time = s.actual_dose_timestamp
+          ? ` · ${new Date(s.actual_dose_timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+          : ''
         const confirmed = s.actual_dose_grams != null ? '' : ' (unconfirmed)'
-        return `${tag}: ${grams}g${units}${confirmed}`
+        return `${tag}: ${grams}g${units}${time}${confirmed}`
       })
 
       const totalCarbs = m.total_eaten_carbs != null

@@ -706,7 +706,12 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           <div className="space-y-1.5 text-sm">
             {data.session && (
               <div className="flex justify-between">
-                <span className="text-gray-500">Pre-bolus</span>
+                <span className="text-gray-500">
+                  Pre-bolus
+                  {data.session.actual_dose_timestamp && (
+                    <span className="ml-1 text-gray-600">{formatTime(data.session.actual_dose_timestamp)}</span>
+                  )}
+                </span>
                 <span className="text-white">
                   {data.session.recommended_dose_grams}g
                   {data.session.pump_suggested_units != null && (
@@ -717,7 +722,12 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             )}
             {data.followUpSession && (data.followUpSession.recommended_dose_grams ?? 0) > 0 && (
               <div className="flex justify-between">
-                <span className="text-gray-500">Follow-up</span>
+                <span className="text-gray-500">
+                  Follow-up
+                  {data.followUpSession.actual_dose_timestamp && (
+                    <span className="ml-1 text-gray-600">{formatTime(data.followUpSession.actual_dose_timestamp)}</span>
+                  )}
+                </span>
                 <span className="text-white">
                   {data.followUpSession.recommended_dose_grams}g
                   {data.followUpSession.pump_suggested_units != null && (
