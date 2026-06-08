@@ -410,12 +410,12 @@ ${fullConvo}`,
       max_tokens: 300,
       messages: [{
         role: 'user',
-        content: `From this conversation, extract the food the user wants to add to their food database. Return ONLY valid JSON.
+        content: `Extract the food item from this text and return ONLY valid JSON.
 
 Schema: { "name": string, "serving_size": string, "carbs_g": number, "fat_g": number | null, "protein_g": number | null, "gi_category": "high" | "medium" | "low" | null, "category": "lunch" | "snack" | "fruit" | "dairy" | "protein" | "drink" | "treat" | null }
 
-Conversation:
-${fullConvo}`,
+Text:
+${reply}\n\nUser message: ${message}`,
       }],
     })
     try {
