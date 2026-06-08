@@ -23,10 +23,16 @@ export async function POST(req: NextRequest) {
 
   const eaten = meal.items_eaten as MealItem[]
   const totalEaten = Math.round(eaten.reduce((s, i) => s + i.carbs * (i.qty_eaten ?? 0), 0))
-  const preBolusGiven = (preSession as T1dDoseSession).actual_dose_grams
-    ?? (preSession as T1dDoseSession).recommended_dose_grams
-    ?? 0
-  const remainingCarbs = Math.max(0, totalEaten - preBolusGiven)
+
+  // Sum ALL confirmed doses for this meal so subsequent follow-ups are calculated correctly
+  const { data: allConfirmed } = await supabase
+    .from('t1d_dose_sessions')
+    .select('actual_dose_grams')
+    .eq('meal_event_id', meal_event_id)
+    .not('actual_dose_grams', 'is', null)
+  const totalGiven = allConfirmed?.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
+    ?? ((preSession as T1dDoseSession).actual_dose_grams ?? (preSession as T1dDoseSession).recommended_dose_grams ?? 0)
+  const remainingCarbs = Math.max(0, totalEaten - totalGiven)
 
   const { data: params } = await supabase
     .from('t1d_engine_params')
@@ -82,7 +88,7 @@ export async function POST(req: NextRequest) {
     }]
   )
 
-  const reasoning = `Follow-up: ${totalEaten}g eaten, ${preBolusGiven}g pre-bolus already given, ${remainingCarbs}g uncovered. ${output.reasoning}`
+  const reasoning = `Follow-up: ${totalEaten}g eaten, ${totalGiven}g dosed so far, ${remainingCarbs}g uncovered. ${output.reasoning}`
 
   const { data: session } = await supabase
     .from('t1d_dose_sessions')

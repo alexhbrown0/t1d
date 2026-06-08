@@ -276,6 +276,22 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
     }
   }
 
+  const handleAnotherDose = async () => {
+    if (!data.meal || !data.session) return
+    const latestSession = data.followUpSession ?? data.session
+    setLoading(true)
+    try {
+      await fetch('/api/t1d/lunch/follow-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meal_event_id: data.meal.id, pre_dose_session_id: latestSession.id }),
+      })
+      await refresh()
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleConfirmFollowUp = async () => {
     if (!data.followUpSession) return
     setLoading(true)
@@ -578,14 +594,15 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
           {data.followUpSession.recommended_dose_grams === 0 ? (
             <div className="bg-[#141414] rounded-2xl border border-teal-500/20 p-5 space-y-3">
-              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">NO FOLLOW-UP NEEDED</p>
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">NO DOSE NEEDED RIGHT NOW</p>
               <p className="text-sm text-gray-300 leading-relaxed">{data.followUpSession.engine_reasoning}</p>
+              <p className="text-xs text-gray-600">You can check again later from the lunch summary if BG rises.</p>
               <button
                 onClick={handleConfirmFollowUp}
                 disabled={loading}
                 className="w-full bg-white/5 border border-white/10 text-gray-300 font-semibold py-3.5 rounded-xl disabled:opacity-50"
               >
-                Got it — Done
+                {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span> : 'Noted — done for now'}
               </button>
               {data.meal && <InlineAsk mealEventId={data.meal.id} />}
             </div>
@@ -675,6 +692,16 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               </div>
             )}
           </div>
+
+          <button
+            onClick={handleAnotherDose}
+            disabled={loading}
+            className="w-full bg-white/5 border border-white/10 text-gray-400 text-sm font-semibold py-3.5 rounded-xl disabled:opacity-40"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2"><Spinner /> Checking…</span>
+            ) : 'Check if another dose is needed →'}
+          </button>
 
           <Link
             href={`/chat?q=${encodeURIComponent("How did Brooks's lunch go today?")}`}
