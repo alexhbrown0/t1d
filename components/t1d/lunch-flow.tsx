@@ -295,7 +295,12 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
       await fetch('/api/t1d/lunch/follow-up', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meal_event_id: data.meal.id, pre_dose_session_id: latestSession.id }),
+        body: JSON.stringify({
+          meal_event_id: data.meal.id,
+          pre_dose_session_id: latestSession.id,
+          starting_bg: data.bg?.value_mgdl ?? (manualBg ? parseFloat(manualBg) : null),
+          starting_trend: data.bg?.trend ?? (manualTrend || null),
+        }),
       })
       await refresh()
     } finally {
@@ -728,6 +733,42 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               </div>
             )}
           </div>
+
+          {!data.bg && (
+            <div className="bg-[#141414] rounded-xl border border-amber-500/20 p-4 space-y-2">
+              <p className="text-[10px] tracking-widest text-amber-400 font-semibold">ENTER CURRENT BG</p>
+              <p className="text-xs text-gray-500">Helps the engine give a better recommendation.</p>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={manualBg}
+                onChange={e => setManualBg(e.target.value)}
+                placeholder="e.g. 145"
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg placeholder:text-gray-600 focus:outline-none focus:border-amber-500/50"
+              />
+              <div className="flex gap-1.5">
+                {([
+                  { value: 'fallingQuickly', label: '↓↓' },
+                  { value: 'falling',        label: '↓'  },
+                  { value: 'steady',          label: '→'  },
+                  { value: 'rising',          label: '↑'  },
+                  { value: 'risingQuickly',  label: '↑↑' },
+                ] as const).map(t => (
+                  <button
+                    key={t.value}
+                    onClick={() => setManualTrend(prev => prev === t.value ? '' : t.value)}
+                    className={`flex-1 py-2 rounded-xl text-base font-semibold transition-colors ${
+                      manualTrend === t.value
+                        ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                        : 'bg-white/5 border border-white/10 text-gray-400'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <button
             onClick={handleAnotherDose}

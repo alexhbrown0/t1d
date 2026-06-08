@@ -5,9 +5,11 @@ import { runDoseEngine } from '@/lib/t1d/engine'
 import type { MealItem, T1dDoseSession } from '@/types/health'
 
 export async function POST(req: NextRequest) {
-  const { meal_event_id, pre_dose_session_id } = await req.json() as {
+  const { meal_event_id, pre_dose_session_id, starting_bg, starting_trend } = await req.json() as {
     meal_event_id: string
     pre_dose_session_id: string
+    starting_bg?: number | null
+    starting_trend?: string | null
   }
 
   const supabase = createServerClient()
@@ -76,17 +78,19 @@ export async function POST(req: NextRequest) {
         protein: null,
       }]
 
-  const output = await runDoseEngine(
-    remainingItems.length > 0 ? remainingItems : [{
-      food_repo_id: null,
-      name: 'Remaining lunch (uncovered)',
-      qty_offered: 1,
-      qty_eaten: null,
-      carbs: remainingCarbs,
-      fat: null,
-      protein: null,
-    }]
-  )
+  const engineItems = remainingItems.length > 0 ? remainingItems : [{
+    food_repo_id: null,
+    name: 'Remaining lunch (uncovered)',
+    qty_offered: 1,
+    qty_eaten: null,
+    carbs: remainingCarbs,
+    fat: null,
+    protein: null,
+  }]
+  const output = await runDoseEngine(engineItems, {
+    startingBg: starting_bg ?? null,
+    startingTrend: starting_trend ?? null,
+  })
 
   const reasoning = `Follow-up: ${totalEaten}g eaten, ${totalGiven}g dosed so far, ${remainingCarbs}g uncovered. ${output.reasoning}`
 
