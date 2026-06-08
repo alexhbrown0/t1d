@@ -30,6 +30,14 @@ Your job: analyze a meal and its current context, then output a specific dosing 
 - ISF: ${params.current_isf} mg/dL per unit
 - DIA: ${params.current_dia} hours
 
+## Multi-dose protocol — CRITICAL
+This is the pre-eating dose. It is dose 1 of 2–3 doses for this meal. A follow-up dose WILL be calculated after Brooks finishes eating, based on what he actually ate. Keep this in mind:
+- The pre-eating dose does NOT need to cover the full meal. It covers roughly pre_bolus_pct of expected carbs.
+- Be conservative. It is always safer to undercover slightly — the follow-up fills the gap. An overdose at school with no immediate caregiver is the worst outcome.
+- Never try to pre-cover the follow-up carbs in this first dose.
+- If activity is coming in the next 1–4 hours, the COMBINED pre+follow-up strategy needs to account for it. Lean toward the lower end of pre_bolus_pct for the first dose when activity is on the horizon.
+- For a typical school lunch with afternoon activity: the right first dose is around pre_bolus_pct × total_carbs with appropriate activity reduction — not higher.
+
 ## Reading the BG trend
 Use the last 5 CGM readings and the delta between consecutive readings. Do NOT use or mention trend arrows.
 
@@ -69,9 +77,12 @@ When dropping: insulin is still needed — food must be covered. The goal is to 
 
 4. Recent fast carbs (within 30 min) — still active. Reduce upfront dose proportionally. These show up in the context.
 
-5. Upcoming high-intensity activity (within 30 min) — drives BG down significantly.
-   Default reduction: ${(params.activity_reduction_pct * 100).toFixed(0)}%.
-   Set hold_for_activity: true and explain when activity is imminent.
+5. Upcoming high-intensity activity — drives BG down significantly during and after. The schedule shows the next 4 hours. Use it.
+   - < 30 min: imminent. Reduce by full activity_reduction_pct (${(params.activity_reduction_pct * 100).toFixed(0)}%). Set hold_for_activity: true.
+   - 30–90 min: significant concern. Reduce by ~half of activity_reduction_pct. Note it clearly.
+   - 90–180 min: meaningful — reduce first dose by ~25% of activity_reduction_pct. Note in reasoning.
+   - 180+ min: light note only. Minimal dose impact but mention it.
+   At Summer Live, PE rotations and playground time after lunch are high-intensity and WILL overlap with active insulin. Always check the schedule and factor this in even when activity is 2+ hours away.
 
 ## Using food history
 Each food item comes with its playbook (if one exists from prior meals) and similar-food outcomes.
@@ -161,13 +172,17 @@ export function buildDoseEngineUserContext(input: {
     lines.push(`Current BG: ${currentBg} mg/dL (${latestAge}min ago)`)
   }
 
-  lines.push('\n## Schedule — next 2 hours')
+  const nowMinForSchedule = new Date().getHours() * 60 + new Date().getMinutes()
+  lines.push('\n## Schedule — next 4 hours')
   if (scheduleNext2h.length === 0) {
     lines.push('  No scheduled activities')
   } else {
     for (const s of scheduleNext2h) {
+      const [sh, sm] = s.start_time.split(':').map(Number)
+      const minsUntil = (sh * 60 + sm) - nowMinForSchedule
+      const relStr = minsUntil <= 0 ? 'now' : `in ${minsUntil}min`
       const note = s.notes ? ` — ${s.notes}` : ''
-      lines.push(`  ${s.start_time}–${s.end_time}: ${s.event_type} (${s.activity_level ?? 'normal'})${note}`)
+      lines.push(`  ${s.start_time}–${s.end_time} (${relStr}): ${s.event_type} (${s.activity_level ?? 'normal'})${note}`)
     }
   }
 

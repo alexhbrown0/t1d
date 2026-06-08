@@ -1,7 +1,7 @@
 import { claude } from '@/lib/claude/client'
 import { buildDoseEngineSystemPrompt, buildDoseEngineUserContext } from '@/lib/claude/prompts/t1d'
 import { getLatestEgvs } from '@/lib/dexcom/client'
-import { getScheduleNext2h, getImminentHighActivity } from '@/lib/t1d/schedule'
+import { getScheduleNextN, getImminentHighActivity } from '@/lib/t1d/schedule'
 import {
   getCurrentEngineParams,
   getFoodRepo,
@@ -24,7 +24,7 @@ export async function runDoseEngine(meal: MealItem[], ctx: EngineContext = {}): 
   const [params, egvs, schedule, recentFastCarbs, allFoods] = await Promise.all([
     getCurrentEngineParams(),
     getLatestEgvs(5),
-    getScheduleNext2h(),
+    getScheduleNextN(240),
     getRecentFastCarbs(),
     getFoodRepo(),
   ])

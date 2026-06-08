@@ -52,10 +52,14 @@ function applyOverride(
 }
 
 export async function getScheduleNext2h(): Promise<T1dSchoolSchedule[]> {
+  return getScheduleNextN(120)
+}
+
+export async function getScheduleNextN(minutes: number): Promise<T1dSchoolSchedule[]> {
   const [schedule, override] = await Promise.all([getTodaySchedule(), getTodayOverride()])
   const effective = applyOverride(schedule, override)
   const now = nowMinutes()
-  const windowEnd = now + 120
+  const windowEnd = now + minutes
   return effective.filter(s => {
     const start = timeToMinutes(s.start_time)
     const end = timeToMinutes(s.end_time)
