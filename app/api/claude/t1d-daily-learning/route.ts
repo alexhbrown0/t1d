@@ -20,7 +20,15 @@ function timeToMin(t: string) {
 
 // Cron: runs at 8:35 PM Central (01:35 UTC) after Glooko's nightly sync
 // Also manually triggerable with cron secret
+export async function GET(req: NextRequest) {
+  return handler(req)
+}
+
 export async function POST(req: NextRequest) {
+  return handler(req)
+}
+
+async function handler(req: NextRequest) {
   const secret = req.headers.get('x-cron-secret') ?? new URL(req.url).searchParams.get('secret')
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
