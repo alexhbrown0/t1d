@@ -313,6 +313,7 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const autoSentRef = useRef(false)
   const photoRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handlePhotoFile = async (file: File) => {
     const preview = URL.createObjectURL(file)
@@ -361,6 +362,7 @@ export default function ChatPage() {
     const optimistic: ChatMsg = { id: Date.now().toString(), role: 'user', content: displayText, created_at: new Date().toISOString(), photo_url: previewUrl }
     setMessages(prev => [...prev, optimistic])
     setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setPhotos([])
     setProposal(null)
     setLogProposal(null)
@@ -696,12 +698,25 @@ export default function ChatPage() {
               </span>
             )}
           </button>
-          <input
+          <textarea
+            ref={textareaRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send(input)}
+            rows={1}
+            onChange={e => {
+              setInput(e.target.value)
+              e.target.style.height = 'auto'
+              e.target.style.height = `${e.target.scrollHeight}px`
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                send(input)
+                e.currentTarget.style.height = 'auto'
+              }
+            }}
             placeholder={photos.length > 0 ? `${photos.length} photo${photos.length > 1 ? 's' : ''} ready — add a note or just send…` : 'Ask or send an update…'}
-            className="flex-1 min-w-0 bg-transparent text-base text-white placeholder-gray-600 outline-none"
+            className="flex-1 min-w-0 bg-transparent text-base text-white placeholder-gray-600 outline-none resize-none leading-normal"
+            style={{ maxHeight: '8rem', overflowY: 'auto' }}
           />
           <button
             onClick={() => send(input)}
