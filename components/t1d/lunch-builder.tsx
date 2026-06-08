@@ -386,7 +386,7 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
                       <p className="text-sm text-white truncate">{r.name}</p>
                       <span className="text-[9px] text-teal-500 bg-teal-500/10 px-1.5 py-0.5 rounded flex-shrink-0">recipe</span>
                     </div>
-                    <p className="text-[10px] text-gray-500">{item.carbs}g · {item.serving_size}</p>
+                    <p className="text-[10px] text-gray-500">{item.carbs}g per {item.serving_size}</p>
                   </div>
                   <button
                     onClick={() => openQtyInput(item)}
@@ -408,8 +408,8 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
                   <div className="min-w-0 flex-1 pr-3">
                     <p className="text-sm text-white truncate">{food.name}</p>
                     <p className="text-[10px] text-gray-500">
-                      {food.carbs_g}g · {food.serving_size}
-                      {stat && <span className="text-gray-600 ml-2">last {stat.daysAgo === 0 ? 'today' : stat.daysAgo === 1 ? 'yesterday' : `${stat.daysAgo}d ago`}</span>}
+                      {food.carbs_g}g per {food.serving_size}
+                      {stat && <span className="text-gray-600 ml-2">· last {stat.daysAgo === 0 ? 'today' : stat.daysAgo === 1 ? 'yesterday' : `${stat.daysAgo}d ago`}</span>}
                     </p>
                   </div>
                   <button
