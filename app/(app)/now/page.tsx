@@ -31,16 +31,14 @@ export default async function NowPage() {
       .select('*')
       .eq('active', true)
       .order('start_time', { ascending: true }),
-    isWeekday
-      ? supabase
-          .from('t1d_meal_events')
-          .select('id, total_offered_carbs, items_eaten')
-          .eq('context', 'school_lunch')
-          .gte('timestamp', targetDate.toISOString())
-          .lt('timestamp', targetEnd.toISOString())
-          .order('timestamp', { ascending: false })
-          .limit(1)
-      : Promise.resolve({ data: [] }),
+    supabase
+      .from('t1d_meal_events')
+      .select('id, total_offered_carbs, items_eaten')
+      .eq('context', 'school_lunch')
+      .gte('timestamp', targetDate.toISOString())
+      .lt('timestamp', targetEnd.toISOString())
+      .order('timestamp', { ascending: false })
+      .limit(1),
   ])
 
   const egvs = egvsResult.data ?? []
@@ -53,7 +51,7 @@ export default async function NowPage() {
   let lunchPhase: 'none' | 'packed' | 'dosed' | 'done' = 'none'
   let lunchCarbs: number | null = null
 
-  if (isWeekday && lunchResult.data && lunchResult.data.length > 0) {
+  if (lunchResult.data && lunchResult.data.length > 0) {
     const meal = lunchResult.data[0] as Pick<T1dMealEvent, 'id' | 'total_offered_carbs' | 'items_eaten'>
     lunchCarbs = meal.total_offered_carbs
 
@@ -79,8 +77,8 @@ export default async function NowPage() {
       <AppHeader />
       <BgCard egvs={egvs} />
 
-      {/* Weekday lunch tile */}
-      {isWeekday && (
+      {/* Lunch tile */}
+      {(
         <Link href={lunchPhase === 'none' ? '/engine/lunch' : '/lunch'}>
           <div className="bg-[#141414] rounded-2xl border border-teal-500/20 px-4 py-3.5 flex items-center gap-3 active:opacity-80">
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
