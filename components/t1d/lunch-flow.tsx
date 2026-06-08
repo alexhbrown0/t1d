@@ -18,6 +18,7 @@ interface LunchData {
   schedule: Array<{ event_type: string; start_time: string; end_time: string; day_of_week: number }>
   override: { pe_cancelled?: boolean; pe_start_time?: string | null } | null
   phase: Phase
+  totalDosedCarbs: number
 }
 
 const TREND: Record<string, string> = {
@@ -194,7 +195,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const refresh = async () => {
     const r = await fetch('/api/t1d/lunch/today')
     const d = await r.json()
-    setData({ ...d, followUpSession: d.follow_up_session })
+    setData({ ...d, followUpSession: d.follow_up_session, totalDosedCarbs: d.total_dosed_carbs ?? 0 })
   }
 
   const handleClearLunch = async () => {
@@ -646,10 +647,52 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
       {/* ── Follow-up pending ─────────────────────────────────────────────── */}
       {phase === 'followup_pending' && (
-        <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-10 text-center space-y-3">
-          <Spinner className="h-6 w-6 text-teal-400 mx-auto" />
-          <p className="text-sm text-white">Calculating follow-up dose…</p>
-        </div>
+        data.followUpSession ? (
+          // Returned to pending because carbs are still uncovered
+          <div className="bg-[#141414] rounded-2xl border border-amber-500/20 p-5 space-y-3">
+            <p className="text-[10px] tracking-widest text-amber-400 font-semibold">CARBS NOT FULLY COVERED</p>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Dosed for</span>
+              <span className="text-white font-semibold">{Math.round(data.totalDosedCarbs)}g</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Total eaten</span>
+              <span className="text-white font-semibold">{Math.round(data.meal?.total_eaten_carbs ?? 0)}g</span>
+            </div>
+            <div className="flex justify-between text-sm border-t border-white/5 pt-2">
+              <span className="text-amber-400">Still uncovered</span>
+              <span className="text-amber-300 font-bold">
+                {Math.max(0, Math.round((data.meal?.total_eaten_carbs ?? 0) - data.totalDosedCarbs))}g
+              </span>
+            </div>
+            <button
+              onClick={handleAnotherDose}
+              disabled={loading}
+              className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-semibold py-3.5 rounded-xl disabled:opacity-40"
+            >
+              {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Checking…</span> : 'Check if another dose is needed →'}
+            </button>
+            {!data.bg && (
+              <div className="space-y-2">
+                <p className="text-[10px] tracking-widest text-amber-400 font-semibold">ENTER CURRENT BG</p>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={manualBg}
+                  onChange={e => setManualBg(e.target.value)}
+                  placeholder="e.g. 145"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white text-base placeholder:text-gray-600 focus:outline-none focus:border-amber-500/50"
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          // First-time auto-calculation spinner
+          <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-10 text-center space-y-3">
+            <Spinner className="h-6 w-6 text-teal-400 mx-auto" />
+            <p className="text-sm text-white">Calculating follow-up dose…</p>
+          </div>
+        )
       )}
 
       {/* ── Follow-up ready ───────────────────────────────────────────────── */}

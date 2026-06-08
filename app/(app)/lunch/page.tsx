@@ -6,10 +6,13 @@ import type { T1dMealEvent, T1dDoseSession } from '@/types/health'
 
 export const dynamic = 'force-dynamic'
 
+const COVERAGE_TOLERANCE_G = 5
+
 function inferPhase(
   meal: T1dMealEvent | null,
   session: T1dDoseSession | null,
-  followUp: T1dDoseSession | null
+  followUp: T1dDoseSession | null,
+  allSessions: T1dDoseSession[]
 ) {
   if (!meal) return 'no_lunch'
   if (!session) return 'packed'
@@ -17,6 +20,9 @@ function inferPhase(
   if (!meal.items_eaten) return 'eating'
   if (!followUp) return 'followup_pending'
   if (followUp.actual_dose_grams == null) return 'followup_ready'
+  const totalEaten = meal.total_eaten_carbs ?? 0
+  const totalDosed = allSessions.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
+  if (totalEaten > 0 && totalDosed < totalEaten - COVERAGE_TOLERANCE_G) return 'followup_pending'
   return 'complete'
 }
 
@@ -45,6 +51,7 @@ export default async function LunchPage() {
 
   let session: T1dDoseSession | null = null
   let followUpSession: T1dDoseSession | null = null
+  let allSessions: T1dDoseSession[] = []
 
   if (meal) {
     const { data: sessions } = await supabase
@@ -53,10 +60,12 @@ export default async function LunchPage() {
       .eq('meal_event_id', meal.id)
       .order('created_at', { ascending: true })
 
-    const all = (sessions ?? []) as T1dDoseSession[]
-    session = all[0] ?? null
-    followUpSession = all.length > 1 ? all[all.length - 1] : null
+    allSessions = (sessions ?? []) as T1dDoseSession[]
+    session = allSessions[0] ?? null
+    followUpSession = allSessions.length > 1 ? allSessions[allSessions.length - 1] : null
   }
+
+  const totalDosedCarbs = allSessions.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
 
   return (
     <div className="px-4 pt-5 pb-6">
@@ -68,7 +77,8 @@ export default async function LunchPage() {
           bg,
           schedule: (schedRes.data ?? []) as Array<{ event_type: string; start_time: string; end_time: string; day_of_week: number }>,
           override: (overrideRes.data?.[0] as { pe_cancelled?: boolean; pe_start_time?: string | null }) ?? null,
-          phase: inferPhase(meal, session, followUpSession),
+          phase: inferPhase(meal, session, followUpSession, allSessions),
+          totalDosedCarbs,
         }}
       />
     </div>

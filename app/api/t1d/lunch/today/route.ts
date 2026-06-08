@@ -6,10 +6,13 @@ import type { T1dMealEvent, T1dDoseSession } from '@/types/health'
 
 export const dynamic = 'force-dynamic'
 
+const COVERAGE_TOLERANCE_G = 5
+
 function inferPhase(
   meal: T1dMealEvent | null,
   session: T1dDoseSession | null,
-  followUp: T1dDoseSession | null
+  followUp: T1dDoseSession | null,
+  allSessions: T1dDoseSession[]
 ) {
   if (!meal) return 'no_lunch'
   if (!session) return 'packed'
@@ -17,6 +20,12 @@ function inferPhase(
   if (!meal.items_eaten) return 'eating'
   if (!followUp) return 'followup_pending'
   if (followUp.actual_dose_grams == null) return 'followup_ready'
+
+  // Only complete if carbs are actually covered
+  const totalEaten = meal.total_eaten_carbs ?? 0
+  const totalDosed = allSessions.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
+  if (totalEaten > 0 && totalDosed < totalEaten - COVERAGE_TOLERANCE_G) return 'followup_pending'
+
   return 'complete'
 }
 
@@ -53,6 +62,7 @@ export async function GET() {
 
   let session: T1dDoseSession | null = null
   let followUp: T1dDoseSession | null = null
+  let allSessions: T1dDoseSession[] = []
 
   if (meal) {
     const { data: sessions } = await supabase
@@ -64,7 +74,10 @@ export async function GET() {
     const all = (sessions ?? []) as T1dDoseSession[]
     session = all[0] ?? null
     followUp = all.length > 1 ? all[all.length - 1] : null
+    allSessions = all
   }
+
+  const totalDosed = allSessions.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
 
   return NextResponse.json({
     meal,
@@ -73,6 +86,7 @@ export async function GET() {
     bg,
     schedule: schedRes.data ?? [],
     override: overrideRes.data?.[0] ?? null,
-    phase: inferPhase(meal, session, followUp),
+    phase: inferPhase(meal, session, followUp, allSessions),
+    total_dosed_carbs: totalDosed,
   })
 }
