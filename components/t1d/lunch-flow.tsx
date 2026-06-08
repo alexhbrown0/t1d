@@ -158,6 +158,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const [preUnits, setPreUnits] = useState('')
   const [followUnits, setFollowUnits] = useState('')
   const [manualBg, setManualBg] = useState('')
+  const [manualTrend, setManualTrend] = useState('')
   const [eatenPcts, setEatenPcts] = useState<Record<string, EatenPct>>({})
   const [photoFilling, setPhotoFilling] = useState(false)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -179,7 +180,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           meal: data.meal.items_offered,
           meal_event_id: data.meal.id,
           starting_bg: data.bg?.value_mgdl ?? (manualBg ? parseFloat(manualBg) : null),
-          starting_trend: data.bg?.trend ?? null,
+          starting_trend: data.bg?.trend ?? (manualTrend || null),
           entered_by: 'alexandra',
         }),
       })
@@ -348,17 +349,38 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               <PackedItems items={data.meal.items_offered} total={data.meal.total_offered_carbs} />
 
               {!data.bg && (
-                <div className="bg-[#141414] rounded-2xl border border-amber-500/20 p-4 space-y-2">
+                <div className="bg-[#141414] rounded-2xl border border-amber-500/20 p-4 space-y-3">
                   <p className="text-[10px] tracking-widest text-amber-400 font-semibold">NO CGM READING</p>
-                  <p className="text-xs text-gray-500">Enter current BG if you have it — or proceed without.</p>
+                  <p className="text-xs text-gray-500">Enter current BG and trend if you have them — or proceed without.</p>
                   <input
                     type="number"
                     inputMode="numeric"
                     value={manualBg}
                     onChange={e => setManualBg(e.target.value)}
-                    placeholder="e.g. 120"
+                    placeholder="Current BG (e.g. 120)"
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg placeholder:text-gray-600 focus:outline-none focus:border-amber-500/50"
                   />
+                  <div className="flex gap-1.5">
+                    {([
+                      { value: 'fallingQuickly', label: '↓↓' },
+                      { value: 'falling',        label: '↓'  },
+                      { value: 'steady',          label: '→'  },
+                      { value: 'rising',          label: '↑'  },
+                      { value: 'risingQuickly',  label: '↑↑' },
+                    ] as const).map(t => (
+                      <button
+                        key={t.value}
+                        onClick={() => setManualTrend(prev => prev === t.value ? '' : t.value)}
+                        className={`flex-1 py-2.5 rounded-xl text-base font-semibold transition-colors ${
+                          manualTrend === t.value
+                            ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                            : 'bg-white/5 border border-white/10 text-gray-400'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
