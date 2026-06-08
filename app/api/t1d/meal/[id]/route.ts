@@ -56,3 +56,15 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = createServerClient()
+  const { id } = await params
+  await supabase.from('t1d_dose_sessions').delete().eq('meal_event_id', id)
+  const { error } = await supabase.from('t1d_meal_events').delete().eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}

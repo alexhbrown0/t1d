@@ -180,6 +180,17 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
     setData({ ...d, followUpSession: d.follow_up_session })
   }
 
+  const handleClearLunch = async () => {
+    if (!data.meal) return
+    setLoading(true)
+    try {
+      await fetch(`/api/t1d/meal/${data.meal.id}`, { method: 'DELETE' })
+      await refresh()
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleReadyToEat = async () => {
     if (!data.meal) return
     setLoading(true)
@@ -374,6 +385,22 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           ) : (
             <>
               <PackedItems items={data.meal.items_offered} total={data.meal.total_offered_carbs} />
+
+              <div className="flex gap-2">
+                <Link
+                  href="/engine/lunch"
+                  className="flex-1 bg-white/5 border border-white/10 text-gray-300 text-sm font-semibold py-3 rounded-xl text-center active:opacity-70"
+                >
+                  Edit Lunch
+                </Link>
+                <button
+                  onClick={handleClearLunch}
+                  disabled={loading}
+                  className="flex-1 bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold py-3 rounded-xl active:opacity-70 disabled:opacity-40"
+                >
+                  Clear &amp; Start Over
+                </button>
+              </div>
 
               {!data.bg && (
                 <div className="bg-[#141414] rounded-2xl border border-amber-500/20 p-4 space-y-3">
