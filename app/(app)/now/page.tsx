@@ -33,7 +33,7 @@ export default async function NowPage() {
       .order('start_time', { ascending: true }),
     supabase
       .from('t1d_meal_events')
-      .select('id, total_offered_carbs, items_eaten')
+      .select('id, total_offered_carbs, total_eaten_carbs, items_eaten')
       .eq('context', 'school_lunch')
       .gte('timestamp', targetDate.toISOString())
       .lt('timestamp', targetEnd.toISOString())
@@ -47,12 +47,15 @@ export default async function NowPage() {
     (s) => s.day_of_week === todayDay && s.start_time > nowTime
   ) ?? null
 
+  const COVERAGE_TOLERANCE_G = 5
+
   // Determine lunch tile status for weekdays
-  let lunchPhase: 'none' | 'packed' | 'dosed' | 'done' = 'none'
+  let lunchPhase: 'none' | 'packed' | 'dosed' | 'needs_followup' | 'done' = 'none'
   let lunchCarbs: number | null = null
+  let lunchUncovered: number | null = null
 
   if (lunchResult.data && lunchResult.data.length > 0) {
-    const meal = lunchResult.data[0] as Pick<T1dMealEvent, 'id' | 'total_offered_carbs' | 'items_eaten'>
+    const meal = lunchResult.data[0] as Pick<T1dMealEvent, 'id' | 'total_offered_carbs' | 'total_eaten_carbs' | 'items_eaten'>
     lunchCarbs = meal.total_offered_carbs
 
     const { data: sessions } = await supabase
@@ -60,12 +63,22 @@ export default async function NowPage() {
       .select('actual_dose_grams')
       .eq('meal_event_id', meal.id)
       .order('created_at', { ascending: true })
-      .limit(2)
 
     const all = (sessions ?? []) as Pick<T1dDoseSession, 'actual_dose_grams'>[]
-    if (all.length > 1 && all[all.length - 1].actual_dose_grams != null) {
-      lunchPhase = 'done'
-    } else if (all.length > 0 && all[0].actual_dose_grams != null) {
+    const anyConfirmed = all.some(s => s.actual_dose_grams != null)
+    const lastConfirmed = all.length > 0 && all[all.length - 1].actual_dose_grams != null
+
+    if (lastConfirmed) {
+      const totalDosed = all.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
+      const totalEaten = meal.total_eaten_carbs ?? 0
+      const uncovered = Math.max(0, totalEaten - totalDosed)
+      if (totalEaten > 0 && uncovered > COVERAGE_TOLERANCE_G) {
+        lunchPhase = 'needs_followup'
+        lunchUncovered = Math.round(uncovered)
+      } else {
+        lunchPhase = 'done'
+      }
+    } else if (anyConfirmed) {
       lunchPhase = 'dosed'
     } else {
       lunchPhase = 'packed'
@@ -82,11 +95,16 @@ export default async function NowPage() {
         <Link href={lunchPhase === 'none' ? '/engine/lunch' : '/lunch'}>
           <div className="bg-[#141414] rounded-2xl border border-teal-500/20 px-4 py-3.5 flex items-center gap-3 active:opacity-80">
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              lunchPhase === 'done' ? 'bg-teal-500/20' : 'bg-teal-500/10'
+              lunchPhase === 'done' ? 'bg-teal-500/20' :
+              lunchPhase === 'needs_followup' ? 'bg-amber-500/20' : 'bg-teal-500/10'
             }`}>
               {lunchPhase === 'done' ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2.5">
                   <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : lunchPhase === 'needs_followup' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
               ) : (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -95,16 +113,18 @@ export default async function NowPage() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-semibold tracking-widest text-teal-400">
+              <p className={`text-[10px] font-semibold tracking-widest ${lunchPhase === 'needs_followup' ? 'text-amber-400' : 'text-teal-400'}`}>
                 {packingForTomorrow ? "TOMORROW'S LUNCH" : 'SCHOOL LUNCH'} ·{' '}
                 {lunchPhase === 'none' ? 'NOT PACKED' :
                  lunchPhase === 'packed' ? 'READY TO DOSE' :
-                 lunchPhase === 'dosed' ? 'IN PROGRESS' : 'DONE'}
+                 lunchPhase === 'dosed' ? 'IN PROGRESS' :
+                 lunchPhase === 'needs_followup' ? 'NEEDS FOLLOW-UP' : 'DONE'}
               </p>
               <p className="text-sm font-semibold text-white mt-0.5">
                 {lunchPhase === 'none' && `Pack lunch for ${packingForTomorrow ? 'tomorrow' : 'today'}`}
                 {lunchPhase === 'packed' && `${lunchCarbs ?? '—'}g packed${packingForTomorrow ? ' for tomorrow' : ''} · tap to dose`}
                 {lunchPhase === 'dosed' && 'Dose given · record what he ate'}
+                {lunchPhase === 'needs_followup' && `${lunchUncovered}g still uncovered · tap to check`}
                 {lunchPhase === 'done' && 'Lunch complete ✓'}
               </p>
             </div>
