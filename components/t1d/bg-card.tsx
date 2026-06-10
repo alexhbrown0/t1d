@@ -86,7 +86,7 @@ export function BgCard({ egvs: initialEgvs }: Props) {
         const data = await res.json()
         if (Array.isArray(data) && data[0]?.system_time !== latestTimeRef.current) {
           latestTimeRef.current = data[0].system_time
-          setEgvs(data)
+          setEgvs(prev => [data[0], ...prev.filter(e => e.system_time !== data[0].system_time)])
         }
       } catch { /* ignore network errors */ }
     }
