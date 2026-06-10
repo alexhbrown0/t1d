@@ -51,27 +51,16 @@ function ReadingTimer({ lastTime }: { lastTime: string | null }) {
     return () => clearInterval(id)
   }, [])
 
-  if (!lastTime) return (
-    <div className="flex justify-between px-1 mb-1">
-      <span className="text-[10px] text-gray-600">no data</span>
-    </div>
-  )
+  if (!lastTime) return <span className="text-[10px] text-gray-600">no data</span>
 
-  const lastMs = new Date(lastTime).getTime()
-  const elapsed = now - lastMs
+  const elapsed = now - new Date(lastTime).getTime()
   const nextMs = Math.max(0, 5 * 60 * 1000 - elapsed)
-
-  const sinceColor = elapsed > 10 * 60 * 1000 ? 'text-red-400' : 'text-gray-500'
+  const stale = elapsed > 10 * 60 * 1000
 
   return (
-    <div className="flex justify-between px-1 mb-1">
-      <span className={`text-[10px] font-mono ${sinceColor}`}>
-        {fmtElapsed(elapsed)} <span className="text-gray-600 font-sans">since</span>
-      </span>
-      <span className="text-[10px] font-mono text-gray-600">
-        {fmtElapsed(nextMs)} <span className="font-sans">next</span>
-      </span>
-    </div>
+    <span className={`text-[10px] font-mono ${stale ? 'text-red-400' : 'text-gray-600'}`}>
+      {fmtElapsed(elapsed)} <span className="font-sans opacity-60">·</span> {fmtElapsed(nextMs)}
+    </span>
   )
 }
 
@@ -112,26 +101,28 @@ export function BgCard({ egvs: initialEgvs }: Props) {
   return (
     <div className="bg-[#141414] rounded-2xl border border-white/5 overflow-hidden">
       <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center gap-1.5 mb-2">
-          <div className={`w-1.5 h-1.5 rounded-full ${trendDotColor(value)}`} />
-          <span className={`text-[10px] tracking-widest font-semibold ${trendCol}`}>{trendLabel}</span>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${trendDotColor(value)}`} />
+            <span className={`text-[10px] tracking-widest font-semibold ${trendCol}`}>{trendLabel}</span>
+          </div>
+          <ReadingTimer lastTime={latest?.system_time ?? null} />
         </div>
         <div className="flex items-end gap-3">
           <span className="text-[72px] font-bold leading-none text-white tabular-nums">
             {latest?.status === 'HIGH' ? 'HI' : latest?.status === 'LOW' ? 'LO' : bgValue(value)}
           </span>
-          <span className={`text-3xl font-medium pb-2 ${trendCol}`}>{TREND_ARROW[trend] ?? '→'}</span>
+          <span className={`text-[52px] leading-none font-light pb-1 ${trendCol}`}>{TREND_ARROW[trend] ?? '→'}</span>
           {delta != null && (
-            <div className={`ml-auto mb-2 px-3 py-1.5 rounded-full text-sm font-semibold tabular-nums ${delta < 0 ? 'bg-red-500/20 text-red-400' : delta > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-gray-400'}`}>
+            <span className={`text-2xl font-bold pb-2.5 tabular-nums ${delta < 0 ? 'text-red-400' : delta > 0 ? 'text-yellow-400' : 'text-gray-400'}`}>
               {delta > 0 ? '+' : ''}{delta}
-            </div>
+            </span>
           )}
         </div>
         <p className="text-[10px] text-gray-600 tracking-widest font-medium mt-0.5">MG/DL</p>
       </div>
 
       <div className="px-3 pb-2">
-        <ReadingTimer lastTime={latest?.system_time ?? null} />
         <BgChart egvs={egvs} />
       </div>
     </div>
