@@ -4,13 +4,13 @@ const SHARE_BASE = 'https://share2.dexcom.com/ShareWebServices/Services'
 const APP_ID = 'd89443d2-327c-4a6f-89e5-496bbb0317db'
 
 const TREND_MAP: Record<number, string> = {
-  1: 'doubleDown',
-  2: 'singleDown',
-  3: 'fortyFiveDown',
+  1: 'doubleUp',
+  2: 'singleUp',
+  3: 'fortyFiveUp',
   4: 'flat',
-  5: 'fortyFiveUp',
-  6: 'singleUp',
-  7: 'doubleUp',
+  5: 'fortyFiveDown',
+  6: 'singleDown',
+  7: 'doubleDown',
 }
 
 function parseDexcomDate(dt: string): string {
