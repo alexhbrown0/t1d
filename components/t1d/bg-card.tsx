@@ -111,28 +111,28 @@ export function BgCard({ egvs: initialEgvs }: Props) {
 
   return (
     <div className="bg-[#141414] rounded-2xl border border-white/5 overflow-hidden">
-      <div className="px-4 pt-3 pb-2">
-        <div className="flex items-center gap-1.5 mb-1.5">
+      <div className="px-4 pt-4 pb-2">
+        <div className="flex items-center gap-1.5 mb-2">
           <div className={`w-1.5 h-1.5 rounded-full ${trendDotColor(value)}`} />
           <span className={`text-[10px] tracking-widest font-semibold ${trendCol}`}>{trendLabel}</span>
         </div>
 
-        <div className="flex items-end gap-3">
-          <span className="text-[58px] font-bold leading-none text-white tabular-nums">
+        <div className="flex items-end gap-4">
+          <span className="text-[72px] font-bold leading-none text-white tabular-nums">
             {latest?.status === 'HIGH' ? 'HI' : latest?.status === 'LOW' ? 'LO' : bgValue(value)}
           </span>
-          <div className="pb-2 flex flex-col gap-1">
-            <span className={`text-2xl font-light ${trendCol}`}>
+          <div className="pb-3 flex flex-col items-start gap-2">
+            <span className={`text-3xl font-medium ${trendCol}`}>
               {TREND_ARROW[trend] ?? '→'}
             </span>
+            {delta != null && (
+              <div className={`px-3 py-1 rounded-full text-sm font-semibold tabular-nums ${delta < 0 ? 'bg-red-500/20 text-red-400' : delta > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-gray-400'}`}>
+                {delta > 0 ? '+' : ''}{delta}
+              </div>
+            )}
           </div>
-          {delta != null && (
-            <div className={`mb-3 ml-auto px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums ${delta < 0 ? 'bg-red-500/20 text-red-400' : delta > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-gray-400'}`}>
-              {delta > 0 ? '+' : ''}{delta} <span className="text-[9px] font-normal opacity-70">VS. LAST</span>
-            </div>
-          )}
         </div>
-        <p className="text-[10px] text-gray-600 tracking-widest font-medium mt-0.5">MG/DL</p>
+        <p className="text-[10px] text-gray-600 tracking-widest font-medium mt-1">MG/DL</p>
       </div>
 
       <div className="px-3 pb-2">
