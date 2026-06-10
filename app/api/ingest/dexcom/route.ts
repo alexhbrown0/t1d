@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
   try {
     const end = new Date()
     const start = new Date(end.getTime() - 3 * 60 * 60 * 1000)
-    const startIso = start.toISOString().replace(/\.\d{3}Z$/, '')
-    const endIso = end.toISOString().replace(/\.\d{3}Z$/, '')
+    const startIso = start.toISOString().replace(/\.\d{3}Z$/, 'Z')
+    const endIso = end.toISOString().replace(/\.\d{3}Z$/, 'Z')
     const [range, egvs] = await Promise.all([
       fetchDataRange(),
       fetchEgvs(startIso, endIso),
