@@ -716,11 +716,20 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               </div>
             )}
           </div>
-        ) : (
-          // First-time auto-calculation spinner
+        ) : loading ? (
           <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-10 text-center space-y-3">
             <Spinner className="h-6 w-6 text-teal-400 mx-auto" />
             <p className="text-sm text-white">Calculating follow-up dose…</p>
+          </div>
+        ) : (
+          <div className="bg-[#141414] rounded-2xl border border-amber-500/20 p-5 space-y-3 text-center">
+            <p className="text-sm text-gray-400">Follow-up calculation didn't complete.</p>
+            <button
+              onClick={handleAnotherDose}
+              className="w-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold py-3.5 rounded-xl"
+            >
+              Try again →
+            </button>
           </div>
         )
       )}

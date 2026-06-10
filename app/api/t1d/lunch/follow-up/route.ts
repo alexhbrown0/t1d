@@ -87,10 +87,16 @@ export async function POST(req: NextRequest) {
     fat: null,
     protein: null,
   }]
-  const output = await runDoseEngine(engineItems, {
-    startingBg: starting_bg ?? null,
-    startingTrend: starting_trend ?? null,
-  })
+  let output: Awaited<ReturnType<typeof runDoseEngine>>
+  try {
+    output = await runDoseEngine(engineItems, {
+      startingBg: starting_bg ?? null,
+      startingTrend: starting_trend ?? null,
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: `Engine failed: ${message}` }, { status: 500 })
+  }
 
   const reasoning = `Follow-up: ${totalEaten}g eaten, ${totalGiven}g dosed so far, ${remainingCarbs}g uncovered. ${output.reasoning}`
 
