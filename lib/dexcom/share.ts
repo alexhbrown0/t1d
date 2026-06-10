@@ -82,7 +82,7 @@ export async function ingestViaShare(): Promise<{ inserted: number; skipped: num
   const supabase = createServerClient()
   const { error } = await supabase
     .from('dexcom_egvs')
-    .upsert(rows, { onConflict: 'system_time', ignoreDuplicates: true })
+    .upsert(rows, { onConflict: 'system_time' })
 
   if (error) throw new Error(`Failed to upsert EGVs: ${error.message}`)
 

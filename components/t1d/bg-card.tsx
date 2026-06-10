@@ -9,6 +9,26 @@ interface Insight { text: string; cta: 'chat' | 'lunch'; cta_label: string; is_s
 
 const GAP_MS = 10 * 60 * 1000
 
+function computedTrend(egvs: DexcomEgv[]): string {
+  const pts = egvs
+    .slice(0, 3)
+    .filter(e => e.value_mgdl != null)
+    .map(e => ({ t: new Date(e.system_time).getTime(), v: Number(e.value_mgdl) }))
+  if (pts.length < 2) return egvs[0]?.trend ?? 'none'
+  const newest = pts[0]
+  const older = pts[pts.length - 1]
+  const gapMs = newest.t - older.t
+  if (gapMs === 0 || gapMs > 15 * 60 * 1000) return egvs[0]?.trend ?? 'none'
+  const rate = (newest.v - older.v) / (gapMs / 60000)
+  if (rate > 2) return 'doubleUp'
+  if (rate > 1) return 'singleUp'
+  if (rate > 0.5) return 'fortyFiveUp'
+  if (rate > -0.5) return 'flat'
+  if (rate > -1) return 'fortyFiveDown'
+  if (rate > -2) return 'singleDown'
+  return 'doubleDown'
+}
+
 const TREND_ARROW: Record<string, string> = {
   flat: '→', singleUp: '↑', doubleUp: '↑↑',
   singleDown: '↓', doubleDown: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘', none: '→',
@@ -119,7 +139,7 @@ export function BgCard({ egvs: initialEgvs }: Props) {
 
   const latest = egvs[0]
   const prev = egvs[1]
-  const trend = latest?.trend ?? 'none'
+  const trend = computedTrend(egvs)
   const value = latest?.value_mgdl ? Number(latest.value_mgdl) : null
   const prevValue = prev?.value_mgdl ? Number(prev.value_mgdl) : null
   const gapMs = latest && prev
