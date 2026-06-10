@@ -163,12 +163,16 @@ export function BgCard({ egvs: initialEgvs }: Props) {
       {insight && (
         <div className="border-t border-white/5">
           {insight.is_stable ? (
-            <div className="px-4 py-2.5">
+            <div className="px-4 py-2.5 flex items-center gap-1.5">
+              <Sparkle />
               <p className="text-xs text-gray-500">{insight.text}</p>
             </div>
           ) : insightExpanded ? (
             <div className="px-4 py-3 space-y-3">
-              <p className="text-sm text-gray-200 leading-snug">{insight.text}</p>
+              <div className="flex items-start gap-1.5">
+                <Sparkle className="mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-gray-200 leading-snug">{insight.text}</p>
+              </div>
               <div className="flex items-center justify-between">
                 <Link
                   href={insight.cta === 'lunch' ? '/engine/lunch' : `/chat?q=${encodeURIComponent(insight.text)}`}
@@ -186,6 +190,7 @@ export function BgCard({ egvs: initialEgvs }: Props) {
               onClick={() => setInsightExpanded(true)}
               className="w-full px-4 py-2.5 flex items-center gap-2 text-left"
             >
+              <Sparkle className="flex-shrink-0" />
               <p className="text-xs text-gray-400 flex-1 truncate">{insight.text}</p>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
                 <polyline points="6 9 12 15 18 9" />
@@ -195,6 +200,14 @@ export function BgCard({ egvs: initialEgvs }: Props) {
         </div>
       )}
     </div>
+  )
+}
+
+function Sparkle({ className = '' }: { className?: string }) {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="#6b7280" className={className}>
+      <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" />
+    </svg>
   )
 }
 

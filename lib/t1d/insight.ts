@@ -41,7 +41,7 @@ export async function generateInsight(): Promise<void> {
   if (isStable) {
     await supabase.from('t1d_insights').upsert({
       id: 1,
-      text: `Stable in range · ${bg} mg/dL`,
+      text: 'Stable in range',
       cta: 'chat',
       cta_label: 'Ask assistant',
       is_stable: true,
