@@ -52,7 +52,8 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
   const data = await fetchEgvs(startIso, endIso)
   const egvs: Array<Record<string, unknown>> = data.egvs ?? data.records ?? []
 
-  console.log('[dexcom-ingest]', JSON.stringify({ start: startIso, end: endIso, keys: Object.keys(data), count: egvs.length, first: egvs[0] ?? null }))
+  console.log('[dexcom-fields]', egvs[0] ? Object.keys(egvs[0]).join(',') : 'empty')
+  console.log('[dexcom-first]', JSON.stringify(egvs[0] ?? null))
 
   if (egvs.length === 0) {
     // Don't advance last_synced_at — Dexcom may just not have data ready yet
