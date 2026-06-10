@@ -102,9 +102,9 @@ export async function generateInsight(): Promise<void> {
   const params = paramsResult.data
 
   const minsAgo = Math.floor((Date.now() - new Date(latest.system_time).getTime()) / 60000)
-  const rate = rateOfChange(egvs)
+  const rateVal = rateOfChange(egvs)
   const bgSequence = [...egvs].reverse().map(e => Math.round(Number(e.value_mgdl))).join(' → ')
-  const rateStr = rate != null ? `${rate > 0 ? '+' : ''}${rate.toFixed(1)} mg/dL/min` : 'rate unknown'
+  const rateStr = rateVal != null ? `${rateVal > 0 ? '+' : ''}${rateVal.toFixed(1)} mg/dL/min` : 'rate unknown'
 
   const dia = (params?.current_dia ?? 2) * 3600000
   const iobFromGlooko = boluses.reduce((sum, b) => {
@@ -119,7 +119,6 @@ export async function generateInsight(): Promise<void> {
   }, 0)
   const totalIob = Math.max(iobFromGlooko, iobFromApp)
 
-  const ct = getCentralTime()
   const upcoming = schedule
     .filter((s: { day_of_week: number }) => s.day_of_week === ct.dayOfWeek)
     .map((s: { event_type: string; start_time: string }) => {
