@@ -14,6 +14,7 @@ interface LunchData {
   meal: T1dMealEvent | null
   session: T1dDoseSession | null
   followUpSession: T1dDoseSession | null
+  preDoseSessions: T1dDoseSession[]
   bg: { value_mgdl: number | null; trend: string | null } | null
   schedule: Array<{ event_type: string; start_time: string; end_time: string; day_of_week: number }>
   override: { pe_cancelled?: boolean; pe_start_time?: string | null } | null
@@ -195,7 +196,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const refresh = async () => {
     const r = await fetch('/api/t1d/lunch/today')
     const d = await r.json()
-    setData({ ...d, followUpSession: d.follow_up_session, totalDosedCarbs: d.total_dosed_carbs ?? 0 })
+    setData({ ...d, followUpSession: d.follow_up_session, preDoseSessions: d.pre_dose_sessions ?? [], totalDosedCarbs: d.total_dosed_carbs ?? 0 })
   }
 
   const handleClearLunch = async () => {
@@ -539,17 +540,39 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
       {/* ── Eating: log what he ate ───────────────────────────────────────── */}
       {phase === 'eating' && data.session && data.meal && (
         <>
-          <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-4">
-            <p className="text-[10px] tracking-widest text-teal-400 font-semibold mb-1">DOSE GIVEN</p>
-            <p className="text-sm text-white">
-              {data.session.recommended_dose_grams}g into pump
-              {data.session.pump_suggested_units != null && (
-                <span className="text-gray-400"> · {data.session.pump_suggested_units}u</span>
-              )}
-              {data.session.actual_dose_timestamp && (
-                <span className="text-gray-500"> · {formatTime(data.session.actual_dose_timestamp)}</span>
-              )}
-            </p>
+          <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">
+                {data.preDoseSessions.length > 1 ? `PRE-DOSES (${data.preDoseSessions.length})` : 'PRE-DOSE'}
+              </p>
+              <button
+                onClick={handleReadyToEat}
+                disabled={loading}
+                className="text-[10px] text-teal-500 font-semibold active:opacity-70 disabled:opacity-40"
+              >
+                {loading ? '+ Adding…' : '+ Give another dose'}
+              </button>
+            </div>
+            {data.preDoseSessions.map((s, i) => (
+              <p key={s.id} className="text-sm text-white">
+                {i > 0 && <span className="text-gray-600 text-xs mr-1.5">#{i + 1}</span>}
+                {s.actual_dose_grams ?? s.recommended_dose_grams}g
+                {s.pump_suggested_units != null && (
+                  <span className="text-gray-400"> · {s.pump_suggested_units}u</span>
+                )}
+                {s.actual_dose_timestamp && (
+                  <span className="text-gray-500"> · {formatTime(s.actual_dose_timestamp)}</span>
+                )}
+              </p>
+            ))}
+            {data.preDoseSessions.length === 0 && (
+              <p className="text-sm text-gray-500">No pre-dose given</p>
+            )}
+            {data.preDoseSessions.length > 1 && (
+              <p className="text-xs text-gray-500 border-t border-white/5 pt-2">
+                Total pre-dosed: {Math.round(data.preDoseSessions.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0))}g
+              </p>
+            )}
           </div>
 
           <div className="bg-[#141414] rounded-2xl border border-white/5 p-5 space-y-4">

@@ -71,18 +71,26 @@ export async function GET() {
       .eq('meal_event_id', meal.id)
       .order('created_at', { ascending: true })
 
-    const all = (sessions ?? []) as T1dDoseSession[]
-    session = all[0] ?? null
-    followUp = all.length > 1 ? all[all.length - 1] : null
-    allSessions = all
+    allSessions = (sessions ?? []) as T1dDoseSession[]
+
+    // Pre-eating: surface the latest unconfirmed session so the UI re-enters pre_dose_ready
+    const unconfirmed = !meal?.items_eaten ? allSessions.find(s => s.actual_dose_grams == null) : null
+    session = unconfirmed ?? allSessions[0] ?? null
+
+    // Follow-up is the last session that was created after eating was recorded
+    // (entered_by = 'followup' or it's the last session when items_eaten is set)
+    const postEatingSessions = meal?.items_eaten ? allSessions.filter(s => s.entered_by === 'followup') : []
+    followUp = postEatingSessions.length > 0 ? postEatingSessions[postEatingSessions.length - 1] : null
   }
 
+  const preDoseSessions = allSessions.filter(s => s.entered_by !== 'followup' && s.actual_dose_grams != null)
   const totalDosed = allSessions.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
 
   return NextResponse.json({
     meal,
     session,
     follow_up_session: followUp,
+    pre_dose_sessions: preDoseSessions,
     bg,
     schedule: schedRes.data ?? [],
     override: overrideRes.data?.[0] ?? null,

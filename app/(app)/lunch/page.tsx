@@ -61,10 +61,15 @@ export default async function LunchPage() {
       .order('created_at', { ascending: true })
 
     allSessions = (sessions ?? []) as T1dDoseSession[]
-    session = allSessions[0] ?? null
-    followUpSession = allSessions.length > 1 ? allSessions[allSessions.length - 1] : null
+
+    const unconfirmed = !meal?.items_eaten ? allSessions.find(s => s.actual_dose_grams == null) : null
+    session = unconfirmed ?? allSessions[0] ?? null
+
+    const postEatingSessions = meal?.items_eaten ? allSessions.filter(s => s.entered_by === 'followup') : []
+    followUpSession = postEatingSessions.length > 0 ? postEatingSessions[postEatingSessions.length - 1] : null
   }
 
+  const preDoseSessions = allSessions.filter(s => s.entered_by !== 'followup' && s.actual_dose_grams != null)
   const totalDosedCarbs = allSessions.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
 
   return (
@@ -74,6 +79,7 @@ export default async function LunchPage() {
           meal,
           session,
           followUpSession,
+          preDoseSessions,
           bg,
           schedule: (schedRes.data ?? []) as Array<{ event_type: string; start_time: string; end_time: string; day_of_week: number }>,
           override: (overrideRes.data?.[0] as { pe_cancelled?: boolean; pe_start_time?: string | null }) ?? null,
