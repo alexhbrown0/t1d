@@ -22,6 +22,8 @@ function bgColor(value: number | null): string {
 
 function deltaLabel(egvs: DexcomEgv[]): string {
   if (egvs.length < 2) return ''
+  const gapMs = new Date(egvs[0].system_time).getTime() - new Date(egvs[1].system_time).getTime()
+  if (gapMs > 10 * 60 * 1000) return ''
   const delta = (egvs[0].value_mgdl ?? 0) - (egvs[1].value_mgdl ?? 0)
   if (delta === 0) return '±0'
   return delta > 0 ? `+${delta}` : `${delta}`

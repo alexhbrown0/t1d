@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DexcomEgv } from '@/types/health'
 
 interface Props { egvs: DexcomEgv[] }
+
+const GAP_MS = 10 * 60 * 1000
 
 const TREND_ARROW: Record<string, string> = {
   rising: '↑', risingQuickly: '↑↑', steady: '→',
@@ -73,13 +75,36 @@ function ReadingTimer({ lastTime }: { lastTime: string | null }) {
   )
 }
 
-export function BgCard({ egvs }: Props) {
+export function BgCard({ egvs: initialEgvs }: Props) {
+  const [egvs, setEgvs] = useState<DexcomEgv[]>(initialEgvs)
+  const latestTimeRef = useRef(initialEgvs[0]?.system_time)
+
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/t1d/bg-latest')
+        const data = await res.json()
+        if (Array.isArray(data) && data[0]?.system_time !== latestTimeRef.current) {
+          latestTimeRef.current = data[0].system_time
+          setEgvs(data)
+        }
+      } catch { /* ignore network errors */ }
+    }
+    const id = setInterval(poll, 60_000)
+    return () => clearInterval(id)
+  }, [])
+
   const latest = egvs[0]
   const prev = egvs[1]
   const trend = latest?.trend ?? 'none'
   const value = latest?.value_mgdl ? Number(latest.value_mgdl) : null
   const prevValue = prev?.value_mgdl ? Number(prev.value_mgdl) : null
-  const delta = value != null && prevValue != null ? Math.round(value - prevValue) : null
+  const gapMs = latest && prev
+    ? new Date(latest.system_time).getTime() - new Date(prev.system_time).getTime()
+    : Infinity
+  const delta = value != null && prevValue != null && gapMs <= GAP_MS
+    ? Math.round(value - prevValue)
+    : null
 
   const trendCol = trendColor(value, trend)
   const trendLabel = TREND_LABEL[trend] ?? 'STEADY'
