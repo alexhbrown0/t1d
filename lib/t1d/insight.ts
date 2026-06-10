@@ -26,8 +26,12 @@ export async function generateInsight(): Promise<void> {
   const midnightIso = getCentralDayStartUTC().toISOString()
   const todayDate = getCentralDateStr()
 
-  const [egvsResult] = await Promise.all([
+  const ct = getCentralTime()
+  const nowMin = ct.minutesSinceMidnight
+
+  const [egvsResult, scheduleForStableCheck] = await Promise.all([
     supabase.from('dexcom_egvs').select('system_time, value_mgdl, trend').order('system_time', { ascending: false }).limit(5),
+    supabase.from('t1d_school_schedule').select('start_time, activity_level').eq('active', true).eq('day_of_week', ct.dayOfWeek),
   ])
 
   const egvs = egvsResult.data ?? []
@@ -35,8 +39,25 @@ export async function generateInsight(): Promise<void> {
   if (!latest?.value_mgdl) return
 
   const bg = Math.round(Number(latest.value_mgdl))
-  const trend = latest.trend ?? 'none'
-  const isStable = trend === 'flat' && bg >= 70 && bg <= 180
+
+  // Compute trend from rate of change — stored trend is unreliable (Share API always returns flat)
+  const pts = egvs.filter(e => e.value_mgdl != null).map(e => ({ t: new Date(e.system_time).getTime(), v: Number(e.value_mgdl) }))
+  const newestPt = pts[0]
+  const olderPt = pts[Math.min(3, pts.length - 1)]
+  const gapMin = newestPt && olderPt ? (newestPt.t - olderPt.t) / 60000 : 0
+  const rate = gapMin > 0 ? (newestPt.v - olderPt.v) / gapMin : 0
+  const isDropping = rate < -1
+  const isRising = rate > 1
+
+  // High-intensity activity within 75 min triggers a Claude call regardless of BG trend
+  const imminentHighActivity = (scheduleForStableCheck.data ?? []).some(s => {
+    if (s.activity_level !== 'high') return false
+    const [h, m] = s.start_time.split(':').map(Number)
+    const minsUntil = (h * 60 + m) - nowMin
+    return minsUntil >= -10 && minsUntil <= 75
+  })
+
+  const isStable = !isDropping && !isRising && bg >= 70 && bg <= 180 && !imminentHighActivity
 
   if (isStable) {
     await supabase.from('t1d_insights').upsert({
