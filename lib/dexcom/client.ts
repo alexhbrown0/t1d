@@ -70,10 +70,13 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
     trend_rate: e.trendRate ?? null,
   }))
 
-  const { error } = await supabase
+  console.log('[dexcom-rows]', JSON.stringify(rows.slice(0, 2)))
+  const { error, data: upserted } = await supabase
     .from('dexcom_egvs')
     .upsert(rows, { onConflict: 'system_time', ignoreDuplicates: true })
+    .select()
 
+  console.log('[dexcom-upsert]', JSON.stringify({ error: error?.message ?? null, count: upserted?.length ?? 0 }))
   if (error) throw new Error(`Failed to upsert EGVs: ${error.message}`)
 
   // Advance cursor only to the last reading's timestamp, not the query end.
