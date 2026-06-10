@@ -19,7 +19,7 @@ function parseDexcomDate(wt: string): string {
 }
 
 async function authenticate(): Promise<string> {
-  const res = await fetch(`${SHARE_BASE}/General/AuthenticatePublisherAccount`, {
+  const res = await fetch(`${SHARE_BASE}/General/LoginPublisherAccountByName`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify({
@@ -28,12 +28,10 @@ async function authenticate(): Promise<string> {
       applicationId: APP_ID,
     }),
   })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Dexcom Share auth failed: ${res.status} ${text}`)
-  }
-  const token = await res.json()
-  return token as string
+  const text = await res.text()
+  console.log('[share-auth]', res.status, text.slice(0, 100))
+  if (!res.ok) throw new Error(`Dexcom Share auth failed: ${res.status} ${text}`)
+  return JSON.parse(text) as string
 }
 
 export async function ingestViaShare(): Promise<{ inserted: number; skipped: number; info?: string }> {
@@ -47,12 +45,11 @@ export async function ingestViaShare(): Promise<{ inserted: number; skipped: num
   const res = await fetch(`${SHARE_BASE}/Publisher/ReadPublisherLatestGlucoseValues?${params}`, {
     headers: { 'Accept': 'application/json' },
   })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Dexcom Share fetch failed: ${res.status} ${text}`)
-  }
+  const body = await res.text()
+  console.log('[share-readings]', res.status, body.slice(0, 200))
+  if (!res.ok) throw new Error(`Dexcom Share fetch failed: ${res.status} ${body}`)
 
-  const readings: Array<{ WT: string; DT: string; Value: number; Trend: number }> = await res.json()
+  const readings: Array<{ WT: string; DT: string; Value: number; Trend: number }> = JSON.parse(body)
 
   if (!readings || readings.length === 0) {
     return { inserted: 0, skipped: 0, info: 'no readings returned' }
