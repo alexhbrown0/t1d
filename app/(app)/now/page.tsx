@@ -68,7 +68,7 @@ export default async function NowPage() {
     const lastConfirmed = all.length > 0 && all[all.length - 1].actual_dose_grams != null
     const eatingRecorded = meal.items_eaten != null
 
-    if (lastConfirmed) {
+    if (lastConfirmed && eatingRecorded) {
       const totalDosed = all.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
       const totalEaten = meal.total_eaten_carbs ?? 0
       const uncovered = Math.max(0, totalEaten - totalDosed)
