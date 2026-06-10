@@ -35,17 +35,9 @@ export async function fetchDataRange() {
 export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: number; info?: string }> {
   const supabase = createServerClient()
 
-  const { data: lastRow } = await supabase
-    .from('dexcom_auth')
-    .select('last_synced_at')
-    .eq('id', 1)
-    .single()
-
+  // Always fetch the last 35 minutes — no cursor, no backfill, just latest data
   const endTime = new Date()
-  const startTime = lastRow?.last_synced_at
-    ? new Date(lastRow.last_synced_at)
-    : new Date(endTime.getTime() - 3 * 60 * 60 * 1000)
-
+  const startTime = new Date(endTime.getTime() - 35 * 60 * 1000)
   const startIso = startTime.toISOString().replace(/\.\d{3}Z$/, '')
   const endIso = endTime.toISOString().replace(/\.\d{3}Z$/, '')
 
@@ -53,10 +45,8 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
   const egvs: Array<Record<string, unknown>> = data.egvs ?? data.records ?? []
 
   if (egvs.length === 0) {
-    // Don't advance last_synced_at — Dexcom may just not have data ready yet
     return { inserted: 0, skipped: 0, info: `empty: keys=${Object.keys(data).join(',')} start=${startIso} end=${endIso}` }
   }
-
 
   const rows = egvs.map((e) => ({
     system_time: e.systemTime,
@@ -72,19 +62,6 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
     .upsert(rows, { onConflict: 'system_time', ignoreDuplicates: true })
 
   if (error) throw new Error(`Failed to upsert EGVs: ${error.message}`)
-
-  // Advance cursor only to the last reading's timestamp, not the query end.
-  // This prevents skipping data when Dexcom's API lags behind wall time.
-  const lastReadingTime = rows
-    .map(r => r.system_time as string)
-    .filter(Boolean)
-    .sort()
-    .at(-1) ?? endIso
-
-  await supabase
-    .from('dexcom_auth')
-    .update({ last_synced_at: lastReadingTime })
-    .eq('id', 1)
 
   return { inserted: rows.length, skipped: 0 }
 }
