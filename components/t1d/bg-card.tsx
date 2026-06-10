@@ -10,22 +10,24 @@ interface Insight { text: string; cta: 'chat' | 'lunch'; cta_label: string; is_s
 const GAP_MS = 10 * 60 * 1000
 
 function computedTrend(egvs: DexcomEgv[]): string {
+  // Use up to 4 readings (~15 min window) to match Dexcom's smoothing
   const pts = egvs
-    .slice(0, 3)
+    .slice(0, 4)
     .filter(e => e.value_mgdl != null)
     .map(e => ({ t: new Date(e.system_time).getTime(), v: Number(e.value_mgdl) }))
   if (pts.length < 2) return egvs[0]?.trend ?? 'none'
   const newest = pts[0]
   const older = pts[pts.length - 1]
   const gapMs = newest.t - older.t
-  if (gapMs === 0 || gapMs > 15 * 60 * 1000) return egvs[0]?.trend ?? 'none'
+  if (gapMs === 0 || gapMs > 20 * 60 * 1000) return egvs[0]?.trend ?? 'none'
   const rate = (newest.v - older.v) / (gapMs / 60000)
-  if (rate > 2) return 'doubleUp'
-  if (rate > 1) return 'singleUp'
-  if (rate > 0.5) return 'fortyFiveUp'
-  if (rate > -0.5) return 'flat'
-  if (rate > -1) return 'fortyFiveDown'
-  if (rate > -2) return 'singleDown'
+  // Thresholds from Dexcom G7 documentation (mg/dL/min)
+  if (rate > 3) return 'doubleUp'
+  if (rate > 2) return 'singleUp'
+  if (rate > 1) return 'fortyFiveUp'
+  if (rate > -1) return 'flat'
+  if (rate > -2) return 'fortyFiveDown'
+  if (rate > -3) return 'singleDown'
   return 'doubleDown'
 }
 
