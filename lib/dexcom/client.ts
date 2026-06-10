@@ -53,8 +53,10 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
   const egvs: Array<Record<string, unknown>> = data.egvs ?? data.records ?? []
 
   if (egvs.length === 0) {
+    // Don't advance last_synced_at — Dexcom may just not have data ready yet
     return { inserted: 0, skipped: 0, info: `empty: keys=${Object.keys(data).join(',')} start=${startIso} end=${endIso}` }
   }
+
 
   const rows = egvs.map((e) => ({
     system_time: e.systemTime,
