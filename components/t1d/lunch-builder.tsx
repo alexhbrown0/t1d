@@ -90,6 +90,8 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
   const [adding, setAdding] = useState<{ food: T1dFoodRepo | RecentItem; qty: string } | null>(null)
   const [editingPhotoIdx, setEditingPhotoIdx] = useState<number | null>(null)
   const [editingPhotoQty, setEditingPhotoQty] = useState('')
+  const [editingPackedIdx, setEditingPackedIdx] = useState<number | null>(null)
+  const [editingPackedQty, setEditingPackedQty] = useState('')
   const [chatInput, setChatInput] = useState('')
   const [chatReply, setChatReply] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
@@ -557,8 +559,10 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
                   inputMode="decimal"
                   step="0.5"
                   min="0"
-                  value={item.qty}
-                  onChange={e => updatePackedQty(i, e.target.value)}
+                  value={editingPackedIdx === i ? editingPackedQty : item.qty}
+                  onFocus={() => { setEditingPackedIdx(i); setEditingPackedQty(String(item.qty)) }}
+                  onChange={e => setEditingPackedQty(e.target.value)}
+                  onBlur={() => { updatePackedQty(i, editingPackedQty); setEditingPackedIdx(null) }}
                   className="w-14 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-white text-sm text-center focus:outline-none focus:border-teal-500/50"
                 />
                 <p className="text-xs text-teal-400 w-12 text-right tabular-nums flex-shrink-0">{Math.round(item.carbs * item.qty)}g</p>
