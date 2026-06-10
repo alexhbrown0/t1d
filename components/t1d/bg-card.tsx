@@ -112,26 +112,22 @@ export function BgCard({ egvs: initialEgvs }: Props) {
   return (
     <div className="bg-[#141414] rounded-2xl border border-white/5 overflow-hidden">
       <div className="px-4 pt-4 pb-2">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <span className="text-[72px] font-bold leading-none text-white tabular-nums">
-              {latest?.status === 'HIGH' ? 'HI' : latest?.status === 'LOW' ? 'LO' : bgValue(value)}
-            </span>
-            <p className="text-[10px] text-gray-600 tracking-widest font-medium mt-1">MG/DL</p>
-          </div>
-          <div className="pb-1 flex flex-col items-end gap-2">
-            <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${trendDotColor(value)}`} />
-              <span className={`text-[10px] tracking-widest font-semibold ${trendCol}`}>{trendLabel}</span>
-            </div>
-            <span className={`text-4xl font-medium ${trendCol}`}>{TREND_ARROW[trend] ?? '→'}</span>
-            {delta != null && (
-              <div className={`px-3 py-1 rounded-full text-sm font-semibold tabular-nums ${delta < 0 ? 'bg-red-500/20 text-red-400' : delta > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-gray-400'}`}>
-                {delta > 0 ? '+' : ''}{delta}
-              </div>
-            )}
-          </div>
+        <div className="flex items-center gap-1.5 mb-2">
+          <div className={`w-1.5 h-1.5 rounded-full ${trendDotColor(value)}`} />
+          <span className={`text-[10px] tracking-widest font-semibold ${trendCol}`}>{trendLabel}</span>
         </div>
+        <div className="flex items-end gap-3">
+          <span className="text-[72px] font-bold leading-none text-white tabular-nums">
+            {latest?.status === 'HIGH' ? 'HI' : latest?.status === 'LOW' ? 'LO' : bgValue(value)}
+          </span>
+          <span className={`text-3xl font-medium pb-2 ${trendCol}`}>{TREND_ARROW[trend] ?? '→'}</span>
+          {delta != null && (
+            <div className={`ml-auto mb-2 px-3 py-1.5 rounded-full text-sm font-semibold tabular-nums ${delta < 0 ? 'bg-red-500/20 text-red-400' : delta > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-gray-400'}`}>
+              {delta > 0 ? '+' : ''}{delta}
+            </div>
+          )}
+        </div>
+        <p className="text-[10px] text-gray-600 tracking-widest font-medium mt-0.5">MG/DL</p>
       </div>
 
       <div className="px-3 pb-2">
@@ -140,6 +136,13 @@ export function BgCard({ egvs: initialEgvs }: Props) {
       </div>
     </div>
   )
+}
+
+function dotColor(bg: number | null): string {
+  if (!bg) return '#6b7280'
+  if (bg < 70) return '#f87171'
+  if (bg > 180) return '#fbbf24'
+  return '#2dd4bf'
 }
 
 function BgChart({ egvs }: { egvs: DexcomEgv[] }) {
@@ -170,7 +173,11 @@ function BgChart({ egvs }: { egvs: DexcomEgv[] }) {
   const points = [...egvs]
     .filter((e) => e.value_mgdl != null)
     .reverse()
-    .map((e) => ({ x: xOf(new Date(e.system_time).getTime()), y: yOf(Number(e.value_mgdl)) }))
+    .map((e) => ({
+      x: xOf(new Date(e.system_time).getTime()),
+      y: yOf(Number(e.value_mgdl)),
+      color: dotColor(e.value_mgdl),
+    }))
     .filter((p) => p.x >= PAD.l && p.x <= W - PAD.r)
 
   let path = ''
@@ -188,37 +195,32 @@ function BgChart({ egvs }: { egvs: DexcomEgv[] }) {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 64 }}>
-      {/* Range bands */}
+      {/* Out-of-range background zones */}
+      <rect x={PAD.l} y={lowY} width={W - PAD.l - PAD.r} height={H - PAD.b - lowY} fill="#ef4444" fillOpacity="0.08" />
+      <rect x={PAD.l} y={PAD.t} width={W - PAD.l - PAD.r} height={highY - PAD.t} fill="#f59e0b" fillOpacity="0.05" />
+
+      {/* Range lines */}
       <line x1={PAD.l} x2={W - PAD.r} y1={highY} y2={highY} stroke="#374151" strokeWidth="0.5" strokeDasharray="3,3" />
-      <line x1={PAD.l} x2={W - PAD.r} y1={lowY} y2={lowY} stroke="#374151" strokeWidth="0.5" strokeDasharray="3,3" />
+      <line x1={PAD.l} x2={W - PAD.r} y1={lowY} y2={lowY} stroke="#ef4444" strokeWidth="0.5" strokeDasharray="3,3" strokeOpacity="0.5" />
       <text x={PAD.l + 2} y={highY - 2} fill="#4b5563" fontSize="6">180</text>
-      <text x={PAD.l + 2} y={lowY - 2} fill="#4b5563" fontSize="6">70</text>
+      <text x={PAD.l + 2} y={lowY - 2} fill="#6b7280" fontSize="6">70</text>
 
       {/* Now line */}
       <line x1={nowX} x2={nowX} y1={PAD.t} y2={H - PAD.b} stroke="#374151" strokeWidth="0.5" />
 
-      {/* BG fill + line */}
+      {/* BG line — gray guide */}
       {path && (
-        <>
-          <defs>
-            <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path d={`${path} L ${lastPoint?.x ?? nowX} ${H - PAD.b} L ${points[0].x} ${H - PAD.b} Z`} fill="url(#bgGrad)" />
-          <path d={path} fill="none" stroke="#2dd4bf" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </>
+        <path d={path} fill="none" stroke="#4b5563" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
       )}
 
-      {/* Reading dots */}
+      {/* Reading dots — colored by range */}
       {points.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r="2" fill="#2dd4bf" />
+        <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={p.color} />
       ))}
 
-      {/* Latest reading dot (larger) */}
+      {/* Latest dot (larger) */}
       {lastPoint && (
-        <circle cx={lastPoint.x} cy={lastPoint.y} r="3.5" fill="#2dd4bf" />
+        <circle cx={lastPoint.x} cy={lastPoint.y} r="4" fill={lastPoint.color} />
       )}
 
       {/* Time axis */}
