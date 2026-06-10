@@ -13,9 +13,11 @@ const TREND_MAP: Record<number, string> = {
   7: 'doubleUp',
 }
 
-function parseDexcomDate(wt: string): string {
-  const ms = parseInt(wt.replace(/[^0-9]/g, ''))
-  return new Date(ms).toISOString()
+function parseDexcomDate(dt: string): string {
+  // Format: /Date(1623356400000)/ or /Date(1623356400000-0500)/
+  // Only take the first digit group (milliseconds since epoch, always UTC)
+  const match = dt.match(/\d+/)
+  return new Date(parseInt(match![0])).toISOString()
 }
 
 async function authenticate(): Promise<string> {
