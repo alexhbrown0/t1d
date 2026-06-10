@@ -52,9 +52,6 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
   const data = await fetchEgvs(startIso, endIso)
   const egvs: Array<Record<string, unknown>> = data.egvs ?? data.records ?? []
 
-  console.log('[dexcom-fields]', egvs[0] ? Object.keys(egvs[0]).join(',') : 'empty')
-  console.log('[dexcom-first]', JSON.stringify(egvs[0] ?? null))
-
   if (egvs.length === 0) {
     // Don't advance last_synced_at — Dexcom may just not have data ready yet
     return { inserted: 0, skipped: 0, info: `empty: keys=${Object.keys(data).join(',')} start=${startIso} end=${endIso}` }
@@ -70,13 +67,10 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
     trend_rate: e.trendRate ?? null,
   }))
 
-  console.log('[dexcom-rows]', JSON.stringify(rows.slice(0, 2)))
-  const { error, data: upserted } = await supabase
+  const { error } = await supabase
     .from('dexcom_egvs')
     .upsert(rows, { onConflict: 'system_time', ignoreDuplicates: true })
-    .select()
 
-  console.log('[dexcom-upsert]', JSON.stringify({ error: error?.message ?? null, count: upserted?.length ?? 0 }))
   if (error) throw new Error(`Failed to upsert EGVs: ${error.message}`)
 
   // Advance cursor only to the last reading's timestamp, not the query end.
