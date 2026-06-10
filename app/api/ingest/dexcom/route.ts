@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ingestRecentEgvs, fetchDataRange, fetchEgvs } from '@/lib/dexcom/client'
 import { ingestViaShare } from '@/lib/dexcom/share'
 import { checkPendingDoses } from '@/lib/t1d/pending-dose-monitor'
+import { generateInsight } from '@/lib/t1d/insight'
 
 function isAuthorized(req: NextRequest): boolean {
   const cronAuth = req.headers.get('authorization')
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
       useShare ? ingestViaShare() : ingestRecentEgvs(),
       checkPendingDoses(),
     ])
+    generateInsight().catch(() => null) // fire-and-forget, don't block ingest response
     return NextResponse.json({ ok: true, ingest, monitor })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

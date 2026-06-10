@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import type { DexcomEgv } from '@/types/health'
 
 interface Props { egvs: DexcomEgv[] }
+interface Insight { text: string; cta: 'chat' | 'lunch'; cta_label: string; is_stable: boolean }
 
 const GAP_MS = 10 * 60 * 1000
 
@@ -66,6 +68,8 @@ function ReadingTimer({ lastTime }: { lastTime: string | null }) {
 
 export function BgCard({ egvs: initialEgvs }: Props) {
   const [egvs, setEgvs] = useState<DexcomEgv[]>(initialEgvs)
+  const [insight, setInsight] = useState<Insight | null>(null)
+  const [insightExpanded, setInsightExpanded] = useState(false)
   const latestTimeRef = useRef(initialEgvs[0]?.system_time)
 
   useEffect(() => {
@@ -91,15 +95,23 @@ export function BgCard({ egvs: initialEgvs }: Props) {
 
     const poll = async () => {
       try {
-        const res = await fetch('/api/t1d/bg-latest')
-        const data = await res.json()
-        if (Array.isArray(data) && data[0]?.system_time !== latestTimeRef.current) {
-          latestTimeRef.current = data[0].system_time
-          setEgvs(prev => [data[0], ...prev.filter(e => e.system_time !== data[0].system_time)])
+        const [bgRes, insightRes] = await Promise.all([
+          fetch('/api/t1d/bg-latest'),
+          fetch('/api/t1d/insight'),
+        ])
+        const bgData = await bgRes.json()
+        const insightData = await insightRes.json()
+        if (Array.isArray(bgData) && bgData[0]?.system_time !== latestTimeRef.current) {
+          latestTimeRef.current = bgData[0].system_time
+          setEgvs(prev => [bgData[0], ...prev.filter(e => e.system_time !== bgData[0].system_time)])
+          setInsightExpanded(false) // collapse on new reading
         }
+        if (insightData?.text) setInsight(insightData)
       } catch { /* ignore network errors */ }
       schedulePoll()
     }
+
+    fetch('/api/t1d/insight').then(r => r.json()).then(d => { if (d?.text) setInsight(d) }).catch(() => null)
 
     schedulePoll()
     return () => clearTimeout(timeoutId)
@@ -147,6 +159,41 @@ export function BgCard({ egvs: initialEgvs }: Props) {
       <div className="px-3 pb-2">
         <BgChart egvs={egvs} />
       </div>
+
+      {insight && (
+        <div className="border-t border-white/5">
+          {insight.is_stable ? (
+            <div className="px-4 py-2.5">
+              <p className="text-xs text-gray-500">{insight.text}</p>
+            </div>
+          ) : insightExpanded ? (
+            <div className="px-4 py-3 space-y-3">
+              <p className="text-sm text-gray-200 leading-snug">{insight.text}</p>
+              <div className="flex items-center justify-between">
+                <Link
+                  href={insight.cta === 'lunch' ? '/engine/lunch' : `/chat?q=${encodeURIComponent(insight.text)}`}
+                  className="text-xs font-semibold text-teal-400"
+                >
+                  {insight.cta_label} →
+                </Link>
+                <button onClick={() => setInsightExpanded(false)} className="text-[10px] text-gray-600">
+                  collapse
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setInsightExpanded(true)}
+              className="w-full px-4 py-2.5 flex items-center gap-2 text-left"
+            >
+              <p className="text-xs text-gray-400 flex-1 truncate">{insight.text}</p>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

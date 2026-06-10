@@ -4,7 +4,6 @@ import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
 import { getCentralTime } from '@/lib/utils/central-time'
 import { AppHeader } from '@/components/t1d/app-header'
 import { BgCard } from '@/components/t1d/bg-card'
-import { InsightTile } from '@/components/t1d/insight-tile'
 import { QuickActions } from '@/components/t1d/quick-actions'
 import { NextUpCard } from '@/components/t1d/next-up-card'
 import type { T1dMealEvent, T1dDoseSession } from '@/types/health'
@@ -140,7 +139,6 @@ export default async function NowPage() {
         </Link>
       )}
 
-      <InsightTile />
       <QuickActions />
       {nextEvent && <NextUpCard event={nextEvent} />}
     </div>
