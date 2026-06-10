@@ -176,7 +176,7 @@ export function buildDoseEngineUserContext(input: {
     lines.push(`Current BG: ${currentBg} mg/dL (${latestAge}min ago)`)
   }
 
-  const nowMinForSchedule = new Date().getHours() * 60 + new Date().getMinutes()
+  const nowMinForSchedule = getCentralTime().minutesSinceMidnight
   lines.push('\n## Schedule — next 4 hours')
   if (scheduleNext2h.length === 0) {
     lines.push('  No scheduled activities')
@@ -184,7 +184,7 @@ export function buildDoseEngineUserContext(input: {
     for (const s of scheduleNext2h) {
       const [sh, sm] = s.start_time.split(':').map(Number)
       const minsUntil = (sh * 60 + sm) - nowMinForSchedule
-      const relStr = minsUntil <= 0 ? 'now' : `in ${minsUntil}min`
+      const relStr = minsUntil <= 0 ? `in progress (started ${Math.abs(minsUntil)}min ago)` : `in ${minsUntil}min`
       const note = s.notes ? ` — ${s.notes}` : ''
       lines.push(`  ${s.start_time}–${s.end_time} (${relStr}): ${s.event_type} (${s.activity_level ?? 'normal'})${note}`)
     }
