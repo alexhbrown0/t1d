@@ -73,9 +73,17 @@ export async function ingestRecentEgvs(): Promise<{ inserted: number; skipped: n
 
   if (error) throw new Error(`Failed to upsert EGVs: ${error.message}`)
 
+  // Advance cursor only to the last reading's timestamp, not the query end.
+  // This prevents skipping data when Dexcom's API lags behind wall time.
+  const lastReadingTime = rows
+    .map(r => r.system_time as string)
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? endIso
+
   await supabase
     .from('dexcom_auth')
-    .update({ last_synced_at: endIso })
+    .update({ last_synced_at: lastReadingTime })
     .eq('id', 1)
 
   return { inserted: rows.length, skipped: 0 }
