@@ -35,7 +35,7 @@ export default function LogBolusPage() {
   const [mealGi, setMealGi] = useState<'high' | 'medium' | 'low' | null>(null)
   const [dose, setDose] = useState<{ grams: number; reasoning: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [currentBg, setCurrentBg] = useState<{ value: number; trend: string } | null>(null)
+  const [currentBg, setCurrentBg] = useState<{ value: number; trend: string; arrow: string; delta: number | null } | null>(null)
   const [lowTreatment, setLowTreatment] = useState<{ type: string; carbs: number; label: string } | null>(null)
   const [foodRepo, setFoodRepo] = useState<RepoFood[]>([])
   const [librarySearch, setLibrarySearch] = useState('')
@@ -45,10 +45,31 @@ export default function LogBolusPage() {
   const [otherLabel, setOtherLabel] = useState('')
   const [otherCarbs, setOtherCarbs] = useState('')
 
+  const TREND_ARROW: Record<string, string> = {
+    rising: '↑', risingQuickly: '↑↑', steady: '→',
+    falling: '↓', fallingQuickly: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘',
+  }
+
   useEffect(() => {
     fetch('/api/t1d/bg-latest')
       .then(r => r.json())
-      .then(d => { if (d?.value_mgdl) setCurrentBg({ value: d.value_mgdl, trend: d.trend ?? 'none' }) })
+      .then(d => {
+        const reading = Array.isArray(d) ? d[0] : d
+        const prev = Array.isArray(d) ? d[1] : null
+        if (!reading?.value_mgdl) return
+        const gapMs = reading && prev
+          ? new Date(reading.system_time).getTime() - new Date(prev.system_time).getTime()
+          : Infinity
+        const delta = prev?.value_mgdl != null && gapMs <= 10 * 60 * 1000
+          ? Math.round(reading.value_mgdl - prev.value_mgdl)
+          : null
+        setCurrentBg({
+          value: reading.value_mgdl,
+          trend: reading.trend ?? 'none',
+          arrow: TREND_ARROW[reading.trend] ?? '',
+          delta,
+        })
+      })
       .catch(() => null)
   }, [])
 
@@ -177,7 +198,15 @@ export default function LogBolusPage() {
           <p className="text-lg font-semibold text-white">Food Bolus</p>
         </div>
         {currentBg && (
-          <p className={`text-sm font-bold tabular-nums ${bgColor}`}>{Math.round(currentBg.value)}</p>
+          <div className="flex items-center gap-1.5">
+            <p className={`text-sm font-bold tabular-nums ${bgColor}`}>{Math.round(currentBg.value)}</p>
+            {currentBg.arrow && <span className={`text-sm ${bgColor}`}>{currentBg.arrow}</span>}
+            {currentBg.delta != null && (
+              <span className={`text-xs font-semibold tabular-nums ${currentBg.delta < 0 ? 'text-red-400' : currentBg.delta > 0 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                {currentBg.delta > 0 ? '+' : ''}{currentBg.delta}
+              </span>
+            )}
+          </div>
         )}
       </div>
 

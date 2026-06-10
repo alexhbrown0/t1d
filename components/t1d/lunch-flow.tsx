@@ -15,7 +15,7 @@ interface LunchData {
   session: T1dDoseSession | null
   followUpSession: T1dDoseSession | null
   preDoseSessions: T1dDoseSession[]
-  bg: { value_mgdl: number | null; trend: string | null } | null
+  bg: { value_mgdl: number | null; trend: string | null; delta: number | null } | null
   schedule: Array<{ event_type: string; start_time: string; end_time: string; day_of_week: number }>
   override: { pe_cancelled?: boolean; pe_start_time?: string | null } | null
   phase: Phase
@@ -214,14 +214,16 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
     if (!data.meal) return
     setLoading(true)
     try {
+      const bgRes = await fetch('/api/t1d/bg-latest').then(r => r.json()).catch(() => null)
+      const freshBg = Array.isArray(bgRes) ? bgRes[0] : bgRes
       await fetch('/api/t1d/engine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           meal: data.meal.items_offered,
           meal_event_id: data.meal.id,
-          starting_bg: data.bg?.value_mgdl ?? (manualBg ? parseFloat(manualBg) : null),
-          starting_trend: data.bg?.trend ?? (manualTrend || null),
+          starting_bg: freshBg?.value_mgdl ?? data.bg?.value_mgdl ?? (manualBg ? parseFloat(manualBg) : null),
+          starting_trend: freshBg?.trend ?? data.bg?.trend ?? (manualTrend || null),
           entered_by: 'alexandra',
         }),
       })
@@ -388,6 +390,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
         <div className="flex items-center gap-2">
           <span className="text-white font-semibold text-sm">{data.bg.value_mgdl}</span>
           {data.bg.trend && <span className="text-gray-400 text-sm">{TREND[data.bg.trend] ?? ''}</span>}
+          {data.bg.delta != null && (
+            <span className={`text-xs font-semibold tabular-nums ${data.bg.delta < 0 ? 'text-red-400' : data.bg.delta > 0 ? 'text-yellow-400' : 'text-gray-400'}`}>
+              {data.bg.delta > 0 ? '+' : ''}{data.bg.delta}
+            </span>
+          )}
           {peMin != null && peMin < 120 && (
             <span className="text-amber-400 text-xs">· PE in {peMin}m</span>
           )}

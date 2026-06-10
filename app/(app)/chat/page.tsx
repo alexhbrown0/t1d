@@ -302,7 +302,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [bg, setBg] = useState<{ value: number | null; trend: string | null } | null>(null)
+  const [bg, setBg] = useState<{ value: number | null; trend: string | null; delta: number | null } | null>(null)
   const [proposal, setProposal] = useState<string | null>(null)
   const [logProposal, setLogProposal] = useState<LogProposal | null>(null)
   const [recipeProposal, setRecipeProposal] = useState<RecipeProposal | null>(null)
@@ -342,7 +342,16 @@ export default function ChatPage() {
 
   useEffect(() => {
     fetch('/api/t1d/bg-latest').then(r => r.json()).then(data => {
-      if (data?.value_mgdl) setBg({ value: data.value_mgdl, trend: data.trend })
+      const reading = Array.isArray(data) ? data[0] : data
+      const prev = Array.isArray(data) ? data[1] : null
+      if (!reading?.value_mgdl) return
+      const gapMs = reading && prev
+        ? new Date(reading.system_time).getTime() - new Date(prev.system_time).getTime()
+        : Infinity
+      const delta = prev?.value_mgdl != null && gapMs <= 10 * 60 * 1000
+        ? Math.round(reading.value_mgdl - prev.value_mgdl)
+        : null
+      setBg({ value: reading.value_mgdl, trend: reading.trend, delta })
     }).catch(() => null)
   }, [])
 
@@ -505,10 +514,6 @@ export default function ChatPage() {
     setMessages(prev => [...prev, saved])
   }
 
-  const bgSubtitle = bg?.value
-    ? `Brooks · ${bg.value} mg/dL `
-    : 'Brooks · –'
-
   return (
     <div
       className="flex flex-col bg-[#0a0a0a]"
@@ -527,8 +532,13 @@ export default function ChatPage() {
       <div className="px-4 pt-4 pb-3 border-b border-white/5 flex-none">
         <p className="text-[10px] tracking-widest text-gray-500 font-semibold">ASSIST</p>
         <p className="text-sm text-gray-400 mt-0.5">
-          {bgSubtitle}
+          {bg?.value ? `Brooks · ${bg.value} mg/dL ` : 'Brooks · –'}
           {bg?.trend && <TrendArrow trend={bg.trend} />}
+          {bg?.delta != null && (
+            <span className={`ml-1 text-xs font-semibold tabular-nums ${bg.delta < 0 ? 'text-red-400' : bg.delta > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>
+              {bg.delta > 0 ? '+' : ''}{bg.delta}
+            </span>
+          )}
         </p>
       </div>
 

@@ -6,16 +6,30 @@ import { useRouter } from 'next/navigation'
 export default function LogCorrectionPage() {
   const router = useRouter()
   const [bg, setBg] = useState('')
+  const [trend, setTrend] = useState<string | null>(null)
+  const [delta, setDelta] = useState<number | null>(null)
   const [activitySoon, setActivitySoon] = useState(false)
   const [loading, setLoading] = useState(true)
   const [recommendation, setRecommendation] = useState<string | null>(null)
   const [computing, setComputing] = useState(false)
 
+  const TREND_ARROW: Record<string, string> = {
+    rising: '↑', risingQuickly: '↑↑', steady: '→',
+    falling: '↓', fallingQuickly: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘',
+  }
+
   useEffect(() => {
     fetch('/api/t1d/bg-latest')
       .then(r => r.json())
       .then(data => {
-        if (data?.value_mgdl) setBg(String(Math.round(data.value_mgdl)))
+        const reading = Array.isArray(data) ? data[0] : data
+        const prev = Array.isArray(data) ? data[1] : null
+        if (reading?.value_mgdl) setBg(String(Math.round(reading.value_mgdl)))
+        if (reading?.trend) setTrend(reading.trend)
+        if (reading && prev && reading.value_mgdl != null && prev.value_mgdl != null) {
+          const gapMs = new Date(reading.system_time).getTime() - new Date(prev.system_time).getTime()
+          if (gapMs <= 10 * 60 * 1000) setDelta(Math.round(reading.value_mgdl - prev.value_mgdl))
+        }
       })
       .finally(() => setLoading(false))
   }, [])
@@ -56,7 +70,7 @@ export default function LogCorrectionPage() {
       {/* BG display */}
       <div className="bg-[#141414] rounded-2xl border border-white/5 p-4">
         <p className="text-[10px] tracking-widest text-gray-500 font-semibold mb-3">CURRENT BG</p>
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-end gap-3">
           <input
             type="number"
             value={bg}
@@ -66,7 +80,15 @@ export default function LogCorrectionPage() {
               isHigh ? 'text-yellow-400' : 'text-white'
             }`}
           />
-          <span className="text-gray-500 text-sm">mg/dL</span>
+          <div className="pb-1 flex items-center gap-2">
+            <span className="text-gray-500 text-sm">mg/dL</span>
+            {trend && <span className={`text-xl ${isHigh ? 'text-yellow-400' : 'text-gray-300'}`}>{TREND_ARROW[trend] ?? ''}</span>}
+            {delta != null && (
+              <span className={`text-sm font-semibold tabular-nums ${delta < 0 ? 'text-red-400' : delta > 0 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                {delta > 0 ? '+' : ''}{delta}
+              </span>
+            )}
+          </div>
         </div>
         {loading && <p className="text-xs text-gray-600 mt-1">Fetching from CGM...</p>}
         {!loading && bg && <p className="text-xs text-gray-600 mt-1">From Dexcom · tap to edit</p>}

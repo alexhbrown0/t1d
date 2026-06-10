@@ -39,15 +39,22 @@ export default async function LunchPage() {
       .gte('timestamp', todayStart.toISOString())
       .order('timestamp', { ascending: false })
       .limit(1),
-    getLatestEgvs(1).catch(() => []),
+    getLatestEgvs(2).catch(() => []),
     supabase.from('t1d_school_schedule').select('*').eq('active', true).order('start_time'),
     supabase.from('t1d_daily_overrides').select('*').eq('override_date', todayDate).limit(1),
   ])
 
   const meal = (mealRes.data?.[0] as T1dMealEvent) ?? null
   const egv = egvs[0]
+  const prevEgv = egvs[1]
   const bgAge = egv ? Date.now() - new Date(egv.system_time).getTime() : Infinity
-  const bg = egv && bgAge <= 15 * 60 * 1000 ? { value_mgdl: egv.value_mgdl, trend: egv.trend } : null
+  const bgGapMs = egv && prevEgv
+    ? new Date(egv.system_time).getTime() - new Date(prevEgv.system_time).getTime()
+    : Infinity
+  const bgDelta = egv && prevEgv && bgGapMs <= 10 * 60 * 1000 && egv.value_mgdl != null && prevEgv.value_mgdl != null
+    ? Math.round(egv.value_mgdl - prevEgv.value_mgdl)
+    : null
+  const bg = egv && bgAge <= 15 * 60 * 1000 ? { value_mgdl: egv.value_mgdl, trend: egv.trend, delta: bgDelta } : null
 
   let session: T1dDoseSession | null = null
   let followUpSession: T1dDoseSession | null = null
