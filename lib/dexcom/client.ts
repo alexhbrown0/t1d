@@ -20,7 +20,7 @@ async function dexcomFetch(path: string) {
 
 export async function fetchEgvs(startTime: string, endTime: string) {
   const params = new URLSearchParams({ startDate: startTime, endDate: endTime })
-  return dexcomFetch(`/v3/users/self/egvs?${params}`)
+  return dexcomFetch(`/v2/users/self/egvs?${params}`)
 }
 
 export async function fetchEvents(startTime: string, endTime: string) {
