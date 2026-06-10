@@ -69,6 +69,26 @@ export function BgCard({ egvs: initialEgvs }: Props) {
   const latestTimeRef = useRef(initialEgvs[0]?.system_time)
 
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>
+
+    const schedulePoll = () => {
+      const latestTime = latestTimeRef.current
+      let delay: number
+      if (latestTime) {
+        const msUntilNext = new Date(latestTime).getTime() + 5 * 60 * 1000 - Date.now()
+        if (msUntilNext > 30_000) {
+          delay = msUntilNext + 10_000  // wake up 10s after the expected reading time
+        } else if (msUntilNext > 0) {
+          delay = msUntilNext + 5_000   // nearly due: wake up 5s after
+        } else {
+          delay = 15_000                // overdue: retry every 15s until it arrives
+        }
+      } else {
+        delay = 30_000
+      }
+      timeoutId = setTimeout(poll, delay)
+    }
+
     const poll = async () => {
       try {
         const res = await fetch('/api/t1d/bg-latest')
@@ -78,9 +98,11 @@ export function BgCard({ egvs: initialEgvs }: Props) {
           setEgvs(prev => [data[0], ...prev.filter(e => e.system_time !== data[0].system_time)])
         }
       } catch { /* ignore network errors */ }
+      schedulePoll()
     }
-    const id = setInterval(poll, 60_000)
-    return () => clearInterval(id)
+
+    schedulePoll()
+    return () => clearTimeout(timeoutId)
   }, [])
 
   const latest = egvs[0]
