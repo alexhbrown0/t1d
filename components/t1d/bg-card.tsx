@@ -164,7 +164,7 @@ export function BgCard({ egvs: initialEgvs }: Props) {
         <div className="border-t border-white/5">
           {insight.is_stable ? (
             <div className="px-4 py-2.5 flex items-center gap-2">
-              <AiTag />
+              <AiStars />
               <p className="text-xs text-gray-500">{insight.text}</p>
             </div>
           ) : insightExpanded ? (
@@ -187,7 +187,7 @@ export function BgCard({ egvs: initialEgvs }: Props) {
               onClick={() => setInsightExpanded(true)}
               className="w-full px-4 py-2.5 flex items-center gap-2 text-left"
             >
-              <AiTag />
+              <AiStars />
               <p className="text-xs text-gray-300 flex-1 truncate">{insight.text}</p>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
                 <polyline points="6 9 12 15 18 9" />
@@ -200,14 +200,14 @@ export function BgCard({ egvs: initialEgvs }: Props) {
   )
 }
 
-function AiTag() {
+function AiStars() {
   return (
-    <span className="flex items-center gap-0.5 flex-shrink-0 text-[9px] font-semibold tracking-widest text-gray-600">
-      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" />
-      </svg>
-      AI
-    </span>
+    <svg width="16" height="11" viewBox="0 0 16 11" fill="none" className="flex-shrink-0">
+      {/* larger star */}
+      <path d="M4.5 0 L5.35 3.65 L9 4.5 L5.35 5.35 L4.5 9 L3.65 5.35 L0 4.5 L3.65 3.65 Z" fill="#2dd4bf" />
+      {/* smaller star */}
+      <path d="M12.5 0 L13.1 2.4 L15.5 3 L13.1 3.6 L12.5 6 L11.9 3.6 L9.5 3 L11.9 2.4 Z" fill="#2dd4bf" fillOpacity="0.5" />
+    </svg>
   )
 }
 
