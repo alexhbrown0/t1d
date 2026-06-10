@@ -19,7 +19,8 @@ function parseDexcomDate(wt: string): string {
 }
 
 async function authenticate(): Promise<string> {
-  const res = await fetch(`${SHARE_BASE}/General/LoginPublisherAccountByName`, {
+  // Step 1: accountName → accountId
+  const authRes = await fetch(`${SHARE_BASE}/General/AuthenticatePublisherAccount`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify({
@@ -28,10 +29,25 @@ async function authenticate(): Promise<string> {
       applicationId: APP_ID,
     }),
   })
-  const text = await res.text()
-  console.log('[share-auth]', res.status, text.slice(0, 100))
-  if (!res.ok) throw new Error(`Dexcom Share auth failed: ${res.status} ${text}`)
-  return JSON.parse(text) as string
+  const authText = await authRes.text()
+  console.log('[share-auth1]', authRes.status, authText.slice(0, 80))
+  if (!authRes.ok) throw new Error(`Dexcom Share auth1 failed: ${authRes.status} ${authText}`)
+  const accountId = JSON.parse(authText) as string
+
+  // Step 2: accountId → sessionId
+  const loginRes = await fetch(`${SHARE_BASE}/General/LoginPublisherAccountById`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({
+      accountId,
+      password: process.env.DEXCOM_PASSWORD,
+      applicationId: APP_ID,
+    }),
+  })
+  const loginText = await loginRes.text()
+  console.log('[share-auth2]', loginRes.status, loginText.slice(0, 80))
+  if (!loginRes.ok) throw new Error(`Dexcom Share auth2 failed: ${loginRes.status} ${loginText}`)
+  return JSON.parse(loginText) as string
 }
 
 export async function ingestViaShare(): Promise<{ inserted: number; skipped: number; info?: string }> {
