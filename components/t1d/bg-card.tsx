@@ -112,19 +112,19 @@ export function BgCard({ egvs: initialEgvs }: Props) {
   return (
     <div className="bg-[#141414] rounded-2xl border border-white/5 overflow-hidden">
       <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center gap-1.5 mb-2">
-          <div className={`w-1.5 h-1.5 rounded-full ${trendDotColor(value)}`} />
-          <span className={`text-[10px] tracking-widest font-semibold ${trendCol}`}>{trendLabel}</span>
-        </div>
-
-        <div className="flex items-end gap-4">
-          <span className="text-[72px] font-bold leading-none text-white tabular-nums">
-            {latest?.status === 'HIGH' ? 'HI' : latest?.status === 'LOW' ? 'LO' : bgValue(value)}
-          </span>
-          <div className="pb-3 flex flex-col items-start gap-2">
-            <span className={`text-3xl font-medium ${trendCol}`}>
-              {TREND_ARROW[trend] ?? '→'}
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <span className="text-[72px] font-bold leading-none text-white tabular-nums">
+              {latest?.status === 'HIGH' ? 'HI' : latest?.status === 'LOW' ? 'LO' : bgValue(value)}
             </span>
+            <p className="text-[10px] text-gray-600 tracking-widest font-medium mt-1">MG/DL</p>
+          </div>
+          <div className="pb-1 flex flex-col items-end gap-2">
+            <div className="flex items-center gap-1.5">
+              <div className={`w-1.5 h-1.5 rounded-full ${trendDotColor(value)}`} />
+              <span className={`text-[10px] tracking-widest font-semibold ${trendCol}`}>{trendLabel}</span>
+            </div>
+            <span className={`text-4xl font-medium ${trendCol}`}>{TREND_ARROW[trend] ?? '→'}</span>
             {delta != null && (
               <div className={`px-3 py-1 rounded-full text-sm font-semibold tabular-nums ${delta < 0 ? 'bg-red-500/20 text-red-400' : delta > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-gray-400'}`}>
                 {delta > 0 ? '+' : ''}{delta}
@@ -132,7 +132,6 @@ export function BgCard({ egvs: initialEgvs }: Props) {
             )}
           </div>
         </div>
-        <p className="text-[10px] text-gray-600 tracking-widest font-medium mt-1">MG/DL</p>
       </div>
 
       <div className="px-3 pb-2">
