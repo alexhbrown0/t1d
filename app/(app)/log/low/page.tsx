@@ -17,13 +17,17 @@ export default function LogLowPage() {
   const [otherLabel, setOtherLabel] = useState('')
   const [otherCarbs, setOtherCarbs] = useState('')
   const [notes, setNotes] = useState('')
+  const [minsAgo, setMinsAgo] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     fetch('/api/t1d/bg-latest')
       .then(r => r.json())
-      .then(d => { if (d?.value_mgdl) setBg(String(Math.round(d.value_mgdl))) })
+      .then(d => {
+        const reading = Array.isArray(d) ? d[0] : d
+        if (reading?.value_mgdl) setBg(String(Math.round(reading.value_mgdl)))
+      })
       .catch(() => null)
   }, [])
 
@@ -42,6 +46,7 @@ export default function LogLowPage() {
     setError('')
     setSubmitting(true)
     try {
+      const timestamp = new Date(Date.now() - minsAgo * 60 * 1000).toISOString()
       const res = await fetch('/api/t1d/low-treatments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -51,6 +56,7 @@ export default function LogLowPage() {
           treatment_carbs_g: totalCarbs,
           notes: notes || null,
           source: 'manual',
+          timestamp,
         }),
       })
       if (!res.ok) {
@@ -94,6 +100,26 @@ export default function LogLowPage() {
           <span className="text-gray-500 text-sm">mg/dL</span>
         </div>
         <p className="text-xs text-gray-600 mt-1">Pre-filled from CGM · tap to edit</p>
+      </div>
+
+      {/* When was treatment given */}
+      <div>
+        <p className="text-[10px] tracking-widest text-gray-500 font-semibold mb-2">WHEN GIVEN</p>
+        <div className="flex gap-2 flex-wrap">
+          {[0, 5, 10, 15, 20].map(m => (
+            <button
+              key={m}
+              onClick={() => setMinsAgo(m)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                minsAgo === m
+                  ? 'bg-red-500/20 border border-red-500/40 text-red-300'
+                  : 'bg-white/5 border border-white/10 text-gray-400'
+              }`}
+            >
+              {m === 0 ? 'Just now' : `${m} min ago`}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Treatment type tabs */}
@@ -188,7 +214,9 @@ export default function LogLowPage() {
       {/* Summary + log */}
       <div className="space-y-3">
         <div className="bg-red-500/5 border border-red-500/20 rounded-2xl px-5 py-4">
-          <p className="text-[10px] tracking-widest text-red-400 font-semibold">GIVING</p>
+          <p className="text-[10px] tracking-widest text-red-400 font-semibold">
+            {minsAgo === 0 ? 'GIVING' : `GAVE · ${minsAgo} MIN AGO`}
+          </p>
           <p className="text-2xl font-bold text-white mt-1">{totalCarbs}g fast carbs</p>
           <p className="text-xs text-gray-500 mt-0.5">{treatmentLabel}</p>
         </div>
