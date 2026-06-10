@@ -14,8 +14,8 @@ export default function LogCorrectionPage() {
   const [computing, setComputing] = useState(false)
 
   const TREND_ARROW: Record<string, string> = {
-    rising: '↑', risingQuickly: '↑↑', steady: '→',
-    falling: '↓', fallingQuickly: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘',
+    flat: '→', singleUp: '↑', doubleUp: '↑↑',
+    singleDown: '↓', doubleDown: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘',
   }
 
   useEffect(() => {

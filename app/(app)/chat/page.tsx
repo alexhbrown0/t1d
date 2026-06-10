@@ -27,8 +27,8 @@ const QUICK_REPLY_MESSAGES: Record<string, string> = {
 
 function TrendArrow({ trend }: { trend: string | null }) {
   const arrows: Record<string, string> = {
-    rising: '↑', risingQuickly: '↑↑', fallingQuickly: '↓↓', falling: '↓',
-    steady: '→', none: '–',
+    flat: '→', singleUp: '↑', doubleUp: '↑↑',
+    singleDown: '↓', doubleDown: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘', none: '–',
   }
   return <span>{arrows[trend ?? 'none'] ?? '→'}</span>
 }

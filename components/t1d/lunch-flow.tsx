@@ -23,8 +23,8 @@ interface LunchData {
 }
 
 const TREND: Record<string, string> = {
-  rising: '↑', risingQuickly: '↑↑', steady: '→',
-  falling: '↓', fallingQuickly: '↓↓', none: '—',
+  flat: '→', singleUp: '↑', doubleUp: '↑↑',
+  singleDown: '↓', doubleDown: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘', none: '—',
 }
 
 function formatTime(ts: string) {
@@ -454,11 +454,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                   />
                   <div className="flex gap-1.5">
                     {([
-                      { value: 'fallingQuickly', label: '↓↓' },
-                      { value: 'falling',        label: '↓'  },
-                      { value: 'steady',          label: '→'  },
-                      { value: 'rising',          label: '↑'  },
-                      { value: 'risingQuickly',  label: '↑↑' },
+                      { value: 'doubleDown',   label: '↓↓' },
+                      { value: 'singleDown',   label: '↓'  },
+                      { value: 'flat',         label: '→'  },
+                      { value: 'singleUp',     label: '↑'  },
+                      { value: 'doubleUp',     label: '↑↑' },
                     ] as const).map(t => (
                       <button
                         key={t.value}
@@ -897,11 +897,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               />
               <div className="flex gap-1.5">
                 {([
-                  { value: 'fallingQuickly', label: '↓↓' },
-                  { value: 'falling',        label: '↓'  },
-                  { value: 'steady',          label: '→'  },
-                  { value: 'rising',          label: '↑'  },
-                  { value: 'risingQuickly',  label: '↑↑' },
+                  { value: 'doubleDown',   label: '↓↓' },
+                  { value: 'singleDown',   label: '↓'  },
+                  { value: 'flat',         label: '→'  },
+                  { value: 'singleUp',     label: '↑'  },
+                  { value: 'doubleUp',     label: '↑↑' },
                 ] as const).map(t => (
                   <button
                     key={t.value}

@@ -46,8 +46,8 @@ export default function LogBolusPage() {
   const [otherCarbs, setOtherCarbs] = useState('')
 
   const TREND_ARROW: Record<string, string> = {
-    rising: '↑', risingQuickly: '↑↑', steady: '→',
-    falling: '↓', fallingQuickly: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘',
+    flat: '→', singleUp: '↑', doubleUp: '↑↑',
+    singleDown: '↓', doubleDown: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘',
   }
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export default function LogBolusPage() {
 
   const isLowOrDropping = currentBg != null && (
     currentBg.value < 80 ||
-    (currentBg.value < 100 && (currentBg.trend === 'falling' || currentBg.trend === 'fallingQuickly'))
+    (currentBg.value < 100 && (currentBg.trend === 'singleDown' || currentBg.trend === 'doubleDown' || currentBg.trend === 'fortyFiveDown'))
   )
 
   const analyzePhoto = async (file: File) => {

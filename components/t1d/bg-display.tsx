@@ -3,12 +3,8 @@
 import type { DexcomEgv } from '@/types/health'
 
 const TREND_ARROW: Record<string, string> = {
-  rising: '↑',
-  risingQuickly: '↑↑',
-  steady: '→',
-  falling: '↓',
-  fallingQuickly: '↓↓',
-  none: '',
+  flat: '→', singleUp: '↑', doubleUp: '↑↑',
+  singleDown: '↓', doubleDown: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘', none: '',
 }
 
 function bgColor(value: number | null): string {

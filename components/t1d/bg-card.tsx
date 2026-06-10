@@ -8,13 +8,13 @@ interface Props { egvs: DexcomEgv[] }
 const GAP_MS = 10 * 60 * 1000
 
 const TREND_ARROW: Record<string, string> = {
-  rising: '↑', risingQuickly: '↑↑', steady: '→',
-  falling: '↓', fallingQuickly: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘', none: '→',
+  flat: '→', singleUp: '↑', doubleUp: '↑↑',
+  singleDown: '↓', doubleDown: '↓↓', fortyFiveUp: '↗', fortyFiveDown: '↘', none: '→',
 }
 
 const TREND_LABEL: Record<string, string> = {
-  rising: 'RISING', risingQuickly: 'RISING FAST', steady: 'STEADY',
-  falling: 'FALLING', fallingQuickly: 'FALLING FAST', fortyFiveUp: 'RISING', fortyFiveDown: 'FALLING', none: 'STEADY',
+  flat: 'STEADY', singleUp: 'RISING', doubleUp: 'RISING FAST',
+  singleDown: 'FALLING', doubleDown: 'FALLING FAST', fortyFiveUp: 'RISING', fortyFiveDown: 'FALLING', none: 'STEADY',
 }
 
 function bgValue(value: number | null): string {
@@ -26,8 +26,8 @@ function trendColor(value: number | null, trend: string | null): string {
   if (!value) return 'text-gray-500'
   if (value < 70) return 'text-red-400'
   if (value > 250) return 'text-red-400'
-  if (trend === 'fallingQuickly') return 'text-red-400'
-  if (trend === 'risingQuickly') return 'text-yellow-400'
+  if (trend === 'doubleDown' || trend === 'singleDown') return 'text-red-400'
+  if (trend === 'doubleUp') return 'text-yellow-400'
   return 'text-teal-400'
 }
 
