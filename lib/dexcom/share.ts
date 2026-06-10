@@ -32,7 +32,6 @@ async function authenticate(): Promise<string> {
     }),
   })
   const authText = await authRes.text()
-  console.log('[share-auth1]', authRes.status, authText.slice(0, 80))
   if (!authRes.ok) throw new Error(`Dexcom Share auth1 failed: ${authRes.status} ${authText}`)
   const accountId = JSON.parse(authText) as string
 
@@ -47,7 +46,6 @@ async function authenticate(): Promise<string> {
     }),
   })
   const loginText = await loginRes.text()
-  console.log('[share-auth2]', loginRes.status, loginText.slice(0, 80))
   if (!loginRes.ok) throw new Error(`Dexcom Share auth2 failed: ${loginRes.status} ${loginText}`)
   return JSON.parse(loginText) as string
 }
@@ -64,7 +62,6 @@ export async function ingestViaShare(): Promise<{ inserted: number; skipped: num
     headers: { 'Accept': 'application/json' },
   })
   const body = await res.text()
-  console.log('[share-readings]', res.status, body.slice(0, 200))
   if (!res.ok) throw new Error(`Dexcom Share fetch failed: ${res.status} ${body}`)
 
   const readings: Array<{ WT: string; DT: string; Value: number; Trend: number }> = JSON.parse(body)

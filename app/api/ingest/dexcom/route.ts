@@ -16,20 +16,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const useShare = !!(process.env.DEXCOM_ACCOUNT_NAME && process.env.DEXCOM_PASSWORD)
-    let ingest
-    if (useShare) {
-      try {
-        ingest = await ingestViaShare()
-      } catch (shareErr) {
-        const msg = shareErr instanceof Error ? shareErr.message : String(shareErr)
-        console.log('[share-error]', msg)
-        ingest = { inserted: 0, skipped: 0, info: `share-error: ${msg}` }
-      }
-    } else {
-      ingest = await ingestRecentEgvs()
-    }
-    const monitor = await checkPendingDoses()
-    console.log('[ingest]', JSON.stringify({ useShare, ingest }))
+    const [ingest, monitor] = await Promise.all([
+      useShare ? ingestViaShare() : ingestRecentEgvs(),
+      checkPendingDoses(),
+    ])
     return NextResponse.json({ ok: true, ingest, monitor })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
