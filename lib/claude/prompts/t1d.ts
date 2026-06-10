@@ -150,7 +150,7 @@ export function buildDoseEngineUserContext(input: {
   const fpuCount = computeFpu(totalFat, totalProtein)
 
   const fmt = (iso: string) =>
-    new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chicago' })
 
   const lines: string[] = []
 

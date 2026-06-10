@@ -17,7 +17,7 @@ function rateOfChange(egvs: { system_time: string; value_mgdl: unknown }[]): num
 }
 
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Chicago' })
 }
 
 export async function generateInsight(): Promise<void> {
