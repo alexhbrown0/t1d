@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ingestRecentEgvs, fetchDataRange, fetchEgvs } from '@/lib/dexcom/client'
+import { ingestViaShare } from '@/lib/dexcom/share'
 import { checkPendingDoses } from '@/lib/t1d/pending-dose-monitor'
 
 function isAuthorized(req: NextRequest): boolean {
@@ -14,8 +15,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const useShare = !!(process.env.DEXCOM_ACCOUNT_NAME && process.env.DEXCOM_PASSWORD)
     const [ingest, monitor] = await Promise.all([
-      ingestRecentEgvs(),
+      useShare ? ingestViaShare() : ingestRecentEgvs(),
       checkPendingDoses(),
     ])
     return NextResponse.json({ ok: true, ingest, monitor })
