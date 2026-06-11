@@ -73,9 +73,13 @@ export async function GET() {
 
     allSessions = (sessions ?? []) as T1dDoseSession[]
 
-    // Pre-eating: surface the latest unconfirmed session so the UI re-enters pre_dose_ready
-    const unconfirmed = !meal?.items_eaten ? allSessions.find(s => s.actual_dose_grams == null) : null
-    session = unconfirmed ?? allSessions[0] ?? null
+    // Use latest unconfirmed session; treat stale wait_and_see as expired
+    const latestUnconfirmed = !meal?.items_eaten
+      ? [...allSessions].reverse().find(s => s.actual_dose_grams == null)
+      : null
+    const staleWaitAndSee = latestUnconfirmed?.wait_and_see &&
+      Date.now() - new Date(latestUnconfirmed.timestamp).getTime() > 30 * 60 * 1000
+    session = staleWaitAndSee ? null : (latestUnconfirmed ?? allSessions[0] ?? null)
 
     // Follow-up is the last session that was created after eating was recorded
     // (entered_by = 'followup' or it's the last session when items_eaten is set)
