@@ -492,6 +492,33 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
         <>
           <PackedItems items={data.meal?.items_offered ?? []} total={data.meal?.total_offered_carbs} dimmed />
 
+          {(() => {
+            const sessionBg = data.session.starting_bg
+            const currentBg = data.bg?.value_mgdl
+            const bgShift = sessionBg != null && currentBg != null ? Math.abs(currentBg - sessionBg) : 0
+            const trendFlipped = data.session.starting_trend != null && data.bg?.trend != null &&
+              (['singleDown', 'doubleDown', 'fortyFiveDown'].includes(data.session.starting_trend) !==
+               ['singleDown', 'doubleDown', 'fortyFiveDown'].includes(data.bg.trend))
+            if (bgShift > 15 || trendFlipped) {
+              return (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 space-y-3">
+                  <p className="text-[10px] tracking-widest text-amber-400 font-semibold">BG HAS CHANGED</p>
+                  <p className="text-xs text-gray-400">
+                    Calculated at <span className="text-white">{sessionBg} mg/dL</span>, now <span className="text-white">{Math.round(currentBg ?? 0)} mg/dL</span>. Recalculate for an accurate dose.
+                  </p>
+                  <button
+                    onClick={handleReadyToEat}
+                    disabled={loading}
+                    className="w-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold py-3 rounded-xl disabled:opacity-40"
+                  >
+                    {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Calculating…</span> : 'Recalculate with current BG →'}
+                  </button>
+                </div>
+              )
+            }
+            return null
+          })()}
+
           <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
             <p className="text-[10px] tracking-widest text-teal-400 font-semibold">FIRST DOSE</p>
 
