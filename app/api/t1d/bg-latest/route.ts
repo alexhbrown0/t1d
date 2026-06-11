@@ -3,23 +3,13 @@ import { createServerClient } from '@/lib/supabase/server'
 
 const STALE_MS = 15 * 60 * 1000
 
-function linearRate(pts: Array<{ t: number; v: number }>): number {
-  const n = pts.length
-  if (n < 2) return 0
-  const tMean = pts.reduce((s, p) => s + p.t, 0) / n
-  const vMean = pts.reduce((s, p) => s + p.v, 0) / n
-  const num = pts.reduce((s, p) => s + (p.t - tMean) * (p.v - vMean), 0)
-  const den = pts.reduce((s, p) => s + (p.t - tMean) ** 2, 0)
-  return den === 0 ? 0 : (num / den) * 60000
-}
-
 function rateToTrend(rate: number): string {
   if (rate > 3) return 'doubleUp'
   if (rate > 2) return 'singleUp'
   if (rate > 1.5) return 'fortyFiveUp'
   if (rate > -1.5) return 'flat'
-  if (rate > -2) return 'fortyFiveDown'
-  if (rate > -3) return 'singleDown'
+  if (rate > -3) return 'fortyFiveDown'
+  if (rate > -4) return 'singleDown'
   return 'doubleDown'
 }
 
@@ -29,17 +19,17 @@ export async function GET() {
     .from('dexcom_egvs')
     .select('id, system_time, display_time, value_mgdl, status, trend, trend_rate, inserted_at')
     .order('system_time', { ascending: false })
-    .limit(4)
+    .limit(2)
   if (!data || data.length === 0) return NextResponse.json(null)
   const age = Date.now() - new Date(data[0].system_time).getTime()
   if (age > STALE_MS) return NextResponse.json(null)
 
-  const pts = data
-    .filter(e => e.value_mgdl != null)
-    .map(e => ({ t: new Date(e.system_time).getTime(), v: Number(e.value_mgdl) }))
-  const span = pts.length >= 2 ? pts[0].t - pts[pts.length - 1].t : 0
-  if (pts.length >= 2 && span <= 20 * 60 * 1000) {
-    data[0] = { ...data[0], trend: rateToTrend(linearRate(pts)) }
+  if (data.length >= 2 && data[0].value_mgdl != null && data[1].value_mgdl != null) {
+    const gapMs = new Date(data[0].system_time).getTime() - new Date(data[1].system_time).getTime()
+    if (gapMs > 0 && gapMs <= 10 * 60 * 1000) {
+      const rate = (Number(data[0].value_mgdl) - Number(data[1].value_mgdl)) / (gapMs / 60000)
+      data[0] = { ...data[0], trend: rateToTrend(rate) }
+    }
   }
 
   return NextResponse.json(data)
