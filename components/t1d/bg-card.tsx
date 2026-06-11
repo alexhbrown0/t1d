@@ -22,8 +22,8 @@ function linearRate(pts: Array<{ t: number; v: number }>): number {
 function rateToTrend(rate: number): string {
   if (rate > 3) return 'doubleUp'
   if (rate > 2) return 'singleUp'
-  if (rate > 1) return 'fortyFiveUp'
-  if (rate > -1) return 'flat'
+  if (rate > 1.5) return 'fortyFiveUp'
+  if (rate > -1.5) return 'flat'
   if (rate > -2) return 'fortyFiveDown'
   if (rate > -3) return 'singleDown'
   return 'doubleDown'
