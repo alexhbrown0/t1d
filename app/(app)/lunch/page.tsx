@@ -69,7 +69,10 @@ export default async function LunchPage() {
 
     allSessions = (sessions ?? []) as T1dDoseSession[]
 
-    const unconfirmed = !meal?.items_eaten ? allSessions.find(s => s.actual_dose_grams == null) : null
+    // Use the LATEST unconfirmed session so re-runs after a wait_and_see show fresh data
+    const unconfirmed = !meal?.items_eaten
+      ? [...allSessions].reverse().find(s => s.actual_dose_grams == null)
+      : null
     session = unconfirmed ?? allSessions[0] ?? null
 
     const postEatingSessions = meal?.items_eaten ? allSessions.filter(s => s.entered_by === 'followup') : []
