@@ -70,6 +70,8 @@ export async function ingestViaShare(): Promise<{ inserted: number; skipped: num
     return { inserted: 0, skipped: 0, info: 'no readings returned' }
   }
 
+  console.log('[share] raw trends:', readings.map(r => ({ value: r.Value, Trend: r.Trend, type: typeof r.Trend })))
+
   const rows = readings.map(r => ({
     system_time: parseDexcomDate(r.WT),
     display_time: parseDexcomDate(r.DT),
