@@ -48,6 +48,7 @@ export async function generateInsight(): Promise<void> {
   const rate = gapMin > 0 ? (newestPt.v - olderPt.v) / gapMin : 0
   const isDropping = rate < -1
   const isRising = rate > 1
+  const trend = isDropping ? 'dropping' : isRising ? 'rising' : 'flat'
 
   // High-intensity activity within 75 min triggers a Claude call regardless of BG trend
   const imminentHighActivity = (scheduleForStableCheck.data ?? []).some(s => {
