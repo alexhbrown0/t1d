@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
 import { getCentralTime } from '@/lib/utils/central-time'
 import { AppHeader } from '@/components/t1d/app-header'
+import { AutoRefresh } from '@/components/t1d/auto-refresh'
 import { BgCard } from '@/components/t1d/bg-card'
 import { QuickActions } from '@/components/t1d/quick-actions'
 import { NextUpCard } from '@/components/t1d/next-up-card'
@@ -91,6 +92,7 @@ export default async function NowPage() {
 
   return (
     <div className="px-4 pt-3 pb-3 flex flex-col gap-5">
+      <AutoRefresh intervalMs={60_000} />
       <AppHeader />
       <BgCard egvs={egvs} />
 
