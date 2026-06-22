@@ -21,8 +21,16 @@ export async function GET(req: NextRequest) {
       useShare ? ingestViaShare() : ingestRecentEgvs(),
       checkPendingDoses(),
     ])
-    generateInsight().catch(() => null) // fire-and-forget, don't block ingest response
-    return NextResponse.json({ ok: true, ingest, monitor })
+    // Await so the serverless function stays alive until the insight is written.
+    // Fire-and-forget gets killed when the response returns on Vercel.
+    let insight: { ok: boolean; error?: string }
+    try {
+      await generateInsight()
+      insight = { ok: true }
+    } catch (err) {
+      insight = { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+    return NextResponse.json({ ok: true, ingest, monitor, insight })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: message }, { status: 500 })
