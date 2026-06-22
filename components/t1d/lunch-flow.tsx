@@ -79,7 +79,7 @@ function MinutesAgoPills({ value, onChange }: { value: number; onChange: (v: num
   )
 }
 
-function InlineAsk({ mealEventId, onSuggestDose }: { mealEventId: string; onSuggestDose?: (grams: number) => void }) {
+function InlineAsk({ mealEventId, onSuggestDose, label }: { mealEventId: string; onSuggestDose?: (grams: number) => void; label?: string }) {
   const [input, setInput] = useState('')
   const [photos, setPhotos] = useState<{ base64: string; mimeType: string }[]>([])
   const [reply, setReply] = useState<string | null>(null)
@@ -124,11 +124,12 @@ function InlineAsk({ mealEventId, onSuggestDose }: { mealEventId: string; onSugg
 
   return (
     <div className="pt-3 border-t border-white/5 space-y-2">
+      {label && <p className="text-[10px] tracking-widest text-gray-500 font-semibold">{label.toUpperCase()}</p>}
       {reply && (
         <div className="bg-[#0f1f1e] border border-teal-500/20 rounded-xl px-3 py-2.5 space-y-2">
           <p className="text-xs text-teal-300 leading-relaxed">{reply}</p>
           {suggestedDose != null && (
-            <p className="text-[10px] text-teal-600">Dose above updated to {suggestedDose}g</p>
+            <p className="text-[11px] font-semibold text-teal-400">✓ Dose updated to {suggestedDose}g — confirm below</p>
           )}
           <button onClick={() => { setReply(null); setSuggestedDose(null) }} className="text-[10px] text-gray-600 active:text-gray-400">Dismiss</button>
         </div>
@@ -532,6 +533,14 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               <CollapsedReasoning text={data.session.engine_reasoning} />
             )}
 
+            {data.meal && (
+              <InlineAsk
+                mealEventId={data.meal.id}
+                onSuggestDose={g => { setOverrideDose(String(g)) }}
+                label="Adjust this dose or ask a question"
+              />
+            )}
+
             <div className="bg-black/40 rounded-xl p-3 font-mono text-xs text-teal-300 space-y-1">
               <p>1. Tap Bolus on Omnipod 5</p>
               <p>2. Select Manual</p>
@@ -565,8 +574,6 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                 <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span>
               ) : `Dose Given${preMinutesAgo > 0 ? ` (${preMinutesAgo}m ago)` : ''} ✓`}
             </button>
-
-            {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => { setOverrideDose(String(g)) }} />}
           </div>
         </>
       )}
@@ -818,7 +825,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                 </button>
               )}
 
-              {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => setFollowOverrideDose(String(g))} />}
+              {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => setFollowOverrideDose(String(g))} label="Adjust this dose or ask a question" />}
             </div>
           ) : (
             <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
@@ -860,7 +867,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                 ) : `Follow-up Given${followMinutesAgo > 0 ? ` (${followMinutesAgo}m ago)` : ''} ✓`}
               </button>
 
-              {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => setFollowOverrideDose(String(g))} />}
+              {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => setFollowOverrideDose(String(g))} label="Adjust this dose or ask a question" />}
             </div>
           )}
         </>
@@ -1006,7 +1013,12 @@ function PreDoseAmount({ recommended, override, onOverride }: {
       <span className="text-5xl font-bold text-white">{display}g</span>
       <span className="text-gray-500 text-sm">into pump</span>
       {override && <span className="text-[10px] text-amber-400 ml-1">(adjusted from {recommended}g)</span>}
-      <button onClick={() => setAdjusting(true)} className="text-xs text-gray-600 ml-auto active:text-gray-400">Adjust</button>
+      <button
+        onClick={() => setAdjusting(true)}
+        className="ml-auto text-xs font-semibold text-teal-400 border border-teal-500/30 rounded-lg px-2.5 py-1 active:bg-teal-500/10"
+      >
+        Edit
+      </button>
     </div>
   )
 }

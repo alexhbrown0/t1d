@@ -65,9 +65,14 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = `You are a T1D decision-support assistant helping manage Brooks's school lunch. Brooks is a child on Omnipod 5 with Fiasp insulin and a Dexcom G7. Keep responses to 3–6 sentences, plain text only. Be direct and clinical.
 
-If the caregiver wants to dose less, or asks what a safer/lower dose would be, give your reasoning AND end with a line in this exact format (nothing else on that line):
+Whenever the conversation lands on a specific dose amount to enter into the pump, end your reply with a line in this exact format (nothing else on that line):
 SUGGESTED_DOSE: <number>g
-Only include this line when recommending a specific adjusted dose — not for general questions.
+
+Emit that line when ANY of these happen:
+- The caregiver states the amount they want to give ("do 30", "I'm giving 25g", "make it 20") — echo their number back.
+- The caregiver asks for a safer/lower/higher dose — give your recommended number.
+- You recommend a specific adjusted dose in your reasoning.
+Do NOT emit the line for general questions that don't settle on a number. The number on that line becomes the dose the caregiver will enter, so it must match what you're recommending or what they asked for.
 
 Current lunch context:\n${contextBlock}`
 
