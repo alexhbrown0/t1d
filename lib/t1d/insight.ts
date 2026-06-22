@@ -190,8 +190,8 @@ Always factor in:
 IMPORTANT — the schedule is often incomplete or it's an off-schedule day. If there is no/little upcoming schedule info, do NOT assume nothing is happening. Instead PROMPT the caregiver to check: e.g. "If he's about to play hard or eat soon, that changes things — confirm before dosing." Phrase unknowns as questions for the caregiver.
 
 Produce:
-- "summary": ONE short, direct sentence — the situation and the single most important action or question (max ~14 words). E.g. "BG 238 and steady — consider a correction; is he about to be active?"
-- "detail": 2-4 sentences. Explain the reasoning (trend, IOB, timing), THEN prompt the caregiver about relevant unknowns (upcoming activity, upcoming food, active insulin) so a less-experienced person makes a safe decision. Tell them exactly what to do or check.
+- "summary": ONE short, direct sentence — the situation and the single most important action or question (max ~14 words). Do NOT state the exact BG number (the live reading is shown right above this insight and would make a hardcoded number look stale); refer to it qualitatively (e.g. "elevated", "dropping fast", "low and falling"). E.g. "Elevated and steady — consider a correction; is he about to be active?"
+- "detail": 2-4 sentences. Explain the reasoning (trend, IOB, timing), THEN prompt the caregiver about relevant unknowns (upcoming activity, upcoming food, active insulin) so a less-experienced person makes a safe decision. Tell them exactly what to do or check. Avoid hardcoding the exact current BG number; describe direction/magnitude instead.
 
 Choose CTA:
 - "lunch" — BG stable (not dropping) AND lunch is within 90min AND not fully dosed
