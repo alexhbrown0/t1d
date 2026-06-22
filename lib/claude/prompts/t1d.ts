@@ -144,9 +144,10 @@ export function buildDoseEngineUserContext(input: {
   const latestAge = latestEgv ? minsOld(latestEgv.system_time) : null
   const bgStale = latestAge == null || latestAge > 15
   const currentBg = !bgStale ? (latestEgv?.value_mgdl ?? 'unknown') : 'unavailable — reading is stale'
-  const totalCarbs = meal.reduce((s, i) => s + i.carbs, 0)
-  const totalFat = meal.reduce((s, i) => s + (i.fat ?? 0), 0)
-  const totalProtein = meal.reduce((s, i) => s + (i.protein ?? 0), 0)
+  const qtyOf = (i: MealItem) => i.qty_offered ?? 1
+  const totalCarbs = meal.reduce((s, i) => s + i.carbs * qtyOf(i), 0)
+  const totalFat = meal.reduce((s, i) => s + (i.fat ?? 0) * qtyOf(i), 0)
+  const totalProtein = meal.reduce((s, i) => s + (i.protein ?? 0) * qtyOf(i), 0)
   const fpuCount = computeFpu(totalFat, totalProtein)
 
   const fmt = (iso: string) =>
@@ -219,8 +220,10 @@ export function buildDoseEngineUserContext(input: {
   lines.push('\n## Meal being dosed')
   for (const item of meal) {
     const giStr = (item as MealItem & { gi_category?: string }).gi_category ? ` [${(item as MealItem & { gi_category?: string }).gi_category} GI]` : ''
+    const q = qtyOf(item)
+    const qtyStr = q !== 1 ? ` ×${q}` : ''
     lines.push(
-      `  ${item.name}${giStr}: ${item.carbs}g carbs, ${item.fat ?? 0}g fat, ${item.protein ?? 0}g protein`
+      `  ${item.name}${qtyStr}${giStr}: ${item.carbs * q}g carbs, ${(item.fat ?? 0) * q}g fat, ${(item.protein ?? 0) * q}g protein`
     )
   }
   lines.push(
