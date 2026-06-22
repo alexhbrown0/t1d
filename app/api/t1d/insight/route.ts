@@ -7,7 +7,7 @@ export async function GET() {
   const supabase = createServerClient()
   const { data } = await supabase
     .from('t1d_insights')
-    .select('text, cta, cta_label, is_stable, generated_at')
+    .select('text, detail, cta, cta_label, is_stable, generated_at')
     .eq('id', 1)
     .single()
   if (!data) return NextResponse.json(null)

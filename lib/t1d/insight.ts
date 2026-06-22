@@ -64,6 +64,7 @@ export async function generateInsight(): Promise<void> {
     await supabase.from('t1d_insights').upsert({
       id: 1,
       text: 'Stable in range',
+      detail: null,
       cta: 'chat',
       cta_label: 'Ask assistant',
       is_stable: true,
@@ -179,13 +180,15 @@ ${params?.clinical_notes ? `\nClinical notes (follow these):\n${params.clinical_
 ${lines.join('\n')}
 Pre-bolus lead: ${params?.pre_bolus_lead_min ?? 8}min. Activity reduction: ${((params?.activity_reduction_pct ?? 0.3) * 100).toFixed(0)}%.
 
-Give ONE sharp, specific insight (1-2 sentences) about what matters most right now. Consider: BG trend, recent doses, IOB, upcoming schedule, lows. Be direct.
+Produce two things about what matters most right now (BG trend, recent doses, IOB, upcoming schedule, lows):
+- "summary": ONE short, direct sentence stating the situation and the action if any (max ~12 words). E.g. "BG 238 and rising — consider a correction, check IOB first."
+- "detail": 2-4 sentences expanding on the reasoning — the trend, IOB, timing, schedule context, and exactly what to watch for or do.
 
 Choose CTA:
 - "lunch" — BG stable (not dropping) AND lunch is within 90min AND not fully dosed
 - "chat" — everything else
 
-Return ONLY valid JSON: {"text": "...", "cta": "lunch" | "chat", "cta_label": "..."}`
+Return ONLY valid JSON: {"summary": "...", "detail": "...", "cta": "lunch" | "chat", "cta_label": "..."}`
 
   try {
     const msg = await anthropic.messages.create({
@@ -197,7 +200,8 @@ Return ONLY valid JSON: {"text": "...", "cta": "lunch" | "chat", "cta_label": ".
     const parsed = JSON.parse(raw)
     await supabase.from('t1d_insights').upsert({
       id: 1,
-      text: parsed.text,
+      text: parsed.summary ?? parsed.text,
+      detail: parsed.detail ?? null,
       cta: parsed.cta ?? 'chat',
       cta_label: parsed.cta_label ?? 'Ask assistant',
       is_stable: false,

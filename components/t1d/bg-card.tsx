@@ -5,7 +5,7 @@ import Link from 'next/link'
 import type { DexcomEgv } from '@/types/health'
 
 interface Props { egvs: DexcomEgv[] }
-interface Insight { text: string; cta: 'chat' | 'lunch'; cta_label: string; is_stable: boolean }
+interface Insight { text: string; detail: string | null; cta: 'chat' | 'lunch'; cta_label: string; is_stable: boolean }
 
 const GAP_MS = 10 * 60 * 1000
 
@@ -186,32 +186,41 @@ export function BgCard({ egvs: initialEgvs }: Props) {
               <AiStars />
               <p className="text-xs text-gray-500">{insight.text}</p>
             </div>
-          ) : insightExpanded ? (
-            <div className="px-4 py-3 space-y-3">
-              <p className="text-sm text-gray-200 leading-snug">{insight.text}</p>
-              <div className="flex items-center justify-between">
+          ) : (
+            <div className="px-4 py-3 space-y-2">
+              {/* Always-visible summary */}
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5"><AiStars /></span>
+                <p className="text-sm text-gray-100 leading-snug flex-1 font-medium">{insight.text}</p>
+                {insight.detail && (
+                  <button
+                    onClick={() => setInsightExpanded(v => !v)}
+                    className="flex-shrink-0 mt-0.5 text-gray-500 active:text-gray-300"
+                    aria-label={insightExpanded ? 'Collapse' : 'Expand'}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                      className={`transition-transform ${insightExpanded ? 'rotate-180' : ''}`}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Expanded detail */}
+              {insightExpanded && insight.detail && (
+                <p className="text-xs text-gray-400 leading-relaxed pl-6">{insight.detail}</p>
+              )}
+
+              {/* CTA */}
+              <div className="pl-6">
                 <Link
-                  href={insight.cta === 'lunch' ? '/engine/lunch' : `/chat?q=${encodeURIComponent(insight.text)}`}
+                  href={insight.cta === 'lunch' ? '/engine/lunch' : `/chat?q=${encodeURIComponent(insight.detail ?? insight.text)}`}
                   className="text-xs font-semibold text-teal-400"
                 >
                   {insight.cta_label} →
                 </Link>
-                <button onClick={() => setInsightExpanded(false)} className="text-[10px] text-gray-600">
-                  collapse
-                </button>
               </div>
             </div>
-          ) : (
-            <button
-              onClick={() => setInsightExpanded(true)}
-              className="w-full px-4 py-2.5 flex items-center gap-2 text-left"
-            >
-              <AiStars />
-              <p className="text-xs text-gray-300 flex-1 truncate">{insight.text}</p>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
           )}
         </div>
       )}
