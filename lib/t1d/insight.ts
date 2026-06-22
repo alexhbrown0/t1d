@@ -199,25 +199,22 @@ Choose CTA:
 
 Return ONLY valid JSON: {"summary": "...", "detail": "...", "cta": "lunch" | "chat", "cta_label": "..."}`
 
-  try {
-    const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
-      messages: [{ role: 'user', content: prompt }],
-    })
-    const raw = (msg.content[0] as { type: string; text: string }).text.trim()
-    const parsed = JSON.parse(raw)
-    await supabase.from('t1d_insights').upsert({
-      id: 1,
-      text: parsed.summary ?? parsed.text,
-      detail: parsed.detail ?? null,
-      cta: parsed.cta ?? 'chat',
-      cta_label: parsed.cta_label ?? 'Ask assistant',
-      is_stable: false,
-      bg_value: bg,
-      generated_at: new Date().toISOString(),
-    })
-  } catch {
-    // Leave existing insight in place if Claude fails
-  }
+  const msg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 600,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  const raw = (msg.content[0] as { type: string; text: string }).text.trim()
+  const json = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+  const parsed = JSON.parse(json)
+  await supabase.from('t1d_insights').upsert({
+    id: 1,
+    text: parsed.summary ?? parsed.text,
+    detail: parsed.detail ?? null,
+    cta: parsed.cta ?? 'chat',
+    cta_label: parsed.cta_label ?? 'Ask assistant',
+    is_stable: false,
+    bg_value: bg,
+    generated_at: new Date().toISOString(),
+  })
 }
