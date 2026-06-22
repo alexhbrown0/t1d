@@ -180,9 +180,18 @@ ${params?.clinical_notes ? `\nClinical notes (follow these):\n${params.clinical_
 ${lines.join('\n')}
 Pre-bolus lead: ${params?.pre_bolus_lead_min ?? 8}min. Activity reduction: ${((params?.activity_reduction_pct ?? 0.3) * 100).toFixed(0)}%.
 
-Produce two things about what matters most right now (BG trend, recent doses, IOB, upcoming schedule, lows):
-- "summary": ONE short, direct sentence stating the situation and the action if any (max ~12 words). E.g. "BG 238 and rising — consider a correction, check IOB first."
-- "detail": 2-4 sentences expanding on the reasoning — the trend, IOB, timing, schedule context, and exactly what to watch for or do.
+You are coaching a caregiver who may NOT be experienced with T1D (a grandparent, babysitter, etc). Your job is to surface what matters AND prompt them to think about things they might not know to consider. Be concrete and reassuring, never alarming.
+
+Always factor in:
+- BG value and trend, IOB, recent doses, recent lows
+- The schedule: upcoming activity drives BG DOWN (dose less / watch for lows); upcoming meals drive BG UP (plan to dose).
+- Things a novice would miss: "is he about to be active?", "has he eaten or is he about to?", "is there insulin still working from a recent dose?"
+
+IMPORTANT — the schedule is often incomplete or it's an off-schedule day. If there is no/little upcoming schedule info, do NOT assume nothing is happening. Instead PROMPT the caregiver to check: e.g. "If he's about to play hard or eat soon, that changes things — confirm before dosing." Phrase unknowns as questions for the caregiver.
+
+Produce:
+- "summary": ONE short, direct sentence — the situation and the single most important action or question (max ~14 words). E.g. "BG 238 and steady — consider a correction; is he about to be active?"
+- "detail": 2-4 sentences. Explain the reasoning (trend, IOB, timing), THEN prompt the caregiver about relevant unknowns (upcoming activity, upcoming food, active insulin) so a less-experienced person makes a safe decision. Tell them exactly what to do or check.
 
 Choose CTA:
 - "lunch" — BG stable (not dropping) AND lunch is within 90min AND not fully dosed
