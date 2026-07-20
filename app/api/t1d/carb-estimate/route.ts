@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { claude } from '@/lib/claude/client'
+import { claude, classifyClaudeError } from '@/lib/claude/client'
 
 interface FoodItem {
   name: string
@@ -70,26 +70,33 @@ Return ONLY valid JSON with this structure:
   "notes": "optional note about anything uncertain"
 }`
 
-  const response = await claude.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: mediaType,
-              data: imageBase64,
+  let response
+  try {
+    response = await claude.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mediaType,
+                data: imageBase64,
+              },
             },
-          },
-          { type: 'text', text: prompt },
-        ],
-      },
-    ],
-  })
+            { type: 'text', text: prompt },
+          ],
+        },
+      ],
+    })
+  } catch (err) {
+    const info = classifyClaudeError(err)
+    console.error('[carb-estimate] Claude failure:', info.kind, err)
+    return NextResponse.json({ error: info.userMessage, ai_unavailable: true }, { status: info.status })
+  }
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
 

@@ -86,6 +86,7 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const [photoItems, setPhotoItems] = useState<PackedItem[] | null>(null)
   const [adding, setAdding] = useState<{ food: T1dFoodRepo | RecentItem; qty: string } | null>(null)
   const [editingPhotoIdx, setEditingPhotoIdx] = useState<number | null>(null)
@@ -140,11 +141,16 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
     const file = e.target.files?.[0]
     if (!file) return
     setAnalyzing(true)
+    setPhotoError(null)
     try {
       const form = new FormData()
       form.append('photo', file)
       const resp = await fetch('/api/t1d/carb-estimate', { method: 'POST', body: form })
       const data = await resp.json()
+      if (!resp.ok || data.ai_unavailable) {
+        setPhotoError(data.error ?? 'Photo analysis failed. Add items manually below.')
+        return
+      }
       const items: PackedItem[] = (data.items ?? []).map((item: {
         name: string; carbs: number; fat: number | null; protein: number | null;
         qty: number; matched_repo_id: string | null
@@ -432,12 +438,24 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
       {/* ── Photo tab ── */}
       {tab === 'photo' && (
         <div className="space-y-3">
+          {photoError && !analyzing && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3 space-y-2">
+              <p className="text-[10px] tracking-widest text-amber-400 font-semibold">PHOTO ANALYSIS UNAVAILABLE</p>
+              <p className="text-xs text-gray-300">{photoError}</p>
+              <button
+                onClick={() => { setPhotoError(null); setTab('items') }}
+                className="text-xs font-semibold text-teal-400"
+              >
+                Add items manually →
+              </button>
+            </div>
+          )}
           {!photoItems && !analyzing && (
             <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-12 text-center space-y-4">
               <p className="text-sm text-gray-400">Take a photo of the lunchbox</p>
               <p className="text-xs text-gray-600">Claude will identify the food and estimate carbs</p>
               <button onClick={() => photoRef.current?.click()} className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold px-6 py-3 rounded-xl">
-                Open Camera
+                {photoError ? 'Try Photo Again' : 'Open Camera'}
               </button>
               <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
             </div>

@@ -192,6 +192,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const [followMinutesAgo, setFollowMinutesAgo] = useState(0)
   const [eatenPcts, setEatenPcts] = useState<Record<string, EatenPct>>({})
   const [photoFilling, setPhotoFilling] = useState(false)
+  const [flowError, setFlowError] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
 
   const refresh = async () => {
@@ -214,10 +215,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const handleReadyToEat = async () => {
     if (!data.meal) return
     setLoading(true)
+    setFlowError(null)
     try {
       const bgRes = await fetch('/api/t1d/bg-latest').then(r => r.json()).catch(() => null)
       const freshBg = Array.isArray(bgRes) ? bgRes[0] : bgRes
-      await fetch('/api/t1d/engine', {
+      const res = await fetch('/api/t1d/engine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -228,7 +230,14 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           entered_by: 'alexandra',
         }),
       })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setFlowError(d.error ?? 'Dose calculation failed. Dose manually via the pump using the packed carb total.')
+        return
+      }
       await refresh()
+    } catch {
+      setFlowError('Network error calculating the dose. Try again, or dose manually via the pump.')
     } finally {
       setLoading(false)
     }
@@ -399,6 +408,14 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           {peMin != null && peMin < 120 && (
             <span className="text-amber-400 text-xs">· PE in {peMin}m</span>
           )}
+        </div>
+      )}
+
+      {flowError && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3 space-y-1">
+          <p className="text-[10px] tracking-widest text-amber-400 font-semibold">AI UNAVAILABLE</p>
+          <p className="text-xs text-gray-300">{flowError}</p>
+          <button onClick={() => setFlowError(null)} className="text-[10px] text-gray-600 active:text-gray-400">Dismiss</button>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { getCentralDateStr } from '@/lib/utils/central-time'
 import { NextRequest, NextResponse } from 'next/server'
 import { runDoseEngine } from '@/lib/t1d/engine'
+import { classifyClaudeError } from '@/lib/claude/client'
 import { createServerClient } from '@/lib/supabase/server'
 import type { MealItem, T1dDoseSession } from '@/types/health'
 
@@ -22,13 +23,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'meal is required' }, { status: 400 })
   }
 
-  const output = await runDoseEngine(meal, {
-    mealGiCategory: meal_gi_category,
-    lowTreatmentCarbs: low_treatment_carbs,
-    lowTreatmentType: low_treatment_type,
-    startingBg: starting_bg,
-    startingTrend: starting_trend,
-  })
+  let output
+  try {
+    output = await runDoseEngine(meal, {
+      mealGiCategory: meal_gi_category,
+      lowTreatmentCarbs: low_treatment_carbs,
+      lowTreatmentType: low_treatment_type,
+      startingBg: starting_bg,
+      startingTrend: starting_trend,
+    })
+  } catch (err) {
+    const info = classifyClaudeError(err)
+    console.error('[engine] Claude failure:', info.kind, err)
+    return NextResponse.json({ error: info.userMessage, ai_unavailable: true }, { status: info.status })
+  }
 
   // Persist the dose session
   const supabase = createServerClient()
