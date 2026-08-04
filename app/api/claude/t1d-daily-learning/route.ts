@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const maxDuration = 300 // 5 minutes — analysis + Claude takes 60-90s
 import { createServerClient } from '@/lib/supabase/server'
+import { dosingRowsForDay } from '@/lib/t1d/day-schedule'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic()
@@ -64,7 +65,7 @@ async function handler(req: NextRequest) {
     supabase.from('t1d_meal_events').select('id, timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs, total_fat_g, total_protein_g, fpu_count').gte('timestamp', sevenDaysAgo.toISOString()).order('timestamp'),
     supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sevenDaysAgo.toISOString()).order('timestamp'),
     supabase.from('t1d_engine_params').select('*').order('effective_from', { ascending: false }).limit(1).single(),
-    supabase.from('t1d_school_schedule').select('*').eq('active', true).order('day_of_week').order('start_time'),
+    Promise.resolve({ data: [1, 2, 3, 4, 5].flatMap(d => dosingRowsForDay(d)) }),
     supabase.from('t1d_daily_overrides').select('*').gte('override_date', sevenDaysAgo.toISOString().split('T')[0]),
     supabase.from('glooko_insulin_totals').select('timestamp, total_bolus_u, total_basal_u, total_insulin_u').gte('timestamp', sevenDaysAgo.toISOString()).order('timestamp'),
     supabase.from('t1d_engine_learnings').select('learning_date, claude_observations').lt('learning_date', today).order('learning_date', { ascending: false }).limit(1).maybeSingle(),

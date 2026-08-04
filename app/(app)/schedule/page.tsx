@@ -1,7 +1,8 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { getCentralTime, getCentralDateStr } from '@/lib/utils/central-time'
 import { ScheduleOverride } from '@/components/t1d/schedule-override'
-import type { T1dSchoolSchedule, T1dDailyOverride } from '@/types/health'
+import { blocksForDay, type DayBlock } from '@/lib/t1d/day-schedule'
+import type { T1dDailyOverride } from '@/types/health'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,32 +72,22 @@ export default async function SchedulePage() {
 
   const todayDate = getCentralDateStr()
 
-  const [{ data: scheduleData }, { data: overrideData }] = await Promise.all([
-    supabase.from('t1d_school_schedule').select('*').eq('day_of_week', todayDay).eq('active', true).order('start_time', { ascending: true }),
-    supabase.from('t1d_daily_overrides').select('*').eq('override_date', todayDate).limit(1).maybeSingle(),
-  ])
+  const { data: overrideData } = await supabase
+    .from('t1d_daily_overrides').select('*').eq('override_date', todayDate).limit(1).maybeSingle()
 
-  const schedule: T1dSchoolSchedule[] = scheduleData ?? []
+  const schedule: DayBlock[] = blocksForDay(todayDay)
   const override = (overrideData ?? null) as T1dDailyOverride | null
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const isWeekend = todayDay === 0 || todayDay === 6
 
   const peEvents = schedule.filter(e => e.event_type === 'pe')
-  const peMinutes = peEvents.reduce((acc, e) => {
-    const start = minutesSinceMidnight(e.start_time)
-    const end = minutesSinceMidnight(e.end_time)
-    return acc + (end - start)
-  }, 0)
+  const peMinutes = peEvents.reduce((acc, e) => acc + (minutesSinceMidnight(e.end) - minutesSinceMidnight(e.start)), 0)
 
   const lunchEvent = schedule.find(e => e.event_type === 'lunch')
   const snackEvents = schedule.filter(e => e.event_type === 'snack')
   const recessEvents = schedule.filter(e => e.event_type === 'recess')
-  const recessMinutes = recessEvents.reduce((acc, e) => {
-    const start = minutesSinceMidnight(e.start_time)
-    const end = minutesSinceMidnight(e.end_time)
-    return acc + (end - start)
-  }, 0)
+  const recessMinutes = recessEvents.reduce((acc, e) => acc + (minutesSinceMidnight(e.end) - minutesSinceMidnight(e.start)), 0)
 
   return (
     <div className="px-4 pt-5 pb-4 space-y-4">
@@ -124,15 +115,15 @@ export default async function SchedulePage() {
                   style={{ left: `${((nowMinutes - DAY_START) / DAY_TOTAL) * 100}%` }}
                 />
               )}
-              {schedule.map(event => {
-                const start = minutesSinceMidnight(event.start_time)
-                const end = minutesSinceMidnight(event.end_time)
+              {schedule.map((event, i) => {
+                const start = minutesSinceMidnight(event.start)
+                const end = minutesSinceMidnight(event.end)
                 const left = ((start - DAY_START) / DAY_TOTAL) * 100
                 const width = ((end - start) / DAY_TOTAL) * 100
                 return (
                   <div
-                    key={event.id}
-                    className={`absolute top-0 bottom-0 ${EVENT_COLORS[event.event_type] ?? 'bg-gray-500'} opacity-70`}
+                    key={i}
+                    className={`absolute top-0 bottom-0 ${event.event_type ? EVENT_COLORS[event.event_type] : 'bg-gray-600'} opacity-70`}
                     style={{ left: `${Math.max(0, left)}%`, width: `${width}%` }}
                   />
                 )
@@ -156,13 +147,13 @@ export default async function SchedulePage() {
             </div>
             <div className="bg-[#141414] rounded-xl border border-white/10 px-3 py-3 text-center">
               <p className="text-xs font-semibold text-gray-400">
-                {lunchEvent ? formatTime(lunchEvent.start_time) : '—'}
+                {lunchEvent ? formatTime(lunchEvent.start) : '—'}
               </p>
               <p className="text-[10px] text-gray-600 mt-0.5">Lunch</p>
             </div>
             <div className="bg-[#141414] rounded-xl border border-orange-400/20 px-3 py-3 text-center">
               <p className="text-xs font-semibold text-orange-400">
-                {snackEvents.length > 0 ? formatTime(snackEvents[0].start_time) : '—'}
+                {snackEvents.length > 0 ? formatTime(snackEvents[0].start) : '—'}
               </p>
               <p className="text-[10px] text-gray-600 mt-0.5">Snack</p>
             </div>
@@ -179,38 +170,38 @@ export default async function SchedulePage() {
                 <p className="text-gray-600 text-sm">No events scheduled</p>
               </div>
             )}
-            {schedule.map(event => {
-              const startMin = minutesSinceMidnight(event.start_time)
-              const endMin = minutesSinceMidnight(event.end_time)
+            {schedule.map((event, i) => {
+              const startMin = minutesSinceMidnight(event.start)
+              const endMin = minutesSinceMidnight(event.end)
               const isNow = nowMinutes >= startMin && nowMinutes < endMin
               const isPast = nowMinutes >= endMin
+              const et = event.event_type
 
               return (
                 <div
-                  key={event.id}
+                  key={i}
                   className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${
-                    isNow ? EVENT_BORDER[event.event_type] ?? 'border-white/10 bg-white/5' : 'border-white/5 bg-[#141414]'
+                    isNow ? (et ? EVENT_BORDER[et] : 'border-white/10 bg-white/5') : 'border-white/5 bg-[#141414]'
                   }`}
                 >
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    isPast ? 'bg-gray-700' : (EVENT_COLORS[event.event_type] ?? 'bg-gray-500')
+                    isPast ? 'bg-gray-700' : (et ? EVENT_COLORS[et] : 'bg-gray-500')
                   }`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className={`text-sm font-semibold ${isPast ? 'text-gray-600' : 'text-white'}`}>
-                        {EVENT_LABELS[event.event_type] ?? event.event_type}
+                        {event.label}
                       </p>
                       {isNow && (
                         <span className={`text-[10px] font-semibold tracking-widest px-1.5 py-0.5 rounded ${
-                          EVENT_TEXT[event.event_type] ?? 'text-white'
+                          et ? EVENT_TEXT[et] : 'text-white'
                         } bg-white/5`}>
                           NOW
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {formatTime(event.start_time)} – {formatTime(event.end_time)}
-                      {event.notes && ` · ${event.notes}`}
+                      {formatTime(event.start)} – {formatTime(event.end)}
                     </p>
                   </div>
                 </div>

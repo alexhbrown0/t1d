@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { getCentralTime, getCentralDayStartUTC, getCentralDateStr, getCentralTimeDisplay } from '@/lib/utils/central-time'
+import { dosingRowsForDay } from '@/lib/t1d/day-schedule'
 import { claude } from '@/lib/claude/client'
 import { getLatestEgvs } from '@/lib/dexcom/client'
 
@@ -76,8 +77,8 @@ export async function POST(req: NextRequest) {
     supabase.from('t1d_meal_events').select('timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs, fpu_count').in('context', ['school_lunch', 'snack']).gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(3),
     // Today's schedule overrides
     supabase.from('t1d_daily_overrides').select('pe_cancelled, pe_start_time, lunch_start_time, notes').eq('override_date', getCentralDateStr()).limit(1),
-    // Full day's schedule
-    supabase.from('t1d_school_schedule').select('event_type, start_time, end_time, day_of_week').eq('active', true).eq('day_of_week', dayOfWeek).order('start_time'),
+    // Full day's schedule (code-defined, see lib/t1d/day-schedule.ts)
+    Promise.resolve({ data: dosingRowsForDay(dayOfWeek) }),
     supabase.from('t1d_engine_params').select('*').order('effective_from', { ascending: false }).limit(1),
     supabase.from('t1d_recipes').select('name, yield_count, yield_unit, carbs_per_piece, carbs_per_100g, typical_serving_g, typical_serving_description, gi_category, notes').eq('active', true),
     supabase.from('t1d_food_repo').select('name, aliases, serving_size, serving_qty, carbs_g, fat_g, protein_g, category, notes').eq('active', true).order('name'),

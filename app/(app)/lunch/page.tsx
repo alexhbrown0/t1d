@@ -1,6 +1,7 @@
-import { getCentralDayStartUTC, getCentralDateStr } from '@/lib/utils/central-time'
+import { getCentralDayStartUTC, getCentralDateStr, getCentralTime } from '@/lib/utils/central-time'
 import { createServerClient } from '@/lib/supabase/server'
 import { getLatestEgvs } from '@/lib/dexcom/client'
+import { dosingRowsForDay } from '@/lib/t1d/day-schedule'
 import { LunchFlow } from '@/components/t1d/lunch-flow'
 import type { T1dMealEvent, T1dDoseSession } from '@/types/health'
 
@@ -31,7 +32,7 @@ export default async function LunchPage() {
   const todayStart = getCentralDayStartUTC()
   const todayDate = getCentralDateStr()
 
-  const [mealRes, egvs, schedRes, overrideRes] = await Promise.all([
+  const [mealRes, egvs, overrideRes] = await Promise.all([
     supabase
       .from('t1d_meal_events')
       .select('*')
@@ -40,9 +41,9 @@ export default async function LunchPage() {
       .order('timestamp', { ascending: false })
       .limit(1),
     getLatestEgvs(2).catch(() => []),
-    supabase.from('t1d_school_schedule').select('*').eq('active', true).order('start_time'),
     supabase.from('t1d_daily_overrides').select('*').eq('override_date', todayDate).limit(1),
   ])
+  const scheduleRows = dosingRowsForDay(getCentralTime().dayOfWeek)
 
   const meal = (mealRes.data?.[0] as T1dMealEvent) ?? null
   const egv = egvs[0]
@@ -93,7 +94,7 @@ export default async function LunchPage() {
           followUpSession,
           preDoseSessions,
           bg,
-          schedule: (schedRes.data ?? []) as Array<{ event_type: string; start_time: string; end_time: string; day_of_week: number }>,
+          schedule: scheduleRows as Array<{ event_type: string; start_time: string; end_time: string; day_of_week: number }>,
           override: (overrideRes.data?.[0] as { pe_cancelled?: boolean; pe_start_time?: string | null }) ?? null,
           phase: inferPhase(meal, session, followUpSession, allSessions),
           totalDosedCarbs,

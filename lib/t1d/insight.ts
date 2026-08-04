@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createServerClient } from '@/lib/supabase/server'
 import { getCentralTime, getCentralDateStr, getCentralDayStartUTC, getCentralTimeDisplay } from '@/lib/utils/central-time'
+import { dosingRowsForDay } from '@/lib/t1d/day-schedule'
 
 const anthropic = new Anthropic()
 
@@ -29,10 +30,8 @@ export async function generateInsight(): Promise<void> {
   const ct = getCentralTime()
   const nowMin = ct.minutesSinceMidnight
 
-  const [egvsResult, scheduleForStableCheck] = await Promise.all([
-    supabase.from('dexcom_egvs').select('system_time, value_mgdl, trend').order('system_time', { ascending: false }).limit(5),
-    supabase.from('t1d_school_schedule').select('start_time, activity_level').eq('active', true).eq('day_of_week', ct.dayOfWeek),
-  ])
+  const egvsResult = await supabase.from('dexcom_egvs').select('system_time, value_mgdl, trend').order('system_time', { ascending: false }).limit(5)
+  const scheduleToday = dosingRowsForDay(ct.dayOfWeek)
 
   const egvs = egvsResult.data ?? []
   const latest = egvs[0]
@@ -51,7 +50,7 @@ export async function generateInsight(): Promise<void> {
   const trend = isDropping ? 'dropping' : isRising ? 'rising' : 'flat'
 
   // High-intensity activity within 75 min triggers a Claude call regardless of BG trend
-  const imminentHighActivity = (scheduleForStableCheck.data ?? []).some(s => {
+  const imminentHighActivity = scheduleToday.some(s => {
     if (s.activity_level !== 'high') return false
     const [h, m] = s.start_time.split(':').map(Number)
     const minsUntil = (h * 60 + m) - nowMin
@@ -75,12 +74,11 @@ export async function generateInsight(): Promise<void> {
   }
 
   // Not stable — fetch full context and call Claude
-  const [bolusResult, appDoseResult, lowResult, mealResult, scheduleResult, overrideResult, paramsResult] = await Promise.all([
+  const [bolusResult, appDoseResult, lowResult, mealResult, overrideResult, paramsResult] = await Promise.all([
     supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u, bg_input_mgdl').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('t1d_dose_sessions').select('timestamp, recommended_dose_grams, actual_dose_grams, actual_dose_timestamp, pump_suggested_units, engine_reasoning, context_snapshot').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(3),
     supabase.from('t1d_meal_events').select('timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs').in('context', ['school_lunch', 'snack']).gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(3),
-    supabase.from('t1d_school_schedule').select('*').eq('active', true).order('start_time'),
     supabase.from('t1d_daily_overrides').select('pe_cancelled, pe_start_time, notes').eq('override_date', todayDate).limit(1),
     supabase.from('t1d_engine_params').select('current_icr, current_dia, pre_bolus_lead_min, activity_reduction_pct, clinical_notes').lte('effective_from', todayDate).order('effective_from', { ascending: false }).limit(1).maybeSingle(),
   ])
@@ -99,7 +97,7 @@ export async function generateInsight(): Promise<void> {
   const todayMeals = mealResult.data ?? []
   const todayMeal = todayMeals.find((m: { context: string }) => m.context === 'school_lunch') ?? todayMeals[0] ?? null
   const todaySnack = todayMeals.find((m: { context: string }) => m.context === 'snack') ?? null
-  const schedule = scheduleResult.data ?? []
+  const schedule = scheduleToday
   const todayOverride = overrideResult.data?.[0] ?? null
   const params = paramsResult.data
 
