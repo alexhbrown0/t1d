@@ -82,7 +82,7 @@ When dropping: insulin is still needed — food must be covered. The goal is to 
    - 30–90 min: significant concern. Reduce by ~half of activity_reduction_pct. Note it clearly.
    - 90–180 min: meaningful — reduce first dose by ~25% of activity_reduction_pct. Note in reasoning.
    - 180+ min: light note only. Minimal dose impact but mention it.
-   At Summer Live, PE rotations and playground time after lunch are high-intensity and WILL overlap with active insulin. Always check the schedule and factor this in even when activity is 2+ hours away.
+   IMPORTANT — school-year schedule: activity happens in the MORNING and just BEFORE lunch (PE ~9:00–10:00, recess 12:00–12:25), and the AFTERNOON is sedentary (Social Studies/Science, Math, Writing). Lunch is 12:25. So for the lunch dose, do NOT reduce for "upcoming activity" — there is none after lunch. Recess ends right as lunch begins; its main effect is that he may arrive at lunch already running lower, so weigh current BG and trend, not a post-meal activity reduction. Only apply activity reduction when the schedule actually shows high-intensity activity ahead of the dose you're calculating.
 
 ## Using food history
 Each food item comes with its playbook (if one exists from prior meals) and similar-food outcomes.
