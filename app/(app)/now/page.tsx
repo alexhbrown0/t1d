@@ -53,9 +53,11 @@ export default async function NowPage() {
 
   const egvs = egvsResult.data ?? []
   const schedule = scheduleResult.data ?? []
-  const nextEvent = schedule.find(
-    (s) => s.day_of_week === todayDay && s.start_time > nowTime
+  const todaySchedule = schedule.filter((s) => s.day_of_week === todayDay)
+  const currentEvent = todaySchedule.find(
+    (s) => s.start_time <= nowTime && s.end_time > nowTime
   ) ?? null
+  const nextEvent = todaySchedule.find((s) => s.start_time > nowTime) ?? null
 
   const COVERAGE_TOLERANCE_G = 5
 
@@ -191,7 +193,7 @@ export default async function NowPage() {
       </Link>
 
       <QuickActions />
-      {nextEvent && <NextUpCard event={nextEvent} />}
+      <NextUpCard current={currentEvent} next={nextEvent} />
     </div>
   )
 }
