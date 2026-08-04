@@ -153,8 +153,8 @@ export function BgCard({ egvs: initialEgvs }: Props) {
 
   return (
     <div className="bg-[#141414] rounded-2xl border border-white/5 overflow-hidden">
-      <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center justify-between mb-2">
+      <div className="px-4 pt-2.5 pb-1">
+        <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5">
             <div className={`w-1.5 h-1.5 rounded-full ${trendDotColor(value)}`} />
             <span className={`text-[10px] tracking-widest font-semibold ${trendCol}`}>{trendLabel}</span>
@@ -162,20 +162,20 @@ export function BgCard({ egvs: initialEgvs }: Props) {
           <ReadingTimer lastTime={latest?.system_time ?? null} />
         </div>
         <div className="flex items-end gap-3">
-          <span className="text-[72px] font-bold leading-none text-white tabular-nums">
+          <span className="text-[64px] font-bold leading-none text-white tabular-nums">
             {latest?.status === 'HIGH' ? 'HI' : latest?.status === 'LOW' ? 'LO' : bgValue(value)}
           </span>
-          <span className={`text-[52px] leading-none font-light pb-1 ${trendCol}`}>{TREND_ARROW[trend] ?? '→'}</span>
+          <span className={`text-[44px] leading-none font-light pb-1 ${trendCol}`}>{TREND_ARROW[trend] ?? '→'}</span>
           {delta != null && (
-            <span className={`text-2xl font-bold pb-2.5 tabular-nums ${delta < 0 ? 'text-red-400' : delta > 0 ? 'text-yellow-400' : 'text-gray-400'}`}>
+            <span className={`text-xl font-bold pb-2 tabular-nums ${delta < 0 ? 'text-red-400' : delta > 0 ? 'text-yellow-400' : 'text-gray-400'}`}>
               {delta > 0 ? '+' : ''}{delta}
             </span>
           )}
+          <span className="text-[10px] text-gray-600 tracking-widest font-medium ml-auto pb-1.5">MG/DL</span>
         </div>
-        <p className="text-[10px] text-gray-600 tracking-widest font-medium mt-0.5">MG/DL</p>
       </div>
 
-      <div className="px-3 pb-2">
+      <div className="px-3 pb-1.5">
         <BgChart egvs={egvs} />
       </div>
 

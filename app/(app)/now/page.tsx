@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
-import { getCentralTime } from '@/lib/utils/central-time'
 import { AppHeader } from '@/components/t1d/app-header'
 import { AutoRefresh } from '@/components/t1d/auto-refresh'
 import { BgCard } from '@/components/t1d/bg-card'
@@ -14,26 +13,17 @@ export const dynamic = 'force-dynamic'
 export default async function NowPage() {
   const supabase = createServerClient()
 
-  const ct = getCentralTime()
-  const isWeekday = ct.dayOfWeek >= 1 && ct.dayOfWeek <= 5
   const { packingForTomorrow, targetDate, targetEnd } = getLunchTargetDate()
-  const todayDay = ct.dayOfWeek
-  const nowTime = `${ct.timeStr}:00`
 
   const { getCentralDayStartUTC } = await import('@/lib/utils/central-time')
   const snackDayStart = getCentralDayStartUTC()
 
-  const [egvsResult, scheduleResult, lunchResult, snackResult] = await Promise.all([
+  const [egvsResult, lunchResult, snackResult] = await Promise.all([
     supabase
       .from('dexcom_egvs')
       .select('*')
       .order('system_time', { ascending: false })
       .limit(36),
-    supabase
-      .from('t1d_school_schedule')
-      .select('*')
-      .eq('active', true)
-      .order('start_time', { ascending: true }),
     supabase
       .from('t1d_meal_events')
       .select('id, total_offered_carbs, total_eaten_carbs, items_eaten')
@@ -52,12 +42,6 @@ export default async function NowPage() {
   ])
 
   const egvs = egvsResult.data ?? []
-  const schedule = scheduleResult.data ?? []
-  const todaySchedule = schedule.filter((s) => s.day_of_week === todayDay)
-  const currentEvent = todaySchedule.find(
-    (s) => s.start_time <= nowTime && s.end_time > nowTime
-  ) ?? null
-  const nextEvent = todaySchedule.find((s) => s.start_time > nowTime) ?? null
 
   const COVERAGE_TOLERANCE_G = 5
 
@@ -118,7 +102,7 @@ export default async function NowPage() {
   }
 
   return (
-    <div className="px-4 pt-3 pb-3 flex flex-col gap-5">
+    <div className="px-4 pt-2 pb-3 flex flex-col gap-3">
       <AutoRefresh intervalMs={60_000} />
       <AppHeader />
       <BgCard egvs={egvs} />
@@ -193,7 +177,7 @@ export default async function NowPage() {
       </Link>
 
       <QuickActions />
-      <NextUpCard current={currentEvent} next={nextEvent} />
+      <NextUpCard />
     </div>
   )
 }
