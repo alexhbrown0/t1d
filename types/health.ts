@@ -245,6 +245,7 @@ export interface T1dDailyOverride {
   pe_cancelled: boolean
   pe_start_time: string | null
   pe_end_time: string | null
+  recess_cancelled: boolean
   lunch_start_time: string | null
   snack_cancelled: boolean
   notes: string | null

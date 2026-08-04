@@ -13,6 +13,7 @@ type Draft = {
   pe_cancelled: boolean
   pe_start_time: string
   pe_end_time: string
+  recess_cancelled: boolean
   lunch_start_time: string
   snack_cancelled: boolean
   notes: string
@@ -24,6 +25,7 @@ function toDraft(o: T1dDailyOverride | null): Draft {
     pe_cancelled: o?.pe_cancelled ?? false,
     pe_start_time: o?.pe_start_time ?? '',
     pe_end_time: o?.pe_end_time ?? '',
+    recess_cancelled: o?.recess_cancelled ?? false,
     lunch_start_time: o?.lunch_start_time ?? '',
     snack_cancelled: o?.snack_cancelled ?? false,
     notes: o?.notes ?? '',
@@ -31,7 +33,7 @@ function toDraft(o: T1dDailyOverride | null): Draft {
 }
 
 function hasAnyOverride(d: Draft) {
-  return d.camp_cancelled || d.pe_cancelled || d.snack_cancelled ||
+  return d.camp_cancelled || d.pe_cancelled || d.recess_cancelled || d.snack_cancelled ||
     d.pe_start_time || d.pe_end_time || d.lunch_start_time || d.notes
 }
 
@@ -101,17 +103,17 @@ export function ScheduleOverride({ date, initial }: Props) {
 
       {!draft.camp_cancelled && (
         <>
-          {/* Rec/PE */}
+          {/* PE → Specials */}
           <Toggle
-            label="Rec / PE cancelled"
-            sub="No activity reduction on lunch or snack dose"
+            label="PE → Specials today"
+            sub="No morning PE — removes the 9:00 activity effect"
             value={draft.pe_cancelled}
             onChange={v => set('pe_cancelled', v)}
           />
 
           {!draft.pe_cancelled && (
             <div className="space-y-1.5">
-              <p className="text-[10px] text-gray-600 font-semibold">REC TIME (if moved)</p>
+              <p className="text-[10px] text-gray-600 font-semibold">PE TIME (if moved)</p>
               <div className="flex gap-2">
                 <input type="time" value={draft.pe_start_time} onChange={e => set('pe_start_time', e.target.value)}
                   className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500/50" />
@@ -121,6 +123,14 @@ export function ScheduleOverride({ date, initial }: Props) {
               </div>
             </div>
           )}
+
+          {/* Recess */}
+          <Toggle
+            label="No recess today"
+            sub="Removes the 12:00 pre-lunch activity"
+            value={draft.recess_cancelled}
+            onChange={v => set('recess_cancelled', v)}
+          />
 
           {/* Lunch time */}
           <div className="space-y-1.5">

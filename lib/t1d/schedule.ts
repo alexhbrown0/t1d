@@ -40,6 +40,7 @@ function applyOverride(
   if (!override) return schedule
   return schedule
     .filter(s => !(override.pe_cancelled && s.event_type === 'pe'))
+    .filter(s => !(override.recess_cancelled && s.event_type === 'recess'))
     .map(s => {
       if (s.event_type === 'pe' && override.pe_start_time) {
         return { ...s, start_time: override.pe_start_time, end_time: override.pe_end_time ?? s.end_time }
