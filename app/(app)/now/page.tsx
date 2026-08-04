@@ -20,7 +20,10 @@ export default async function NowPage() {
   const todayDay = ct.dayOfWeek
   const nowTime = `${ct.timeStr}:00`
 
-  const [egvsResult, scheduleResult, lunchResult] = await Promise.all([
+  const { getCentralDayStartUTC } = await import('@/lib/utils/central-time')
+  const snackDayStart = getCentralDayStartUTC()
+
+  const [egvsResult, scheduleResult, lunchResult, snackResult] = await Promise.all([
     supabase
       .from('dexcom_egvs')
       .select('*')
@@ -37,6 +40,13 @@ export default async function NowPage() {
       .eq('context', 'school_lunch')
       .gte('timestamp', targetDate.toISOString())
       .lt('timestamp', targetEnd.toISOString())
+      .order('timestamp', { ascending: false })
+      .limit(1),
+    supabase
+      .from('t1d_meal_events')
+      .select('id, total_offered_carbs, items_offered')
+      .eq('context', 'snack')
+      .gte('timestamp', snackDayStart.toISOString())
       .order('timestamp', { ascending: false })
       .limit(1),
   ])
@@ -90,6 +100,21 @@ export default async function NowPage() {
     }
   }
 
+  // Snack status: 'none' | 'dosed'
+  let snackPhase: 'none' | 'dosed' = 'none'
+  let snackCarbs: number | null = null
+  const snackMeal = snackResult.data?.[0] ?? null
+  if (snackMeal) {
+    snackCarbs = snackMeal.total_offered_carbs
+    const { data: snackSessions } = await supabase
+      .from('t1d_dose_sessions')
+      .select('actual_dose_grams')
+      .eq('meal_event_id', snackMeal.id)
+      .not('actual_dose_grams', 'is', null)
+      .limit(1)
+    if (snackSessions && snackSessions.length > 0) snackPhase = 'dosed'
+  }
+
   return (
     <div className="px-4 pt-3 pb-3 flex flex-col gap-5">
       <AutoRefresh intervalMs={60_000} />
@@ -140,6 +165,30 @@ export default async function NowPage() {
           </div>
         </Link>
       )}
+
+      {/* Snack tile */}
+      <Link href="/snack">
+        <div className="bg-[#141414] rounded-2xl border border-teal-500/20 px-4 py-3.5 flex items-center gap-3 active:opacity-80">
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${snackPhase === 'dosed' ? 'bg-teal-500/20' : 'bg-teal-500/10'}`}>
+            {snackPhase === 'dosed' ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 12h8" /></svg>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-semibold tracking-widest text-teal-400">
+              MORNING SNACK · {snackPhase === 'dosed' ? 'DOSED' : 'NOT DOSED'}
+            </p>
+            <p className="text-sm font-semibold text-white mt-0.5">
+              {snackPhase === 'dosed' ? `${snackCarbs ?? '—'}g dosed ✓` : 'Tap to pick & dose snack'}
+            </p>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </div>
+      </Link>
 
       <QuickActions />
       {nextEvent && <NextUpCard event={nextEvent} />}
