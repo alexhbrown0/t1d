@@ -113,6 +113,11 @@ export default async function NowPage() {
     if (snackSessions && snackSessions.length > 0) snackPhase = 'dosed'
   }
 
+  // Lunch overdue = not packed, on a school day, and we're packing for today (not the evening "for tomorrow" window)
+  const isSchoolDay = snackWeekday >= 1 && snackWeekday <= 5
+  const lunchOverdue = lunchPhase === 'none' && !packingForTomorrow && isSchoolDay
+  const lunchAmber = lunchOverdue || lunchPhase === 'needs_followup'
+
   return (
     <div className="px-4 pt-2 pb-3 flex flex-col gap-3">
       <AutoRefresh intervalMs={60_000} />
@@ -122,10 +127,12 @@ export default async function NowPage() {
       {/* Lunch tile */}
       {(
         <Link href={lunchPhase === 'none' ? '/engine/lunch' : '/lunch'}>
-          <div className="bg-[#141414] rounded-2xl border border-teal-500/20 px-4 py-3.5 flex items-center gap-3 active:opacity-80">
+          <div className={`rounded-2xl border px-4 py-3.5 flex items-center gap-3 active:opacity-80 ${
+            lunchAmber ? 'bg-amber-500/10 border-amber-500/30' : 'bg-[#141414] border-teal-500/20'
+          }`}>
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
               lunchPhase === 'done' ? 'bg-teal-500/20' :
-              lunchPhase === 'needs_followup' ? 'bg-amber-500/20' : 'bg-teal-500/10'
+              lunchAmber ? 'bg-amber-500/20' : 'bg-teal-500/10'
             }`}>
               {lunchPhase === 'done' ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2.5">
@@ -136,13 +143,13 @@ export default async function NowPage() {
                   <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
               ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={lunchOverdue ? '#f59e0b' : '#2dd4bf'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 11l19-9-9 19-2-8-8-2z" />
                 </svg>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-[10px] font-semibold tracking-widest ${lunchPhase === 'needs_followup' ? 'text-amber-400' : 'text-teal-400'}`}>
+              <p className={`text-[10px] font-semibold tracking-widest ${lunchAmber ? 'text-amber-400' : 'text-teal-400'}`}>
                 {packingForTomorrow ? "TOMORROW'S LUNCH" : 'SCHOOL LUNCH'} ·{' '}
                 {lunchPhase === 'none' ? 'NOT PACKED' :
                  lunchPhase === 'packed' ? 'READY TO DOSE' :
