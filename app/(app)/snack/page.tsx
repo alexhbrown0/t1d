@@ -7,13 +7,21 @@ import type { T1dFoodRepo, MealItem, T1dDoseSession } from '@/types/health'
 
 export const dynamic = 'force-dynamic'
 
+interface PackedRow {
+  food_repo_id: string | null
+  name: string
+  carbs_g: number
+  fat_g: number | null
+  protein_g: number | null
+  serving_size: string
+  packed_at: string
+}
+
 export default async function SnackPage() {
   const supabase = createServerClient()
   const todayStart = getCentralDayStartUTC()
-  const twoWeeksAgo = new Date()
-  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
 
-  const [foodRes, todayRes, recentRes] = await Promise.all([
+  const [foodRes, todayRes, packedRes] = await Promise.all([
     supabase.from('t1d_food_repo').select('*').eq('active', true).order('name'),
     supabase
       .from('t1d_meal_events')
@@ -22,40 +30,22 @@ export default async function SnackPage() {
       .gte('timestamp', todayStart.toISOString())
       .order('timestamp', { ascending: false })
       .limit(1),
-    supabase
-      .from('t1d_meal_events')
-      .select('timestamp, items_offered')
-      .eq('context', 'snack')
-      .gte('timestamp', twoWeeksAgo.toISOString())
-      .order('timestamp', { ascending: false })
-      .limit(40),
+    supabase.from('t1d_packed_snacks').select('*').order('position', { ascending: true }),
   ])
 
   const foodRepo = (foodRes.data ?? []) as T1dFoodRepo[]
   const todayMeal = todayRes.data?.[0] ?? null
 
-  // Tally recent snack items by frequency
-  const tally = new Map<string, { count: number; item: RecentItem }>()
-  for (const meal of recentRes.data ?? []) {
-    for (const item of (meal.items_offered as MealItem[]) ?? []) {
-      const key = item.food_repo_id ?? item.name
-      const repoMatch = foodRepo.find(f => f.id === item.food_repo_id || f.name.toLowerCase() === item.name.toLowerCase())
-      const existing = tally.get(key)
-      if (existing) existing.count++
-      else tally.set(key, {
-        count: 1,
-        item: {
-          food_repo_id: item.food_repo_id,
-          name: item.name,
-          carbs: repoMatch?.carbs_g ?? item.carbs,
-          fat: repoMatch?.fat_g ?? item.fat,
-          protein: repoMatch?.protein_g ?? item.protein,
-          serving_size: repoMatch?.serving_size ?? '',
-        },
-      })
-    }
-  }
-  const recentSnacks = [...tally.values()].sort((a, b) => b.count - a.count).slice(0, 8).map(t => t.item)
+  const packedRows = (packedRes.data ?? []) as PackedRow[]
+  const packedSnacks: RecentItem[] = packedRows.map(p => ({
+    food_repo_id: p.food_repo_id,
+    name: p.name,
+    carbs: p.carbs_g,
+    fat: p.fat_g,
+    protein: p.protein_g,
+    serving_size: p.serving_size,
+  }))
+  const packedAt = packedRows[0]?.packed_at ?? null
 
   let existing = null
   if (todayMeal) {
@@ -90,7 +80,7 @@ export default async function SnackPage() {
           <p className="text-lg font-semibold text-white">Dose Snack</p>
         </div>
       </div>
-      <SnackFlow foodRepo={foodRepo} recentSnacks={recentSnacks} existing={existing} />
+      <SnackFlow foodRepo={foodRepo} packedSnacks={packedSnacks} packedAt={packedAt} existing={existing} />
     </div>
   )
 }

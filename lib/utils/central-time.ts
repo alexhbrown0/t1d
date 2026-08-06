@@ -53,6 +53,15 @@ export function getCentralDayStartUTC(offsetDays = 0, date = new Date()): Date {
 }
 
 /**
+ * UTC Date for the start (Sunday midnight) of the current Central week.
+ * Used to decide whether the weekly snack set has been packed this week.
+ */
+export function getCentralWeekStartUTC(date = new Date()): Date {
+  const ct = getCentralTime(date)
+  return getCentralDayStartUTC(-ct.dayOfWeek, date)
+}
+
+/**
  * YYYY-MM-DD string in Central Time, offset by days.
  * Replaces the anti-pattern: new Date().toISOString().split('T')[0]
  */

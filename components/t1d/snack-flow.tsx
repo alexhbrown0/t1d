@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { T1dFoodRepo } from '@/types/health'
 import type { RecentItem } from '@/components/t1d/lunch-builder'
 
@@ -24,7 +25,8 @@ interface ExistingSnack {
   total_carbs: number | null
 }
 
-type Tab = 'common' | 'search' | 'photo'
+type Tab = 'packed' | 'search' | 'photo'
+const TAB_LABEL: Record<Tab, string> = { packed: 'Packed', search: 'Search', photo: 'Photo' }
 
 function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -37,15 +39,17 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 
 export function SnackFlow({
   foodRepo,
-  recentSnacks,
+  packedSnacks,
+  packedAt,
   existing,
 }: {
   foodRepo: T1dFoodRepo[]
-  recentSnacks: RecentItem[]
+  packedSnacks: RecentItem[]
+  packedAt: string | null
   existing: ExistingSnack | null
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>('common')
+  const [tab, setTab] = useState<Tab>('packed')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Selected | null>(null)
   const [session, setSession] = useState<{ id: string; recommended: number; reasoning: string | null } | null>(
@@ -248,12 +252,24 @@ export function SnackFlow({
   return (
     <div className="space-y-4">
       {selected && (
-        <div className="bg-[#141414] rounded-2xl border border-teal-500/30 px-4 py-3 flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-white truncate">{selected.name}</p>
-            <p className="text-[10px] text-gray-500">{selected.carbs}g carbs</p>
+        <div className="bg-[#141414] rounded-2xl border border-teal-500/30 px-4 py-3 space-y-2">
+          <div className="flex items-center gap-3">
+            <input
+              value={selected.name}
+              onChange={e => setSelected({ ...selected, name: e.target.value })}
+              className="flex-1 min-w-0 bg-transparent text-sm text-white outline-none border-b border-transparent focus:border-teal-500/40"
+            />
+            <button onClick={() => setSelected(null)} className="text-xs text-gray-500 flex-shrink-0">Change</button>
           </div>
-          <button onClick={() => setSelected(null)} className="text-xs text-gray-500">Change</button>
+          <div className="flex items-baseline gap-2">
+            <input
+              type="number" inputMode="numeric"
+              value={selected.carbs}
+              onChange={e => setSelected({ ...selected, carbs: parseFloat(e.target.value) || 0 })}
+              className="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-lg font-bold text-white text-center focus:outline-none focus:border-teal-500/50"
+            />
+            <span className="text-gray-500 text-xs">g carbs · tap to adjust</span>
+          </div>
         </div>
       )}
 
@@ -288,24 +304,37 @@ export function SnackFlow({
       ) : (
         <>
           <div className="flex w-full gap-1 bg-white/5 rounded-xl p-1">
-            {(['common', 'search', 'photo'] as Tab[]).map(t => (
+            {(['packed', 'search', 'photo'] as Tab[]).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                className={`flex-1 text-[11px] font-semibold py-2 rounded-lg capitalize ${tab === t ? 'bg-white/10 text-white' : 'text-gray-500'}`}>
-                {t}
+                className={`flex-1 text-[11px] font-semibold py-2 rounded-lg ${tab === t ? 'bg-white/10 text-white' : 'text-gray-500'}`}>
+                {TAB_LABEL[t]}
               </button>
             ))}
           </div>
 
-          {tab === 'common' && (
+          {tab === 'packed' && (
             <div className="space-y-2">
-              {recentSnacks.length === 0 && <p className="text-xs text-gray-600 text-center py-6">No recent snacks yet — search or take a photo.</p>}
-              {recentSnacks.map((r, i) => (
-                <button key={i} onClick={() => pickRecent(r)}
-                  className="w-full bg-[#141414] border border-white/5 rounded-xl px-4 py-3 flex items-center justify-between active:opacity-70">
-                  <span className="text-sm text-white">{r.name}</span>
-                  <span className="text-xs text-teal-400">{r.carbs}g</span>
-                </button>
-              ))}
+              <div className="flex items-center justify-between px-1">
+                <p className="text-[10px] tracking-widest text-teal-400 font-semibold">PACKED THIS WEEK</p>
+                <Link href="/snack/pack" className="text-[10px] text-gray-500 active:text-gray-300">Edit pack →</Link>
+              </div>
+              {packedSnacks.length === 0 ? (
+                <div className="bg-[#141414] rounded-xl border border-white/5 px-4 py-6 text-center space-y-2">
+                  <p className="text-xs text-gray-500">No snacks packed yet.</p>
+                  <Link href="/snack/pack" className="inline-block text-xs font-semibold text-teal-400">Pack this week&apos;s snacks →</Link>
+                </div>
+              ) : (
+                <>
+                  {packedSnacks.map((r, i) => (
+                    <button key={i} onClick={() => pickRecent(r)}
+                      className="w-full bg-[#141414] border border-white/5 rounded-xl px-4 py-3 flex items-center justify-between active:opacity-70">
+                      <span className="text-sm text-white">{r.name}</span>
+                      <span className="text-xs text-teal-400">{r.carbs}g</span>
+                    </button>
+                  ))}
+                  {packedAt && <p className="text-[10px] text-gray-600 px-1 pt-1">Packed {new Date(packedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</p>}
+                </>
+              )}
             </div>
           )}
 
@@ -337,9 +366,15 @@ export function SnackFlow({
             </div>
           )}
 
-          <button onClick={() => setManual({ name: '', carbs: '' })} className="w-full text-xs text-gray-500 py-2 active:text-gray-300">
-            Enter carbs manually
-          </button>
+          {/* Special / one-off snack override */}
+          <div className="bg-[#141414] rounded-2xl border border-amber-500/20 px-4 py-3 space-y-2">
+            <p className="text-[10px] tracking-widest text-amber-400 font-semibold">SOMETHING SPECIAL TODAY?</p>
+            <p className="text-xs text-gray-500">Cupcake, party treat, or anything not on the packed list.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setTab('photo')} className="flex-1 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold py-2.5 rounded-xl">Take a photo</button>
+              <button onClick={() => setManual({ name: '', carbs: '' })} className="flex-1 bg-white/5 border border-white/10 text-gray-300 text-xs font-semibold py-2.5 rounded-xl">Enter manually</button>
+            </div>
+          </div>
         </>
       )}
     </div>
