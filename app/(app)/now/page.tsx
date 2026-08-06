@@ -15,7 +15,7 @@ export default async function NowPage() {
 
   const { packingForTomorrow, targetDate, targetEnd } = getLunchTargetDate()
 
-  const { getCentralDayStartUTC, getCentralWeekStartUTC } = await import('@/lib/utils/central-time')
+  const { getCentralDayStartUTC, getCentralWeekStartUTC, getCentralTime } = await import('@/lib/utils/central-time')
   const snackDayStart = getCentralDayStartUTC()
   const weekStart = getCentralWeekStartUTC()
 
@@ -49,6 +49,9 @@ export default async function NowPage() {
 
   const latestPackedAt = packedResult.data?.[0]?.packed_at ?? null
   const needsPacking = !latestPackedAt || new Date(latestPackedAt) < weekStart
+  // Overdue = still unpacked on a school day (Mon–Fri). Weekend is just a gentle nudge.
+  const snackWeekday = getCentralTime().dayOfWeek
+  const packOverdue = needsPacking && snackWeekday >= 1 && snackWeekday <= 5
 
   const egvs = egvsResult.data ?? []
 
@@ -116,18 +119,24 @@ export default async function NowPage() {
       <AppHeader />
       <BgCard egvs={egvs} />
 
-      {/* Pack this week's snacks prompt — persists until packed */}
+      {/* Pack this week's snacks prompt — persists until packed; yellow once overdue (school day) */}
       {needsPacking && (
         <Link href="/snack/pack">
-          <div className="bg-amber-500/10 rounded-2xl border border-amber-500/30 px-4 py-3.5 flex items-center gap-3 active:opacity-80">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-500/20">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <div className={`rounded-2xl border px-4 py-3.5 flex items-center gap-3 active:opacity-80 ${
+            packOverdue ? 'bg-amber-500/10 border-amber-500/30' : 'bg-teal-500/10 border-teal-500/20'
+          }`}>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${packOverdue ? 'bg-amber-500/20' : 'bg-teal-500/10'}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={packOverdue ? '#f59e0b' : '#2dd4bf'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="8" width="18" height="13" rx="2" /><path d="M3 8l3-5h12l3 5" /><path d="M12 8v13" />
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-semibold tracking-widest text-amber-400">THIS WEEK&apos;S SNACKS</p>
-              <p className="text-sm font-semibold text-white mt-0.5">Pack Brooks&apos;s snacks for the week</p>
+              <p className={`text-[10px] font-semibold tracking-widest ${packOverdue ? 'text-amber-400' : 'text-teal-400'}`}>
+                THIS WEEK&apos;S SNACKS{packOverdue ? ' · NOT PACKED' : ''}
+              </p>
+              <p className="text-sm font-semibold text-white mt-0.5">
+                {packOverdue ? 'Snacks still not packed for this week' : "Pack Brooks's snacks for the week"}
+              </p>
             </div>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2">
               <polyline points="9 18 15 12 9 6" />
