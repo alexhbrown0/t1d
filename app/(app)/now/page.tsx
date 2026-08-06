@@ -119,32 +119,6 @@ export default async function NowPage() {
       <AppHeader />
       <BgCard egvs={egvs} />
 
-      {/* Pack this week's snacks prompt — persists until packed; yellow once overdue (school day) */}
-      {needsPacking && (
-        <Link href="/snack/pack">
-          <div className={`rounded-2xl border px-4 py-3.5 flex items-center gap-3 active:opacity-80 ${
-            packOverdue ? 'bg-amber-500/10 border-amber-500/30' : 'bg-teal-500/10 border-teal-500/20'
-          }`}>
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${packOverdue ? 'bg-amber-500/20' : 'bg-teal-500/10'}`}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={packOverdue ? '#f59e0b' : '#2dd4bf'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="8" width="18" height="13" rx="2" /><path d="M3 8l3-5h12l3 5" /><path d="M12 8v13" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className={`text-[10px] font-semibold tracking-widest ${packOverdue ? 'text-amber-400' : 'text-teal-400'}`}>
-                THIS WEEK&apos;S SNACKS{packOverdue ? ' · NOT PACKED' : ''}
-              </p>
-              <p className="text-sm font-semibold text-white mt-0.5">
-                {packOverdue ? 'Snacks still not packed for this week' : "Pack Brooks's snacks for the week"}
-              </p>
-            </div>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </div>
-        </Link>
-      )}
-
       {/* Lunch tile */}
       {(
         <Link href={lunchPhase === 'none' ? '/engine/lunch' : '/lunch'}>
@@ -190,22 +164,34 @@ export default async function NowPage() {
         </Link>
       )}
 
-      {/* Snack tile */}
-      <Link href="/snack">
-        <div className="bg-[#141414] rounded-2xl border border-teal-500/20 px-4 py-3.5 flex items-center gap-3 active:opacity-80">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${snackPhase === 'dosed' ? 'bg-teal-500/20' : 'bg-teal-500/10'}`}>
-            {snackPhase === 'dosed' ? (
+      {/* Snack tile — one box, routes to pack view (not packed) or dose view (packed) */}
+      <Link href={needsPacking ? '/snack/pack' : '/snack'}>
+        <div className={`rounded-2xl border px-4 py-3.5 flex items-center gap-3 active:opacity-80 ${
+          packOverdue ? 'bg-amber-500/10 border-amber-500/30' : 'bg-[#141414] border-teal-500/20'
+        }`}>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+            packOverdue ? 'bg-amber-500/20' : snackPhase === 'dosed' ? 'bg-teal-500/20' : 'bg-teal-500/10'
+          }`}>
+            {needsPacking ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={packOverdue ? '#f59e0b' : '#2dd4bf'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="8" width="18" height="13" rx="2" /><path d="M3 8l3-5h12l3 5" /><path d="M12 8v13" />
+              </svg>
+            ) : snackPhase === 'dosed' ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 12h8" /></svg>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-semibold tracking-widest text-teal-400">
-              MORNING SNACK · {snackPhase === 'dosed' ? 'DOSED' : 'NOT DOSED'}
+            <p className={`text-[10px] font-semibold tracking-widest ${packOverdue ? 'text-amber-400' : 'text-teal-400'}`}>
+              {needsPacking
+                ? `THIS WEEK'S SNACKS${packOverdue ? ' · NOT PACKED' : ''}`
+                : `MORNING SNACK · ${snackPhase === 'dosed' ? 'DOSED' : 'NOT DOSED'}`}
             </p>
             <p className="text-sm font-semibold text-white mt-0.5">
-              {snackPhase === 'dosed' ? `${snackCarbs ?? '—'}g dosed ✓` : 'Tap to pick & dose snack'}
+              {needsPacking
+                ? (packOverdue ? 'Snacks still not packed for this week' : "Pack Brooks's snacks for the week")
+                : snackPhase === 'dosed' ? `${snackCarbs ?? '—'}g dosed ✓` : 'Tap to pick & dose snack'}
             </p>
           </div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2">
