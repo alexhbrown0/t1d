@@ -38,11 +38,15 @@ export function MenuUploader({ existingDates }: { existingDates: string[] }) {
       const form = new FormData()
       form.append('file', file)
       const resp = await fetch('/api/t1d/cafeteria-menu/parse', { method: 'POST', body: form })
-      const data = await resp.json()
-      if (!resp.ok) { setError(data.error ?? 'Could not parse the menu.'); return }
+      const data = await resp.json().catch(() => null)
+      if (!resp.ok || !data) {
+        if (resp.status === 504) setError('The menu took too long to read. Try again, or upload one page/month at a time.')
+        else setError(data?.error ?? `Could not read the menu (error ${resp.status}).`)
+        return
+      }
       setDays(data.days ?? [])
     } catch {
-      setError('Upload failed. Try again.')
+      setError('Upload failed — network error. Try again.')
     } finally {
       setParsing(false)
     }
