@@ -13,9 +13,11 @@ export async function PATCH(
     items_offered?: MealItem[]
     items_eaten?: MealItem[]
     entered_by?: string
+    is_cafeteria?: boolean
   }
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (body.is_cafeteria != null) update.is_cafeteria = body.is_cafeteria
 
   if (body.items_offered) {
     const totalCarbs = body.items_offered.reduce((s, i) => s + i.carbs * i.qty_offered, 0)

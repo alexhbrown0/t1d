@@ -1,9 +1,9 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
-import { LunchBuilder } from '@/components/t1d/lunch-builder'
+import { LunchPackMode } from '@/components/t1d/lunch-pack-mode'
 import type { RecentItem, ItemStat, LunchRecipe } from '@/components/t1d/lunch-builder'
 import Link from 'next/link'
-import type { T1dFoodRepo, MealItem } from '@/types/health'
+import type { T1dFoodRepo, MealItem, T1dCafeteriaMenuItem } from '@/types/health'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +16,9 @@ export default async function EngineLunchPage() {
   const twoWeeksAgo = new Date()
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
 
-  const [foodRes, existingMealRes, recipesRes, recentMealsRes] = await Promise.all([
+  const targetDateStr = targetDate.toISOString().slice(0, 10)
+
+  const [foodRes, existingMealRes, recipesRes, recentMealsRes, menuRes] = await Promise.all([
     supabase.from('t1d_food_repo').select('*').eq('active', true).order('name'),
     // Load existing meal event for target date (so user can continue packing)
     supabase
@@ -37,11 +39,17 @@ export default async function EngineLunchPage() {
       .lt('timestamp', targetDate.toISOString()) // exclude today/target
       .order('timestamp', { ascending: false })
       .limit(30),
+    supabase.from('t1d_cafeteria_menu').select('*').eq('menu_date', targetDateStr).order('carbs_g', { ascending: false }),
   ])
 
   const foodRepo = (foodRes.data ?? []) as T1dFoodRepo[]
   const recipes = (recipesRes.data ?? []) as LunchRecipe[]
+  const menu = (menuRes.data ?? []) as T1dCafeteriaMenuItem[]
   const existingMeal = existingMealRes.data?.[0] ?? null
+  const initialCafeteria = existingMeal?.is_cafeteria ?? false
+  const initialSelectedNames = existingMeal && initialCafeteria
+    ? (existingMeal.items_offered as MealItem[]).map(i => i.name)
+    : []
   const initialPacked = existingMeal
     ? (existingMeal.items_offered as MealItem[]).map(i => ({
         food_repo_id: i.food_repo_id,
@@ -115,7 +123,7 @@ export default async function EngineLunchPage() {
           </p>
         </div>
       </div>
-      <LunchBuilder
+      <LunchPackMode
         foodRepo={foodRepo}
         recentItems={recentItems}
         itemStats={itemStats}
@@ -123,6 +131,10 @@ export default async function EngineLunchPage() {
         existingMealId={existingMeal?.id ?? null}
         saveTimestamp={saveTimestamp.toISOString()}
         recipes={recipes}
+        menu={menu}
+        initialCafeteria={initialCafeteria}
+        initialSelectedNames={initialSelectedNames}
+        targetLabel={targetLabel}
       />
     </div>
   )

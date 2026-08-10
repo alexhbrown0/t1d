@@ -193,7 +193,9 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const [eatenPcts, setEatenPcts] = useState<Record<string, EatenPct>>({})
   const [photoFilling, setPhotoFilling] = useState(false)
   const [flowError, setFlowError] = useState<string | null>(null)
+  const [portioning, setPortioning] = useState(false)
   const photoRef = useRef<HTMLInputElement>(null)
+  const portionRef = useRef<HTMLInputElement>(null)
 
   const refresh = async () => {
     const r = await fetch('/api/t1d/lunch/today')
@@ -240,6 +242,38 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
       setFlowError('Network error calculating the dose. Try again, or dose manually via the pump.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePortionPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !data.meal) return
+    e.target.value = ''
+    setPortioning(true)
+    setFlowError(null)
+    try {
+      const form = new FormData()
+      form.append('photo', file)
+      form.append('meal_id', data.meal.id)
+      const resp = await fetch('/api/t1d/cafeteria/portions', { method: 'POST', body: form })
+      const result = await resp.json()
+      if (!resp.ok || result.ai_unavailable) {
+        setFlowError(result.error ?? 'Could not read portions. Adjust quantities by hand.')
+        return
+      }
+      const portions = new Map<string, number>((result.items ?? []).map((i: { name: string; portion: number }) => [i.name.toLowerCase(), i.portion]))
+      const scaled = data.meal.items_offered.map(it => {
+        const p = portions.get(it.name.toLowerCase())
+        return { ...it, qty_offered: p != null ? Math.round(it.qty_offered * p * 100) / 100 : it.qty_offered }
+      }).filter(it => it.qty_offered > 0)
+      await fetch(`/api/t1d/meal/${data.meal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items_offered: scaled, is_cafeteria: true, entered_by: 'alexandra' }),
+      })
+      await refresh()
+    } finally {
+      setPortioning(false)
     }
   }
 
@@ -441,6 +475,21 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           ) : (
             <>
               <PackedItems items={data.meal.items_offered} total={data.meal.total_offered_carbs} />
+
+              {data.meal.is_cafeteria && (
+                <div className="bg-[#141414] rounded-2xl border border-amber-500/20 p-4 space-y-2">
+                  <p className="text-[10px] tracking-widest text-amber-400 font-semibold">CAFETERIA · SET PORTIONS</p>
+                  <p className="text-xs text-gray-500">These are standard servings. Take a photo of his tray before he eats to size the actual portions.</p>
+                  <button
+                    onClick={() => portionRef.current?.click()}
+                    disabled={portioning}
+                    className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50"
+                  >
+                    {portioning ? <span className="flex items-center justify-center gap-2"><Spinner /> Reading tray…</span> : 'Take tray photo to set portions'}
+                  </button>
+                  <input ref={portionRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePortionPhoto} />
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Link

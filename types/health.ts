@@ -204,9 +204,19 @@ export interface T1dMealEvent {
   photo_url: string | null
   claude_analysis: unknown | null
   source: 'photo' | 'manual'
+  is_cafeteria: boolean
   entered_by: string | null
   created_at: string
   updated_at: string
+}
+
+export interface T1dCafeteriaMenuItem {
+  id: string
+  menu_date: string
+  name: string
+  carbs_g: number
+  category: 'entree' | 'side' | 'milk' | 'condiment' | null
+  created_at: string
 }
 
 export interface IcrSegment {

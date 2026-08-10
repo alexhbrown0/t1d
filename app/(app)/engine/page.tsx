@@ -65,6 +65,17 @@ export default function EnginePage() {
               </svg>
             </div>
           </Link>
+          <Link href="/engine/menu">
+            <div className="bg-[#141414] rounded-2xl border border-teal-500/20 px-5 py-5 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Cafeteria Menu</p>
+                <p className="text-xs text-gray-500 mt-0.5">Upload the month&apos;s school menu PDF with carb counts</p>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </div>
+          </Link>
         </div>
       )}
       {tab === 'INSIGHTS' && (

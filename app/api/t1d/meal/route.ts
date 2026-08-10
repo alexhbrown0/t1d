@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
     photo_url?: string
     claude_analysis?: unknown
     timestamp?: string
+    is_cafeteria?: boolean
   }
 
   if (!body.context || !body.items || !body.source) {
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
       photo_url: body.photo_url ?? null,
       claude_analysis: body.claude_analysis ?? null,
       source: body.source,
+      is_cafeteria: body.is_cafeteria ?? false,
       entered_by: body.entered_by ?? null,
     })
     .select()
