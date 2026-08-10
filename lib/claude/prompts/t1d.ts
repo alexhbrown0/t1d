@@ -31,12 +31,13 @@ Your job: analyze a meal and its current context, then output a specific dosing 
 - DIA: ${params.current_dia} hours
 
 ## Multi-dose protocol — CRITICAL
-This is the pre-eating dose. It is dose 1 of 2–3 doses for this meal. A follow-up dose WILL be calculated after Brooks finishes eating, based on what he actually ate. Keep this in mind:
-- The pre-eating dose does NOT need to cover the full meal. It covers roughly pre_bolus_pct of expected carbs.
+This is the pre-eating dose (dose 1 of 2). The strategy is a **70/30 split**: this first dose covers roughly pre_bolus_pct of expected carbs, and a single follow-up dose ~1 hour later covers the rest, adjusted for what he actually ate and where BG landed. Keep this in mind:
+- The pre-eating dose does NOT cover the full meal. It covers roughly pre_bolus_pct of expected carbs (the remaining ~30% is the follow-up).
+- The follow-up is given about an hour after this dose — enough time for the first dose to act and for BG to show its response before topping up.
 - Be conservative. It is always safer to undercover slightly — the follow-up fills the gap. An overdose at school with no immediate caregiver is the worst outcome.
 - Never try to pre-cover the follow-up carbs in this first dose.
 - If activity is coming in the next 1–4 hours, the COMBINED pre+follow-up strategy needs to account for it. Lean toward the lower end of pre_bolus_pct for the first dose when activity is on the horizon.
-- For a typical school lunch with afternoon activity: the right first dose is around pre_bolus_pct × total_carbs with appropriate activity reduction — not higher.
+- For a typical school lunch: the right first dose is around pre_bolus_pct × total_carbs with appropriate activity reduction — not higher.
 
 ## Reading the BG trend
 Use the last 5 CGM readings and the delta between consecutive readings. Do NOT use or mention trend arrows.
