@@ -21,12 +21,14 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export function CafeteriaBuilder({
   menu,
+  stapleNames,
   existingMealId,
   initialSelectedNames,
   saveTimestamp,
   targetLabel,
 }: {
   menu: T1dCafeteriaMenuItem[]
+  stapleNames: string[]
   existingMealId: string | null
   initialSelectedNames: string[]
   saveTimestamp: string
@@ -37,6 +39,11 @@ export function CafeteriaBuilder({
     () => new Set(menu.filter(m => initialSelectedNames.includes(m.name)).map(m => m.id))
   )
   const [saving, setSaving] = useState(false)
+  const [staplesOpen, setStaplesOpen] = useState(false)
+
+  const stapleSet = new Set(stapleNames)
+  const featured = menu.filter(m => !stapleSet.has(m.name))
+  const staples = menu.filter(m => stapleSet.has(m.name))
 
   const toggle = (id: string) => {
     setSelected(prev => {
@@ -48,7 +55,7 @@ export function CafeteriaBuilder({
 
   const grouped = CATEGORY_ORDER.map(cat => ({
     cat,
-    items: menu.filter(m => (m.category ?? 'other') === cat),
+    items: featured.filter(m => (m.category ?? 'other') === cat),
   })).filter(g => g.items.length > 0)
 
   const chosen = menu.filter(m => selected.has(m.id))
@@ -95,30 +102,56 @@ export function CafeteriaBuilder({
     )
   }
 
+  const itemButton = (m: T1dCafeteriaMenuItem) => {
+    const on = selected.has(m.id)
+    return (
+      <button key={m.id} onClick={() => toggle(m.id)}
+        className={`w-full rounded-xl border px-4 py-3 flex items-center gap-3 text-left active:opacity-80 ${
+          on ? 'bg-teal-500/10 border-teal-500/40' : 'bg-[#141414] border-white/5'
+        }`}>
+        <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${on ? 'border-teal-500 bg-teal-500' : 'border-gray-600'}`}>
+          {on && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
+        </div>
+        <span className="text-sm text-white flex-1 min-w-0">{m.name}</span>
+        <span className="text-xs text-teal-400 flex-shrink-0">{Math.round(Number(m.carbs_g))}g</span>
+      </button>
+    )
+  }
+
+  const stapleSelectedCount = staples.filter(m => selected.has(m.id)).length
+
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500">Pick what Brooks will get from the cafeteria. Portions get set from a tray photo before he eats.</p>
 
-      {grouped.map(({ cat, items }) => (
-        <div key={cat} className="space-y-2">
-          <p className="text-[10px] tracking-widest text-gray-500 font-semibold">{CATEGORY_LABEL[cat]}</p>
-          {items.map(m => {
-            const on = selected.has(m.id)
-            return (
-              <button key={m.id} onClick={() => toggle(m.id)}
-                className={`w-full rounded-xl border px-4 py-3 flex items-center gap-3 text-left active:opacity-80 ${
-                  on ? 'bg-teal-500/10 border-teal-500/40' : 'bg-[#141414] border-white/5'
-                }`}>
-                <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${on ? 'border-teal-500 bg-teal-500' : 'border-gray-600'}`}>
-                  {on && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
-                </div>
-                <span className="text-sm text-white flex-1 min-w-0">{m.name}</span>
-                <span className="text-xs text-teal-400 flex-shrink-0">{Math.round(Number(m.carbs_g))}g</span>
-              </button>
-            )
-          })}
+      {/* Always available — persistent staples, collapsed by default */}
+      {staples.length > 0 && (
+        <div className="space-y-2">
+          <button onClick={() => setStaplesOpen(o => !o)}
+            className="w-full flex items-center justify-between px-1 py-1">
+            <span className="text-[10px] tracking-widest text-gray-500 font-semibold">
+              ALWAYS AVAILABLE{stapleSelectedCount > 0 ? ` · ${stapleSelectedCount} SELECTED` : ''}
+            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"
+              className={`transition-transform ${staplesOpen ? 'rotate-180' : ''}`}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {staplesOpen && <div className="space-y-2">{staples.map(itemButton)}</div>}
         </div>
-      ))}
+      )}
+
+      {/* Today's featured menu */}
+      <div className="space-y-4">
+        <p className="text-[10px] tracking-widest text-teal-400 font-semibold">TODAY&apos;S MENU</p>
+        {grouped.map(({ cat, items }) => (
+          <div key={cat} className="space-y-2">
+            <p className="text-[10px] tracking-widest text-gray-600 font-semibold">{CATEGORY_LABEL[cat]}</p>
+            {items.map(itemButton)}
+          </div>
+        ))}
+        {grouped.length === 0 && <p className="text-xs text-gray-600">No day-specific items — check &quot;Always available&quot; above.</p>}
+      </div>
 
       {chosen.length > 0 && (
         <div className="sticky bottom-4 pt-2">

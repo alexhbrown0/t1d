@@ -17,6 +17,7 @@ export function LunchPackMode(props: {
   saveTimestamp: string
   recipes: LunchRecipe[]
   menu: T1dCafeteriaMenuItem[]
+  stapleNames: string[]
   initialCafeteria: boolean
   initialSelectedNames: string[]
   targetLabel: string
@@ -49,6 +50,7 @@ export function LunchPackMode(props: {
       ) : (
         <CafeteriaBuilder
           menu={props.menu}
+          stapleNames={props.stapleNames}
           existingMealId={props.existingMealId}
           initialSelectedNames={props.initialSelectedNames}
           saveTimestamp={props.saveTimestamp}

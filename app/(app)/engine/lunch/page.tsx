@@ -18,7 +18,7 @@ export default async function EngineLunchPage() {
 
   const targetDateStr = targetDate.toISOString().slice(0, 10)
 
-  const [foodRes, existingMealRes, recipesRes, recentMealsRes, menuRes] = await Promise.all([
+  const [foodRes, existingMealRes, recipesRes, recentMealsRes, menuRes, allMenuRes] = await Promise.all([
     supabase.from('t1d_food_repo').select('*').eq('active', true).order('name'),
     // Load existing meal event for target date (so user can continue packing)
     supabase
@@ -40,11 +40,26 @@ export default async function EngineLunchPage() {
       .order('timestamp', { ascending: false })
       .limit(30),
     supabase.from('t1d_cafeteria_menu').select('*').eq('menu_date', targetDateStr).order('carbs_g', { ascending: false }),
+    supabase.from('t1d_cafeteria_menu').select('menu_date, name'),
   ])
 
   const foodRepo = (foodRes.data ?? []) as T1dFoodRepo[]
   const recipes = (recipesRes.data ?? []) as LunchRecipe[]
   const menu = (menuRes.data ?? []) as T1dCafeteriaMenuItem[]
+
+  // Staples = items that recur on >=50% of menu days (PB&J, milk, chips, etc.) — kept in
+  // a separate "always available" section so the day's featured items stand out.
+  const allMenu = (allMenuRes.data ?? []) as Array<{ menu_date: string; name: string }>
+  const allDates = new Set(allMenu.map(r => r.menu_date))
+  const nameDates = new Map<string, Set<string>>()
+  for (const r of allMenu) {
+    if (!nameDates.has(r.name)) nameDates.set(r.name, new Set())
+    nameDates.get(r.name)!.add(r.menu_date)
+  }
+  const stapleNames = allDates.size > 0
+    ? [...nameDates.entries()].filter(([, dates]) => dates.size / allDates.size >= 0.5).map(([name]) => name)
+    : []
+
   const existingMeal = existingMealRes.data?.[0] ?? null
   const initialCafeteria = existingMeal?.is_cafeteria ?? false
   const initialSelectedNames = existingMeal && initialCafeteria
@@ -132,6 +147,7 @@ export default async function EngineLunchPage() {
         saveTimestamp={saveTimestamp.toISOString()}
         recipes={recipes}
         menu={menu}
+        stapleNames={stapleNames}
         initialCafeteria={initialCafeteria}
         initialSelectedNames={initialSelectedNames}
         targetLabel={targetLabel}
