@@ -58,7 +58,7 @@ Identify every food item in the photo. For EACH item return three linked fields 
 CRITICAL — pick the unit by how the food is naturally counted:
 - Countable small pieces (M&M's and other candies, gummies, individual crackers/chips/pretzels, nuts, berries, grapes): use serving_size "1 piece" (or "1 cracker"/"1 pretzel"/etc.), set carbs to the per-PIECE carbs, and set qty to the number of pieces you see. Example: ~20 peanut M&M's → { carbs: 1.4, qty: 20, serving_size: "1 piece" } = 28g, NOT { carbs: 28, qty: 1 }.
 
-COUNTING — be precise and conservative. You tend to OVER-count clustered small items (grapes, berries, candy). Count only pieces that are distinct and clearly separable; do NOT count a piece twice because it overlaps another, and do NOT round up to a "nicer" number. When you are torn between two counts, choose the LOWER one — a caregiver can bump the number up in one tap, but an overshoot silently over-doses. If a piece is mostly hidden behind another, don't count it.
+COUNTING — this matters most. Before writing any JSON, actually count each countable item out loud, one piece at a time, in the "counting" field below (e.g. "grapes: 1,2,3,4,5,6 → 6; strawberries: 1,2 → 2"). Enumerate every distinct piece exactly once. Do not double-count overlaps and do not round up to a nicer number. Only after you have tallied should you fill in qty from your own tally. If pieces overlap or are partly hidden, count what you can distinguish and pick the lower number when genuinely unsure.
 - Pre-portioned packages (juice box, yogurt pouch, granola bar, chip bag, sandwich, Lunchable): serving_size is that package ("1 box", "1 bar", "1 sandwich"), carbs is one package, qty is the number of packages.
 - Bulk/measured foods (rice, pasta, hummus, sauce): serving_size is a sensible measure ("1 cup", "2 tbsp"), carbs is one measure, qty is how many measures.
 - When an item matches a known food above, express carbs and serving_size in THAT food's unit and set qty to the count in that unit.
@@ -68,7 +68,8 @@ Also for each item:
 - Assign gi_category: "high" (white potato, white rice, white bread, crackers, juice, candy), "medium" (pasta, banana, oats, whole grain bread), or "low" (protein, fat, non-starchy veg, dairy, nuts)
 - Note if it matches a database entry (repo items already have gi_category — use those values)
 
-Return ONLY valid JSON with this structure:
+First write your piece-by-piece tally as plain text. THEN, as the last thing in your reply, output the final JSON inside a \`\`\`json code block with this structure (qty must equal your tally):
+\`\`\`json
 {
   "items": [
     {
@@ -79,17 +80,19 @@ Return ONLY valid JSON with this structure:
       "fat": 0.7,
       "protein": 0.5,
       "gi_category": "high",
+      "counting": "1,2,3...20 → 20",
       "repo_name": "M&M's Peanut Chocolate Candies"
     }
   ],
   "notes": "optional note about anything uncertain"
-}`
+}
+\`\`\``
 
   let response
   try {
     response = await claude.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [
         {
           role: 'user',
@@ -117,8 +120,9 @@ Return ONLY valid JSON with this structure:
 
   let parsed: { items: Array<{ name: string; qty: number; carbs: number; fat: number | null; protein: number | null; gi_category?: 'high' | 'medium' | 'low' | null; repo_name?: string; serving_size?: string }>; notes?: string }
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    parsed = JSON.parse(jsonMatch?.[0] ?? text)
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+    const jsonStr = fenced?.[1] ?? text.match(/\{[\s\S]*\}/)?.[0] ?? text
+    parsed = JSON.parse(jsonStr)
   } catch {
     return NextResponse.json({ error: 'Failed to parse Claude response', raw: text }, { status: 500 })
   }
