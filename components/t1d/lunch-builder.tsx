@@ -95,6 +95,8 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
   const [editingPhotoQty, setEditingPhotoQty] = useState('')
   const [editingPackedIdx, setEditingPackedIdx] = useState<number | null>(null)
   const [editingPackedQty, setEditingPackedQty] = useState('')
+  const [editingCarbsIdx, setEditingCarbsIdx] = useState<number | null>(null)
+  const [editingCarbsVal, setEditingCarbsVal] = useState('')
   const [chatInput, setChatInput] = useState('')
   const [chatReply, setChatReply] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
@@ -137,6 +139,14 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
     }
   }
 
+  // Editing the total grams back-solves the per-unit carbs, so changing qty
+  // afterward still scales correctly.
+  const updatePackedCarbs = (index: number, rawTotal: string) => {
+    const total = parseFloat(rawTotal)
+    if (isNaN(total) || total < 0) return
+    setPacked(prev => prev.map((p, i) => i === index ? { ...p, carbs: p.qty > 0 ? total / p.qty : total } : p))
+  }
+
   const removeItem = (index: number) => setPacked(prev => prev.filter((_, i) => i !== index))
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,7 +166,7 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
       }
       const items: PackedItem[] = (data.items ?? []).map((item: {
         name: string; carbs: number; fat: number | null; protein: number | null;
-        qty: number; matched_repo_id: string | null
+        qty: number; matched_repo_id: string | null; serving_size?: string
       }) => ({
         food_repo_id: item.matched_repo_id ?? null,
         name: item.name,
@@ -164,7 +174,7 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
         fat: item.fat ?? null,
         protein: item.protein ?? null,
         qty: item.qty ?? 1,
-        serving_size: '1 serving',
+        serving_size: item.serving_size || '1 serving',
       }))
       setPhotoItems(items)
     } finally {
@@ -593,7 +603,20 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
                   onBlur={() => { updatePackedQty(i, editingPackedQty); setEditingPackedIdx(null) }}
                   className="w-14 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-white text-sm text-center focus:outline-none focus:border-teal-500/50"
                 />
-                <p className="text-xs text-teal-400 w-12 text-right tabular-nums flex-shrink-0">{Math.round(item.carbs * item.qty)}g</p>
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="1"
+                    min="0"
+                    value={editingCarbsIdx === i ? editingCarbsVal : Math.round(item.carbs * item.qty)}
+                    onFocus={() => { setEditingCarbsIdx(i); setEditingCarbsVal(String(Math.round(item.carbs * item.qty))) }}
+                    onChange={e => setEditingCarbsVal(e.target.value)}
+                    onBlur={() => { updatePackedCarbs(i, editingCarbsVal); setEditingCarbsIdx(null) }}
+                    className="w-12 bg-black/40 border border-white/10 rounded-lg px-1 py-1.5 text-teal-400 text-xs text-right tabular-nums focus:outline-none focus:border-teal-500/50"
+                  />
+                  <span className="text-[10px] text-gray-600">g</span>
+                </div>
                 <button onClick={() => removeItem(i)} className="text-gray-600 active:text-red-400 transition-colors">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />

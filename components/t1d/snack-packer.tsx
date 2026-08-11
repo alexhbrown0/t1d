@@ -36,6 +36,8 @@ export function SnackPacker({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [photoNote, setPhotoNote] = useState('')
+  const [editCarbsIdx, setEditCarbsIdx] = useState<number | null>(null)
+  const [editCarbsVal, setEditCarbsVal] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
 
   const key = (i: { food_repo_id: string | null; name: string }) => i.food_repo_id ?? i.name.toLowerCase()
@@ -51,6 +53,13 @@ export function SnackPacker({
 
   const setQty = (i: number, delta: number) => {
     setPacked(prev => prev.map((p, j) => j === i ? { ...p, qty: Math.max(1, p.qty + delta) } : p))
+  }
+
+  // Editing total grams back-solves per-unit carbs so qty keeps scaling correctly.
+  const setTotalCarbs = (i: number, rawTotal: string) => {
+    const total = parseFloat(rawTotal)
+    if (isNaN(total) || total < 0) return
+    setPacked(prev => prev.map((p, j) => j === i ? { ...p, carbs: p.qty > 0 ? Math.round((total / p.qty) * 10) / 10 : total } : p))
   }
 
   const addRepo = (f: T1dFoodRepo) => add({
@@ -151,12 +160,23 @@ export function SnackPacker({
           <div key={i} className="bg-[#141414] rounded-xl border border-white/5 px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-sm text-white truncate">{item.name}</p>
-              <p className="text-[10px] text-gray-500">{item.carbs}g each{item.qty > 1 ? ` · ${Math.round(item.carbs * item.qty)}g total` : ''}</p>
+              <p className="text-[10px] text-gray-500">{item.serving_size || '1 serving'}{item.qty > 1 ? ` · ${item.qty}×` : ''}</p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <button onClick={() => setQty(i, -1)} className="w-6 h-6 rounded-md bg-white/5 text-white text-base font-bold flex items-center justify-center">−</button>
               <span className="text-white text-sm font-semibold w-4 text-center tabular-nums">{item.qty}</span>
               <button onClick={() => setQty(i, 1)} className="w-6 h-6 rounded-md bg-white/5 text-white text-base font-bold flex items-center justify-center">+</button>
+            </div>
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              <input
+                type="number" inputMode="decimal" step="1" min="0"
+                value={editCarbsIdx === i ? editCarbsVal : Math.round(item.carbs * item.qty)}
+                onFocus={() => { setEditCarbsIdx(i); setEditCarbsVal(String(Math.round(item.carbs * item.qty))) }}
+                onChange={e => setEditCarbsVal(e.target.value)}
+                onBlur={() => { setTotalCarbs(i, editCarbsVal); setEditCarbsIdx(null) }}
+                className="w-12 bg-black/40 border border-white/10 rounded-lg px-1 py-1.5 text-teal-400 text-xs text-right tabular-nums focus:outline-none focus:border-teal-500/50"
+              />
+              <span className="text-[10px] text-gray-600">g</span>
             </div>
             <button onClick={() => setPacked(prev => prev.filter((_, j) => j !== i))} className="text-gray-600 active:text-red-400 flex-shrink-0">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
