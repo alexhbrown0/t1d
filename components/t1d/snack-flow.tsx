@@ -71,9 +71,11 @@ export function SnackFlow({
     food_repo_id: f.id, name: f.name, carbs: f.carbs_g,
     fat: f.fat_g ?? null, protein: f.protein_g ?? null, qty: 1, serving_size: f.serving_size,
   })
+  // Packed qty is the week's inventory (e.g. 2 bags for the week); a dose is for
+  // one serving by default — bump the stepper if he eats more than one.
   const pickPacked = (r: PackedSnack) => setSelected({
     food_repo_id: r.food_repo_id, name: r.name, carbs: r.carbs,
-    fat: r.fat ?? null, protein: r.protein ?? null, qty: r.qty || 1, serving_size: r.serving_size,
+    fat: r.fat ?? null, protein: r.protein ?? null, qty: 1, serving_size: r.serving_size,
   })
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
