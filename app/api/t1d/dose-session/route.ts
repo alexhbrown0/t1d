@@ -19,11 +19,14 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('t1d_dose_sessions')
     .insert({
-      timestamp: new Date().toISOString(),
+      timestamp: body.timestamp ?? new Date().toISOString(),
       recommended_dose_grams: body.recommended_dose_grams ?? null,
+      actual_dose_grams: body.actual_dose_grams ?? null,
+      actual_dose_timestamp: body.actual_dose_timestamp ?? null,
+      pump_suggested_units: body.pump_suggested_units ?? null,
       engine_reasoning: body.reasoning ?? null,
       entered_by: body.entered_by ?? null,
-      context_snapshot: body.items ? { items: body.items, total_carbs: body.total_carbs } : null,
+      context_snapshot: body.context_snapshot ?? (body.items ? { items: body.items, total_carbs: body.total_carbs } : null),
     })
     .select()
     .single()

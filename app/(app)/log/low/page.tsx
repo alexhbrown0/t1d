@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { logEvent } from '@/lib/t1d/device'
 
 const JUICE_CARBS = 15
 const GUMMY_CARBS = 5
@@ -64,6 +65,7 @@ export default function LogLowPage() {
         setError(d.error ?? 'Failed to log — try again')
         return
       }
+      await logEvent('low', `Low treated${bg ? ` · BG ${Math.round(parseFloat(bg))}` : ''} → ${treatmentLabel}`, `${totalCarbs}g fast carbs`)
       router.push('/now')
     } catch {
       setError('Network error — try again')

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { logEvent } from '@/lib/t1d/device'
 
 interface FoodItem {
   name: string
@@ -176,6 +177,7 @@ export default function LogBolusPage() {
         entered_by: 'alexandra',
       }),
     }).catch(() => null)
+    await logEvent('dose', `Bolus logged · ${Math.round(totalCarbs)}g${dose?.grams != null ? ` · dose ${dose.grams}g` : ''}`)
     router.push('/now')
   }
 

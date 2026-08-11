@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { logEvent } from '@/lib/t1d/device'
 
 export default function LogCorrectionPage() {
   const router = useRouter()
@@ -12,6 +13,31 @@ export default function LogCorrectionPage() {
   const [loading, setLoading] = useState(true)
   const [recommendation, setRecommendation] = useState<string | null>(null)
   const [computing, setComputing] = useState(false)
+  const [units, setUnits] = useState('')
+  const [givenSaving, setGivenSaving] = useState(false)
+
+  const markCorrectionGiven = async () => {
+    if (!bg) return
+    setGivenSaving(true)
+    try {
+      await fetch('/api/t1d/dose-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actual_dose_grams: 0,
+          actual_dose_timestamp: new Date().toISOString(),
+          pump_suggested_units: units ? parseFloat(units) : null,
+          reasoning: `Correction for BG ${Math.round(parseFloat(bg))}`,
+          context_snapshot: { correction: true, bg: parseFloat(bg) },
+          entered_by: 'alexandra',
+        }),
+      }).catch(() => null)
+      await logEvent('correction', `Correction given · BG ${Math.round(parseFloat(bg))}${units ? ` · ${units}u` : ''}`)
+      router.push('/now')
+    } finally {
+      setGivenSaving(false)
+    }
+  }
 
   const TREND_ARROW: Record<string, string> = {
     flat: '→', singleUp: '↑', doubleUp: '↑↑',
@@ -148,6 +174,29 @@ export default function LogCorrectionPage() {
         <div className="bg-[#141414] rounded-2xl border border-white/5 p-4 text-center">
           <p className="text-xs text-gray-500">Corrections are delivered via the Omnipod 5 pump</p>
           <p className="text-xs text-gray-600 mt-1">The app will calculate how many carb-equivalents to enter</p>
+        </div>
+      )}
+
+      {/* Log that the correction was given */}
+      {bg && (
+        <div className="bg-[#141414] rounded-2xl border border-yellow-500/20 p-4 space-y-3">
+          <p className="text-[10px] tracking-widest text-yellow-400 font-semibold">CORRECTION GIVEN</p>
+          <div>
+            <label className="text-[10px] tracking-widest text-gray-500 font-semibold">INSULIN UNITS (what the pump gave)</label>
+            <input
+              type="number" step="0.01" inputMode="decimal" value={units}
+              onChange={e => setUnits(e.target.value)} placeholder="e.g. 0.55"
+              className="mt-2 w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-yellow-500/50"
+            />
+          </div>
+          <button
+            onClick={markCorrectionGiven}
+            disabled={givenSaving}
+            className="w-full bg-yellow-500 text-black font-bold py-3.5 rounded-2xl active:opacity-80 disabled:opacity-50"
+          >
+            {givenSaving ? 'Saving…' : 'Log Correction Given ✓'}
+          </button>
+          <p className="text-[10px] text-gray-600">Records it in the log, counts toward IOB, and notifies the parent device.</p>
         </div>
       )}
     </div>

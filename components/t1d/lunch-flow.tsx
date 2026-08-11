@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { getCentralTime } from '@/lib/utils/central-time'
+import { logEvent } from '@/lib/t1d/device'
 import type { T1dMealEvent, T1dDoseSession, MealItem } from '@/types/health'
 
 type Phase = 'no_lunch' | 'packed' | 'pre_dose_ready' | 'eating' | 'followup_pending' | 'followup_ready' | 'complete'
@@ -281,11 +282,12 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
     if (!data.session) return
     setLoading(true)
     try {
+      const preGrams = overrideDose ? parseFloat(overrideDose) : data.session.recommended_dose_grams
       await fetch(`/api/t1d/dose-session/${data.session.id}/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          actual_dose_grams: overrideDose ? parseFloat(overrideDose) : data.session.recommended_dose_grams,
+          actual_dose_grams: preGrams,
           pump_suggested_units: preUnits ? parseFloat(preUnits) : undefined,
           entered_by: 'alexandra',
           actual_dose_timestamp: preMinutesAgo > 0
@@ -293,6 +295,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             : undefined,
         }),
       })
+      await logEvent('dose', `Lunch pre-dose given · ${preGrams}g${preUnits ? ` (${preUnits}u)` : ''}`)
       setPreUnits('')
       await refresh()
     } finally {
@@ -380,11 +383,12 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
     if (!data.followUpSession) return
     setLoading(true)
     try {
+      const followGrams = followOverrideDose ? parseFloat(followOverrideDose) : data.followUpSession.recommended_dose_grams
       await fetch(`/api/t1d/dose-session/${data.followUpSession.id}/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          actual_dose_grams: followOverrideDose ? parseFloat(followOverrideDose) : data.followUpSession.recommended_dose_grams,
+          actual_dose_grams: followGrams,
           pump_suggested_units: followUnits ? parseFloat(followUnits) : undefined,
           entered_by: 'alexandra',
           actual_dose_timestamp: followMinutesAgo > 0
@@ -392,6 +396,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             : undefined,
         }),
       })
+      await logEvent('dose', `Lunch follow-up dose given · ${followGrams}g${followUnits ? ` (${followUnits}u)` : ''}`)
       setFollowUnits('')
       setFollowOverrideDose('')
       await refresh()

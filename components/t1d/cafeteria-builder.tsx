@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { logEvent } from '@/lib/t1d/device'
 import type { T1dCafeteriaMenuItem } from '@/types/health'
 
 function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
@@ -87,6 +88,7 @@ export function CafeteriaBuilder({
           body: JSON.stringify({ context: 'school_lunch', is_cafeteria: true, source: 'photo', items, entered_by: 'alexandra', timestamp: saveTimestamp }),
         })
       }
+      await logEvent('meal', `Cafeteria lunch loaded · ${totalCarbs}g`)
       router.push('/lunch')
     } finally {
       setSaving(false)

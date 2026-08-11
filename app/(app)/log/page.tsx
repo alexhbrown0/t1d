@@ -133,15 +133,22 @@ export default async function LogPage() {
         sourceTag: m.source === 'chat' ? 'via chat' : undefined,
       }
     }),
-    ...sessions.filter(s => !mealLinkedSessionIds.has(s.id)).map(s => ({
-      id: s.id,
-      type: 'bolus' as const,
-      timestamp: s.timestamp,
-      label: s.recommended_dose_grams ? `Bolus · ${s.recommended_dose_grams}g` : 'Bolus logged',
-      sub: s.engine_confidence ? `Confidence: ${s.engine_confidence}` : s.entered_by ?? '',
-      color: 'text-blue-400',
-      dot: 'bg-blue-500',
-    })),
+    ...sessions.filter(s => !mealLinkedSessionIds.has(s.id)).map(s => {
+      const snap = s.context_snapshot as { correction?: boolean; bg?: number } | null
+      const isCorrection = snap?.correction === true
+      const units = s.pump_suggested_units != null ? `${s.pump_suggested_units}u` : ''
+      return {
+        id: s.id,
+        type: 'bolus' as const,
+        timestamp: s.timestamp,
+        label: isCorrection
+          ? `Correction${snap?.bg ? ` · BG ${Math.round(snap.bg)}` : ''}${units ? ` · ${units}` : ''}`
+          : (s.recommended_dose_grams ? `Bolus · ${s.recommended_dose_grams}g` : 'Bolus logged'),
+        sub: isCorrection ? '' : (s.engine_confidence ? `Confidence: ${s.engine_confidence}` : s.entered_by ?? ''),
+        color: isCorrection ? 'text-yellow-400' : 'text-blue-400',
+        dot: isCorrection ? 'bg-yellow-500' : 'bg-blue-500',
+      }
+    }),
     ...lows.map(l => ({
       id: l.id,
       type: 'low' as const,

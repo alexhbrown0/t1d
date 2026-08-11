@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { logEvent } from '@/lib/t1d/device'
 import type { T1dFoodRepo, PackedSnack } from '@/types/health'
 
 interface Selected {
@@ -175,16 +176,18 @@ export function SnackFlow({
     if (!session) return
     setLoading(true)
     try {
+      const grams = overrideDose ? parseFloat(overrideDose) : session.recommended
       await fetch(`/api/t1d/dose-session/${session.id}/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          actual_dose_grams: overrideDose ? parseFloat(overrideDose) : session.recommended,
+          actual_dose_grams: grams,
           pump_suggested_units: units ? parseFloat(units) : undefined,
           entered_by: 'alexandra',
           actual_dose_timestamp: minutesAgo > 0 ? new Date(Date.now() - minutesAgo * 60000).toISOString() : undefined,
         }),
       })
+      await logEvent('dose', `Snack dose given · ${grams}g${selected ? ` (${selected.name})` : ''}`)
       router.push('/now')
     } finally {
       setLoading(false)

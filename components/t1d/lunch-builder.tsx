@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { logEvent } from '@/lib/t1d/device'
 import type { T1dFoodRepo, MealItem } from '@/types/health'
 
 type Tab = 'items' | 'photo'
@@ -236,6 +237,8 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
           }),
         })
       }
+      const totalG = Math.round(packed.reduce((s, p) => s + p.carbs * p.qty, 0))
+      await logEvent('meal', `Lunch ${existingMealId ? 'updated' : 'packed'} · ${totalG}g`)
       router.push('/lunch')
     } finally {
       setSaving(false)
