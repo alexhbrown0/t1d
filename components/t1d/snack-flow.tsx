@@ -204,8 +204,8 @@ export function SnackFlow({
     return (
       <div className="space-y-4">
         <div className="bg-[#141414] rounded-2xl border border-white/5 px-4 py-3">
-          <p className="text-sm text-white">{selected?.name}</p>
-          <p className="text-[10px] text-gray-500">{selected?.carbs}g carbs</p>
+          <p className="text-sm text-white">{selected && selected.qty > 1 ? `${selected.qty} × ` : ''}{selected?.name}</p>
+          <p className="text-[10px] text-gray-500">{selected ? Math.round(selected.carbs * selected.qty) : 0}g carbs</p>
         </div>
         <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
           <p className="text-[10px] tracking-widest text-teal-400 font-semibold">SNACK DOSE</p>
@@ -261,14 +261,24 @@ export function SnackFlow({
             />
             <button onClick={() => setSelected(null)} className="text-xs text-gray-500 flex-shrink-0">Change</button>
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-center gap-3">
+            {/* Quantity */}
+            <div className="flex items-center gap-2">
+              <button onClick={() => setSelected({ ...selected, qty: Math.max(1, selected.qty - 1) })}
+                className="w-7 h-7 rounded-lg bg-white/5 text-white text-lg font-bold flex items-center justify-center">−</button>
+              <span className="text-white text-sm font-semibold w-4 text-center tabular-nums">{selected.qty}</span>
+              <button onClick={() => setSelected({ ...selected, qty: selected.qty + 1 })}
+                className="w-7 h-7 rounded-lg bg-white/5 text-white text-lg font-bold flex items-center justify-center">+</button>
+            </div>
+            <span className="text-gray-600 text-xs">×</span>
+            {/* Per-serving carbs */}
             <input
               type="number" inputMode="numeric"
               value={selected.carbs}
               onChange={e => setSelected({ ...selected, carbs: parseFloat(e.target.value) || 0 })}
-              className="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-lg font-bold text-white text-center focus:outline-none focus:border-teal-500/50"
+              className="w-14 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-base font-bold text-white text-center focus:outline-none focus:border-teal-500/50"
             />
-            <span className="text-gray-500 text-xs">g carbs · tap to adjust</span>
+            <span className="text-gray-500 text-xs flex-1">g each · <span className="text-teal-400 font-semibold">{Math.round(selected.carbs * selected.qty)}g total</span></span>
           </div>
         </div>
       )}
