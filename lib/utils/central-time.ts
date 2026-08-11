@@ -54,11 +54,20 @@ export function getCentralDayStartUTC(offsetDays = 0, date = new Date()): Date {
 
 /**
  * UTC Date for the start (Sunday midnight) of the current Central week.
- * Used to decide whether the weekly snack set has been packed this week.
  */
 export function getCentralWeekStartUTC(date = new Date()): Date {
   const ct = getCentralTime(date)
   return getCentralDayStartUTC(-ct.dayOfWeek, date)
+}
+
+/**
+ * Start of the current snack "pack week", anchored to the most recent Saturday
+ * (00:00 Central). A set packed for a school week (Sat→Fri) is considered stale
+ * once the next Saturday arrives — i.e. it clears after Friday so each week starts fresh.
+ */
+export function getSnackWeekStartUTC(date = new Date()): Date {
+  const ct = getCentralTime(date)
+  return getCentralDayStartUTC(-((ct.dayOfWeek + 1) % 7), date)
 }
 
 /**

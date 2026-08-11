@@ -15,9 +15,9 @@ export default async function NowPage() {
 
   const { packingForTomorrow, targetDate, targetEnd } = getLunchTargetDate()
 
-  const { getCentralDayStartUTC, getCentralWeekStartUTC, getCentralTime } = await import('@/lib/utils/central-time')
+  const { getCentralDayStartUTC, getSnackWeekStartUTC, getCentralTime } = await import('@/lib/utils/central-time')
   const snackDayStart = getCentralDayStartUTC()
-  const weekStart = getCentralWeekStartUTC()
+  const weekStart = getSnackWeekStartUTC()
 
   const [egvsResult, lunchResult, snackResult, packedResult] = await Promise.all([
     supabase

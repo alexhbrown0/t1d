@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
-import { getCentralDayStartUTC } from '@/lib/utils/central-time'
+import { getCentralDayStartUTC, getSnackWeekStartUTC } from '@/lib/utils/central-time'
 import { SnackFlow } from '@/components/t1d/snack-flow'
 import type { RecentItem } from '@/components/t1d/lunch-builder'
 import type { T1dFoodRepo, MealItem, T1dDoseSession } from '@/types/health'
@@ -36,7 +36,10 @@ export default async function SnackPage() {
   const foodRepo = (foodRes.data ?? []) as T1dFoodRepo[]
   const todayMeal = todayRes.data?.[0] ?? null
 
-  const packedRows = (packedRes.data ?? []) as PackedRow[]
+  const allPackedRows = (packedRes.data ?? []) as PackedRow[]
+  // Stale packs (from before this pack week / last Friday) are ignored so each week starts fresh.
+  const packStale = allPackedRows.length > 0 && new Date(allPackedRows[0].packed_at) < getSnackWeekStartUTC()
+  const packedRows = packStale ? [] : allPackedRows
   const packedSnacks: RecentItem[] = packedRows.map(p => ({
     food_repo_id: p.food_repo_id,
     name: p.name,
