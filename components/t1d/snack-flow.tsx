@@ -156,6 +156,7 @@ export function SnackFlow({
         body: JSON.stringify({
           meal: [mealItem],
           meal_event_id: meal.id,
+          meal_type: 'snack',
           starting_bg: freshBg?.value_mgdl ?? null,
           starting_trend: freshBg?.trend ?? null,
           entered_by: 'alexandra',

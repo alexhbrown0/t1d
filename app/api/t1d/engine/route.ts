@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   // Support both `meal` and `items` field names
   const meal = (body.meal ?? body.items) as MealItem[] | undefined
-  const { meal_event_id, entered_by, meal_gi_category, low_treatment_carbs, low_treatment_type, starting_bg, starting_trend } = body as {
+  const { meal_event_id, entered_by, meal_gi_category, low_treatment_carbs, low_treatment_type, starting_bg, starting_trend, meal_type } = body as {
     meal_event_id?: string
     entered_by?: string
     meal_gi_category?: string | null
@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     low_treatment_type?: string | null
     starting_bg?: number | null
     starting_trend?: string | null
+    meal_type?: 'lunch' | 'snack'
   }
 
   if (!meal || !Array.isArray(meal) || meal.length === 0) {
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
       lowTreatmentType: low_treatment_type,
       startingBg: starting_bg,
       startingTrend: starting_trend,
+      mealType: meal_type ?? 'lunch',
     })
   } catch (err) {
     const info = classifyClaudeError(err)

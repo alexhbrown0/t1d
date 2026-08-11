@@ -14,14 +14,32 @@ function formatIcrForPrompt(params: T1dEngineParams): string {
   return params.icr_segments.map((s: IcrSegment) => `${s.icr} g/unit (${s.start}–${s.end})`).join(', ')
 }
 
-export function buildDoseEngineSystemPrompt(params: T1dEngineParams, clinicalNotes?: string | null): string {
+export function buildDoseEngineSystemPrompt(params: T1dEngineParams, clinicalNotes?: string | null, mealType: 'lunch' | 'snack' = 'lunch'): string {
   const activeIcr = resolveActiveIcr(params)
   const fpuCarbEquiv = ((params.fpu_insulin_factor ?? 0.5) * activeIcr).toFixed(1)
+  const isSnack = mealType === 'snack'
+
+  const snackProtocol = `## Snack dosing — SINGLE full dose
+This is a SNACK, not a meal. Dose it as ONE dose now. There is NO follow-up dose and NO 70/30 split.
+- Cover the FULL snack carbs (about 100%), adjusted only for: current BG and trend, insulin on board, and genuinely UPCOMING high-intensity activity.
+- Do NOT hold back ~30% for a follow-up — there is no follow-up for a snack.
+- Do NOT apply the school-lunch 30g ceiling; snacks are small.
+- Activity that has ALREADY ENDED is not a reason to cut the dose toward zero. Recently-finished exercise can raise insulin sensitivity somewhat, so a modest trim (up to ~activity_reduction_pct) can be reasonable if he just finished hard activity — but a child with in-range BG eating a small snack after PE, with no further activity for the next hour, should still be covered for essentially the whole snack. Under-dosing a snack just re-spikes him.
+- Only set dose_now_grams to 0 / wait_and_see under the low-BG rules below (BG < 80 and steady/dropping). A normal BG plus a real carb snack means a real dose.`
+
+  const lunchProtocol = `## Multi-dose protocol — CRITICAL
+This is the pre-eating dose (dose 1 of 2). The strategy is a **70/30 split**: this first dose covers roughly pre_bolus_pct of expected carbs, and a single follow-up dose ~1 hour later covers the rest, adjusted for what he actually ate and where BG landed. Keep this in mind:
+- The pre-eating dose does NOT cover the full meal. It covers roughly pre_bolus_pct of expected carbs (the remaining ~30% is the follow-up).
+- The follow-up is given about an hour after this dose — enough time for the first dose to act and for BG to show its response before topping up.
+- Be conservative. It is always safer to undercover slightly — the follow-up fills the gap. An overdose at school with no immediate caregiver is the worst outcome.
+- Never try to pre-cover the follow-up carbs in this first dose.
+- If activity is coming in the next 1–4 hours, the COMBINED pre+follow-up strategy needs to account for it. Lean toward the lower end of pre_bolus_pct for the first dose when activity is on the horizon.
+- For a typical school lunch: the right first dose is around pre_bolus_pct × total_carbs with appropriate activity reduction — not higher.`
 
   return `You are the dosing engine for Brooks, a child with Type 1 diabetes on Omnipod 5 (pump) and Dexcom G7 (CGM).
 ${clinicalNotes ? `\n## Clinical notes — follow these:\n${clinicalNotes}\n` : ''}
 
-Your job: analyze a meal and its current context, then output a specific dosing recommendation as JSON. You output carbs to enter into the pump — not insulin units. The pump converts to units using its ICR.
+Your job: analyze a ${isSnack ? 'snack' : 'meal'} and its current context, then output a specific dosing recommendation as JSON. You output carbs to enter into the pump — not insulin units. The pump converts to units using its ICR.
 
 ## Brooks's Profile
 - Insulin: ${params.insulin_type} (Fiasp onset 0–5 min — dose when he starts eating, not before)
@@ -30,14 +48,7 @@ Your job: analyze a meal and its current context, then output a specific dosing 
 - ISF: ${params.current_isf} mg/dL per unit
 - DIA: ${params.current_dia} hours
 
-## Multi-dose protocol — CRITICAL
-This is the pre-eating dose (dose 1 of 2). The strategy is a **70/30 split**: this first dose covers roughly pre_bolus_pct of expected carbs, and a single follow-up dose ~1 hour later covers the rest, adjusted for what he actually ate and where BG landed. Keep this in mind:
-- The pre-eating dose does NOT cover the full meal. It covers roughly pre_bolus_pct of expected carbs (the remaining ~30% is the follow-up).
-- The follow-up is given about an hour after this dose — enough time for the first dose to act and for BG to show its response before topping up.
-- Be conservative. It is always safer to undercover slightly — the follow-up fills the gap. An overdose at school with no immediate caregiver is the worst outcome.
-- Never try to pre-cover the follow-up carbs in this first dose.
-- If activity is coming in the next 1–4 hours, the COMBINED pre+follow-up strategy needs to account for it. Lean toward the lower end of pre_bolus_pct for the first dose when activity is on the horizon.
-- For a typical school lunch: the right first dose is around pre_bolus_pct × total_carbs with appropriate activity reduction — not higher.
+${isSnack ? snackProtocol : lunchProtocol}
 
 ## Reading the BG trend
 Use the last 5 CGM readings and the delta between consecutive readings. Do NOT use or mention trend arrows.
@@ -83,7 +94,8 @@ When dropping: insulin is still needed — food must be covered. The goal is to 
    - 30–90 min: significant concern. Reduce by ~half of activity_reduction_pct. Note it clearly.
    - 90–180 min: meaningful — reduce first dose by ~25% of activity_reduction_pct. Note in reasoning.
    - 180+ min: light note only. Minimal dose impact but mention it.
-   IMPORTANT — school-year schedule: activity happens in the MORNING and just BEFORE lunch (PE ~9:00–10:00, recess 12:00–12:25), and the AFTERNOON is sedentary (Social Studies/Science, Math, Writing). Lunch is 12:25. So for the lunch dose, do NOT reduce for "upcoming activity" — there is none after lunch. Recess ends right as lunch begins; its main effect is that he may arrive at lunch already running lower, so weigh current BG and trend, not a post-meal activity reduction. Only apply activity reduction when the schedule actually shows high-intensity activity ahead of the dose you're calculating.
+   - ALREADY ENDED (activity is in the PAST — e.g. PE that just finished): this is NOT "upcoming activity" and does NOT get the upcoming-activity reduction. Recently-finished hard exercise can leave him somewhat more insulin-sensitive, so a small trim MAY be justified, but it must never drive a normal-BG dose toward zero. If the only activity is behind him and nothing high-intensity is ahead in the next hour, dose normally.
+   IMPORTANT — school-year schedule: activity happens in the MORNING and just BEFORE lunch (PE ~9:30–10:00, recess 12:00–12:25; Specials 9:00–9:30 is non-physical), and the AFTERNOON is sedentary (Social Studies/Science, Math, Writing). Lunch is 12:25. So for the lunch dose, do NOT reduce for "upcoming activity" — there is none after lunch. Recess ends right as lunch begins; its main effect is that he may arrive at lunch already running lower, so weigh current BG and trend, not a post-meal activity reduction. Only apply activity reduction when the schedule actually shows high-intensity activity ahead of the dose you're calculating.
 
 ## Using food history
 Each food item comes with its playbook (if one exists from prior meals) and similar-food outcomes.

@@ -18,6 +18,7 @@ interface EngineContext {
   lowTreatmentType?: string | null
   startingBg?: number | null
   startingTrend?: string | null
+  mealType?: 'lunch' | 'snack'
 }
 
 export async function runDoseEngine(meal: MealItem[], ctx: EngineContext = {}): Promise<EngineOutput> {
@@ -33,7 +34,7 @@ export async function runDoseEngine(meal: MealItem[], ctx: EngineContext = {}): 
   const foodPlaybooks = buildPlaybookMap(allFoods)
   const similarFoodOutcomes = getSimilarFoods(meal, allFoods)
 
-  const systemPrompt = buildDoseEngineSystemPrompt(params, params.clinical_notes)
+  const systemPrompt = buildDoseEngineSystemPrompt(params, params.clinical_notes, ctx.mealType ?? 'lunch')
   const userContext = buildDoseEngineUserContext({
     meal,
     last5Egvs: egvs.map(e => ({ system_time: e.system_time, value_mgdl: e.value_mgdl })),
