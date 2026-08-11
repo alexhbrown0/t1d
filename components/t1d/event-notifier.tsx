@@ -12,19 +12,29 @@ interface EventRow {
   created_at: string
 }
 
-const LAST_SEEN_KEY = 't1d_events_last_seen'
+const ACKED_KEY = 't1d_events_acked'
 const POLL_MS = 20_000
+const LOOKBACK_MS = 24 * 60 * 60 * 1000
 
-const KIND_STYLE: Record<string, { border: string; dot: string; label: string }> = {
-  low: { border: 'border-red-500/40', dot: 'bg-red-500', label: 'LOW TREATED' },
-  dose: { border: 'border-blue-500/40', dot: 'bg-blue-500', label: 'DOSE GIVEN' },
-  correction: { border: 'border-yellow-500/40', dot: 'bg-yellow-500', label: 'CORRECTION' },
-  meal: { border: 'border-teal-500/40', dot: 'bg-teal-500', label: 'MEAL LOGGED' },
+const KIND_STYLE: Record<string, { box: string; dot: string; text: string; label: string }> = {
+  low: { box: 'bg-red-500/10 border-red-500/40', dot: 'bg-red-500', text: 'text-red-300', label: 'LOW TREATED' },
+  dose: { box: 'bg-blue-500/10 border-blue-500/40', dot: 'bg-blue-500', text: 'text-blue-300', label: 'DOSE GIVEN' },
+  correction: { box: 'bg-yellow-500/10 border-yellow-500/40', dot: 'bg-yellow-500', text: 'text-yellow-300', label: 'CORRECTION' },
+  meal: { box: 'bg-teal-500/10 border-teal-500/40', dot: 'bg-teal-500', text: 'text-teal-300', label: 'MEAL LOGGED' },
+}
+
+function readAcked(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(ACKED_KEY)
+    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+  } catch {
+    return new Set()
+  }
 }
 
 export function EventNotifier() {
-  const [toasts, setToasts] = useState<EventRow[]>([])
-  const lastSeenRef = useRef<string>('')
+  const [alerts, setAlerts] = useState<EventRow[]>([])
+  const ackedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -33,19 +43,20 @@ export function EventNotifier() {
     const poll = async () => {
       // Re-check each tick so enabling the toggle takes effect without a reload.
       if (isParentDevice()) {
-        if (!lastSeenRef.current) {
-          lastSeenRef.current = window.localStorage.getItem(LAST_SEEN_KEY) ?? new Date().toISOString()
-        }
+        if (ackedRef.current.size === 0) ackedRef.current = readAcked()
+        const since = new Date(Date.now() - LOOKBACK_MS).toISOString()
         try {
-          const res = await fetch(`/api/t1d/events?since=${encodeURIComponent(lastSeenRef.current)}`)
+          const res = await fetch(`/api/t1d/events?since=${encodeURIComponent(since)}&limit=50`)
           const rows = (await res.json()) as EventRow[]
-          if (Array.isArray(rows) && rows.length > 0) {
-            lastSeenRef.current = rows[0].created_at // newest-first
-            window.localStorage.setItem(LAST_SEEN_KEY, lastSeenRef.current)
-            const fromOthers = rows.filter(r => r.logged_by !== 'parent').reverse()
-            if (fromOthers.length > 0) setToasts(prev => [...prev, ...fromOthers].slice(-5))
+          if (Array.isArray(rows)) {
+            const pending = rows
+              .filter(r => r.logged_by !== 'parent' && !ackedRef.current.has(r.id))
+              .reverse() // oldest first, newest at the bottom
+            setAlerts(pending)
           }
         } catch { /* ignore */ }
+      } else {
+        setAlerts([])
       }
       if (!stopped) timer = setTimeout(poll, POLL_MS)
     }
@@ -54,25 +65,35 @@ export function EventNotifier() {
     return () => { stopped = true; clearTimeout(timer) }
   }, [])
 
-  const dismiss = (id: string) => setToasts(prev => prev.filter(t => t.id !== id))
+  const ack = (id: string) => {
+    ackedRef.current.add(id)
+    try {
+      window.localStorage.setItem(ACKED_KEY, JSON.stringify([...ackedRef.current].slice(-200)))
+    } catch { /* ignore */ }
+    setAlerts(prev => prev.filter(a => a.id !== id))
+  }
 
-  if (toasts.length === 0) return null
+  if (alerts.length === 0) return null
 
   return (
-    <div className="fixed top-3 right-3 z-50 flex flex-col gap-2 w-[min(92vw,360px)]">
-      {toasts.map(t => {
-        const s = KIND_STYLE[t.kind] ?? { border: 'border-white/20', dot: 'bg-gray-400', label: 'ACTIVITY' }
+    <div className="flex flex-col gap-2">
+      {alerts.map(a => {
+        const s = KIND_STYLE[a.kind] ?? { box: 'bg-white/5 border-white/20', dot: 'bg-gray-400', text: 'text-gray-300', label: 'ACTIVITY' }
         return (
-          <div key={t.id} className={`bg-[#1a1a1a] rounded-xl border ${s.border} shadow-lg px-4 py-3 flex items-start gap-3 animate-[fadeIn_.15s_ease-out]`}>
+          <div key={a.id} className={`rounded-2xl border px-4 py-3 flex items-start gap-3 ${s.box}`}>
             <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${s.dot}`} />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] tracking-widest text-gray-500 font-semibold">{s.label}</p>
-              <p className="text-sm text-white leading-snug mt-0.5">{t.summary}</p>
-              {t.detail && <p className="text-xs text-gray-500 mt-0.5">{t.detail}</p>}
-              <p className="text-[10px] text-gray-600 mt-1">{new Date(t.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
+              <p className={`text-[10px] tracking-widest font-semibold ${s.text}`}>{s.label}</p>
+              <p className="text-sm text-white leading-snug mt-0.5">{a.summary}</p>
+              {a.detail && <p className="text-xs text-gray-500 mt-0.5">{a.detail}</p>}
+              <p className="text-[10px] text-gray-600 mt-1">{new Date(a.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
             </div>
-            <button onClick={() => dismiss(t.id)} className="text-gray-600 active:text-gray-300 flex-shrink-0">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            <button onClick={() => ack(a.id)}
+              className={`flex-shrink-0 w-9 h-9 rounded-xl border flex items-center justify-center active:opacity-70 ${s.box}`}
+              aria-label="Confirm seen">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
             </button>
           </div>
         )

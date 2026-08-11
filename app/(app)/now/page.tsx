@@ -4,6 +4,7 @@ import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
 import { AppHeader } from '@/components/t1d/app-header'
 import { AutoRefresh } from '@/components/t1d/auto-refresh'
 import { BgCard } from '@/components/t1d/bg-card'
+import { EventNotifier } from '@/components/t1d/event-notifier'
 import { QuickActions } from '@/components/t1d/quick-actions'
 import { NextUpCard } from '@/components/t1d/next-up-card'
 import type { T1dMealEvent, T1dDoseSession } from '@/types/health'
@@ -123,6 +124,8 @@ export default async function NowPage() {
       <AutoRefresh intervalMs={60_000} />
       <AppHeader />
       <BgCard egvs={egvs} />
+
+      <EventNotifier />
 
       {/* Lunch tile */}
       {(
