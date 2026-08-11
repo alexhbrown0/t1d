@@ -6,6 +6,7 @@ import { EngineToday } from '@/components/t1d/engine-today'
 import { EngineLunchEntry } from '@/components/t1d/engine-lunch-entry'
 import { EngineData } from '@/components/t1d/engine-data'
 import { EngineParams } from '@/components/t1d/engine-params'
+import { DeviceNotifyToggle } from '@/components/t1d/device-notify-toggle'
 
 const TABS = ['TODAY', 'LUNCH', 'FOODS', 'INSIGHTS', 'ENGINE'] as const
 type Tab = typeof TABS[number]
@@ -94,7 +95,12 @@ export default function EnginePage() {
           <EngineData />
         </div>
       )}
-      {tab === 'ENGINE' && <EngineParams />}
+      {tab === 'ENGINE' && (
+        <div className="space-y-3">
+          <DeviceNotifyToggle />
+          <EngineParams />
+        </div>
+      )}
     </div>
   )
 }

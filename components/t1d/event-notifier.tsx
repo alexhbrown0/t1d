@@ -13,7 +13,7 @@ interface EventRow {
 }
 
 const LAST_SEEN_KEY = 't1d_events_last_seen'
-const POLL_MS = 30_000
+const POLL_MS = 20_000
 
 const KIND_STYLE: Record<string, { border: string; dot: string; label: string }> = {
   low: { border: 'border-red-500/40', dot: 'bg-red-500', label: 'LOW TREATED' },
@@ -27,27 +27,26 @@ export function EventNotifier() {
   const lastSeenRef = useRef<string>('')
 
   useEffect(() => {
-    if (!isParentDevice()) return
-
-    lastSeenRef.current = window.localStorage.getItem(LAST_SEEN_KEY) ?? new Date().toISOString()
-
     let timer: ReturnType<typeof setTimeout>
     let stopped = false
 
     const poll = async () => {
-      try {
-        const res = await fetch(`/api/t1d/events?since=${encodeURIComponent(lastSeenRef.current)}`)
-        const rows = (await res.json()) as EventRow[]
-        if (Array.isArray(rows) && rows.length > 0) {
-          // newest-first from API; advance lastSeen to the newest
-          lastSeenRef.current = rows[0].created_at
-          window.localStorage.setItem(LAST_SEEN_KEY, lastSeenRef.current)
-          const fromOthers = rows.filter(r => r.logged_by !== 'parent').reverse()
-          if (fromOthers.length > 0) {
-            setToasts(prev => [...prev, ...fromOthers].slice(-5))
-          }
+      // Re-check each tick so enabling the toggle takes effect without a reload.
+      if (isParentDevice()) {
+        if (!lastSeenRef.current) {
+          lastSeenRef.current = window.localStorage.getItem(LAST_SEEN_KEY) ?? new Date().toISOString()
         }
-      } catch { /* ignore */ }
+        try {
+          const res = await fetch(`/api/t1d/events?since=${encodeURIComponent(lastSeenRef.current)}`)
+          const rows = (await res.json()) as EventRow[]
+          if (Array.isArray(rows) && rows.length > 0) {
+            lastSeenRef.current = rows[0].created_at // newest-first
+            window.localStorage.setItem(LAST_SEEN_KEY, lastSeenRef.current)
+            const fromOthers = rows.filter(r => r.logged_by !== 'parent').reverse()
+            if (fromOthers.length > 0) setToasts(prev => [...prev, ...fromOthers].slice(-5))
+          }
+        } catch { /* ignore */ }
+      }
       if (!stopped) timer = setTimeout(poll, POLL_MS)
     }
 
