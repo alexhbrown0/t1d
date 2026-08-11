@@ -56,15 +56,6 @@ export function EventNotifier() {
 
   const dismiss = (id: string) => setToasts(prev => prev.filter(t => t.id !== id))
 
-  const scheduled = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    for (const t of toasts) {
-      if (scheduled.current.has(t.id)) continue
-      scheduled.current.add(t.id)
-      setTimeout(() => dismiss(t.id), 15_000)
-    }
-  }, [toasts])
-
   if (toasts.length === 0) return null
 
   return (
