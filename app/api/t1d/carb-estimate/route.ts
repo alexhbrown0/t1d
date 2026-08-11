@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
 
   let imageBase64: string | null = null
   let mediaType: 'image/jpeg' | 'image/png' | 'image/webp' = 'image/jpeg'
+  let hint = ''
 
   if (contentType.includes('multipart/form-data')) {
     const form = await req.formData()
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
     imageBase64 = Buffer.from(buffer).toString('base64')
     if (file.type === 'image/png') mediaType = 'image/png'
     else if (file.type === 'image/webp') mediaType = 'image/webp'
+    hint = ((form.get('hint') as string | null) ?? '').trim()
   } else {
     return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 })
   }
@@ -42,7 +44,7 @@ export async function POST(req: NextRequest) {
     .join('\n')
 
   const prompt = `You are analyzing a photo of a child's lunch box or meal to estimate carbohydrates for insulin dosing.
-
+${hint ? `\nThe caregiver added this note about the food — trust it to identify items, brand, and portion size: "${hint}"\n` : ''}
 Known foods in our database (use these exact carb values when you recognize them):
 ${repoSummary || '(no foods in database yet — use general nutrition knowledge)'}
 

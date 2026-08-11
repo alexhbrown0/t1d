@@ -88,6 +88,7 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
   const [saving, setSaving] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
+  const [photoNote, setPhotoNote] = useState('')
   const [photoItems, setPhotoItems] = useState<PackedItem[] | null>(null)
   const [adding, setAdding] = useState<{ food: T1dFoodRepo | RecentItem; qty: string } | null>(null)
   const [editingPhotoIdx, setEditingPhotoIdx] = useState<number | null>(null)
@@ -146,6 +147,7 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
     try {
       const form = new FormData()
       form.append('photo', file)
+      if (photoNote.trim()) form.append('hint', photoNote.trim())
       const resp = await fetch('/api/t1d/carb-estimate', { method: 'POST', body: form })
       const data = await resp.json()
       if (!resp.ok || data.ai_unavailable) {
@@ -454,9 +456,14 @@ export function LunchBuilder({ foodRepo, recentItems, itemStats, initialPacked, 
             </div>
           )}
           {!photoItems && !analyzing && (
-            <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-12 text-center space-y-4">
+            <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-10 text-center space-y-3">
               <p className="text-sm text-gray-400">Take a photo of the lunchbox</p>
               <p className="text-xs text-gray-600">Claude will identify the food and estimate carbs</p>
+              <input
+                type="text" value={photoNote} onChange={e => setPhotoNote(e.target.value)}
+                placeholder="Add a note first (e.g. Publix cupcake, small)"
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/50"
+              />
               <button onClick={() => photoRef.current?.click()} className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold px-6 py-3 rounded-xl">
                 {photoError ? 'Try Photo Again' : 'Open Camera'}
               </button>

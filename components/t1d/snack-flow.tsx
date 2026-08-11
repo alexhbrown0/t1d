@@ -64,6 +64,7 @@ export function SnackFlow({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [manual, setManual] = useState<{ name: string; carbs: string } | null>(null)
+  const [photoNote, setPhotoNote] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
 
   const dosed = existing?.actual_dose_grams != null
@@ -88,6 +89,7 @@ export function SnackFlow({
     try {
       const form = new FormData()
       form.append('photo', file)
+      if (photoNote.trim()) form.append('hint', photoNote.trim())
       const resp = await fetch('/api/t1d/carb-estimate', { method: 'POST', body: form })
       const data = await resp.json()
       if (!resp.ok || data.ai_unavailable) {
@@ -367,12 +369,17 @@ export function SnackFlow({
           )}
 
           {tab === 'photo' && (
-            <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-10 text-center space-y-3">
+            <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-8 text-center space-y-3">
               {analyzing ? (
                 <p className="text-sm text-white">Analyzing photo…</p>
               ) : (
                 <>
                   <p className="text-sm text-gray-400">Take a photo of the snack</p>
+                  <input
+                    type="text" value={photoNote} onChange={e => setPhotoNote(e.target.value)}
+                    placeholder="Add a note first (e.g. Publix cupcake, small)"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/50"
+                  />
                   <button onClick={() => photoRef.current?.click()} className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold px-6 py-3 rounded-xl">Open Camera</button>
                   <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
                 </>

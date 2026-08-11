@@ -30,6 +30,7 @@ const GUMMY_CARBS = 5
 export default function LogBolusPage() {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [photoNote, setPhotoNote] = useState('')
   const [step, setStep] = useState<'capture' | 'library' | 'items' | 'low_treatment' | 'dose'>('capture')
   const [analyzing, setAnalyzing] = useState(false)
   const [items, setItems] = useState<FoodItem[]>([])
@@ -83,6 +84,7 @@ export default function LogBolusPage() {
     setAnalyzing(true)
     const form = new FormData()
     form.append('photo', file)
+    if (photoNote.trim()) form.append('hint', photoNote.trim())
     try {
       const res = await fetch('/api/t1d/carb-estimate', { method: 'POST', body: form })
       const data = await res.json()
@@ -224,6 +226,11 @@ export default function LogBolusPage() {
       {/* Capture step */}
       {step === 'capture' && (
         <div className="space-y-3">
+          <input
+            type="text" value={photoNote} onChange={e => setPhotoNote(e.target.value)}
+            placeholder="Add a note first (e.g. Publix cupcake, small)"
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
+          />
           <label>
             <div className="bg-[#141414] rounded-2xl border-2 border-dashed border-white/10 p-10 flex flex-col items-center gap-3 cursor-pointer active:border-blue-500/40">
               <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center">

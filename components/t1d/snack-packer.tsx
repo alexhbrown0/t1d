@@ -35,6 +35,7 @@ export function SnackPacker({
   const [analyzing, setAnalyzing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [photoNote, setPhotoNote] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
 
   const key = (i: { food_repo_id: string | null; name: string }) => i.food_repo_id ?? i.name.toLowerCase()
@@ -66,6 +67,7 @@ export function SnackPacker({
     try {
       const form = new FormData()
       form.append('photo', file)
+      if (photoNote.trim()) form.append('hint', photoNote.trim())
       const resp = await fetch('/api/t1d/carb-estimate', { method: 'POST', body: form })
       const data = await resp.json()
       if (!resp.ok || data.ai_unavailable) {
@@ -240,6 +242,11 @@ export function SnackPacker({
               ) : (
                 <>
                   <p className="text-sm text-gray-400">Take a photo of the snacks</p>
+                  <input
+                    type="text" value={photoNote} onChange={e => setPhotoNote(e.target.value)}
+                    placeholder="Add a note first (e.g. Goldfish, big bag)"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/50"
+                  />
                   <button onClick={() => photoRef.current?.click()} className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold px-6 py-3 rounded-xl">Open Camera</button>
                   <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
                 </>
