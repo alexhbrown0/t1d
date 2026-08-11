@@ -15,7 +15,8 @@ export interface DayBlock {
 const MORNING: DayBlock[] = [
   { label: 'Homeroom', start: '07:40', end: '07:55', event_type: null, activity_level: null },
   { label: 'Math', start: '07:55', end: '09:00', event_type: null, activity_level: null },
-  { label: 'PE / Specials', start: '09:00', end: '10:00', event_type: 'pe', activity_level: 'high' },
+  { label: 'Specials', start: '09:00', end: '09:30', event_type: null, activity_level: null },
+  { label: 'PE', start: '09:30', end: '10:00', event_type: 'pe', activity_level: 'high' },
   { label: 'Snack', start: '10:00', end: '10:15', event_type: 'snack', activity_level: 'low' },
   { label: 'ELA Block', start: '10:15', end: '12:00', event_type: null, activity_level: null },
   { label: 'Recess', start: '12:00', end: '12:25', event_type: 'recess', activity_level: 'medium' },

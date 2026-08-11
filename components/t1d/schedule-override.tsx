@@ -106,7 +106,7 @@ export function ScheduleOverride({ date, initial }: Props) {
           {/* PE → Specials */}
           <Toggle
             label="PE → Specials today"
-            sub="No morning PE — removes the 9:00 activity effect"
+            sub="No morning PE — removes the 9:30 activity effect"
             value={draft.pe_cancelled}
             onChange={v => set('pe_cancelled', v)}
           />
