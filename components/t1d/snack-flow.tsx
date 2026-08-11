@@ -3,8 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { T1dFoodRepo } from '@/types/health'
-import type { RecentItem } from '@/components/t1d/lunch-builder'
+import type { T1dFoodRepo, PackedSnack } from '@/types/health'
 
 interface Selected {
   food_repo_id: string | null
@@ -44,7 +43,7 @@ export function SnackFlow({
   existing,
 }: {
   foodRepo: T1dFoodRepo[]
-  packedSnacks: RecentItem[]
+  packedSnacks: PackedSnack[]
   packedAt: string | null
   existing: ExistingSnack | null
 }) {
@@ -72,9 +71,9 @@ export function SnackFlow({
     food_repo_id: f.id, name: f.name, carbs: f.carbs_g,
     fat: f.fat_g ?? null, protein: f.protein_g ?? null, qty: 1, serving_size: f.serving_size,
   })
-  const pickRecent = (r: RecentItem) => setSelected({
+  const pickPacked = (r: PackedSnack) => setSelected({
     food_repo_id: r.food_repo_id, name: r.name, carbs: r.carbs,
-    fat: r.fat ?? null, protein: r.protein ?? null, qty: 1, serving_size: r.serving_size,
+    fat: r.fat ?? null, protein: r.protein ?? null, qty: r.qty || 1, serving_size: r.serving_size,
   })
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -336,10 +335,10 @@ export function SnackFlow({
               ) : (
                 <>
                   {packedSnacks.map((r, i) => (
-                    <button key={i} onClick={() => pickRecent(r)}
+                    <button key={i} onClick={() => pickPacked(r)}
                       className="w-full bg-[#141414] border border-white/5 rounded-xl px-4 py-3 flex items-center justify-between active:opacity-70">
-                      <span className="text-sm text-white">{r.name}</span>
-                      <span className="text-xs text-teal-400">{r.carbs}g</span>
+                      <span className="text-sm text-white">{r.qty > 1 ? `${r.qty} × ` : ''}{r.name}</span>
+                      <span className="text-xs text-teal-400">{r.qty > 1 ? `${Math.round(r.carbs * r.qty)}g` : `${r.carbs}g`}</span>
                     </button>
                   ))}
                   {packedAt && <p className="text-[10px] text-gray-600 px-1 pt-1">Packed {new Date(packedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</p>}

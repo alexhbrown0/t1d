@@ -219,6 +219,16 @@ export interface T1dCafeteriaMenuItem {
   created_at: string
 }
 
+export interface PackedSnack {
+  food_repo_id: string | null
+  name: string
+  carbs: number
+  fat: number | null
+  protein: number | null
+  serving_size: string
+  qty: number
+}
+
 export interface IcrSegment {
   start: string  // "HH:MM"
   end: string    // "HH:MM"

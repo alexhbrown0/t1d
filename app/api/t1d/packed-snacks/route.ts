@@ -8,6 +8,7 @@ interface PackedSnackInput {
   fat_g?: number | null
   protein_g?: number | null
   serving_size?: string | null
+  qty?: number
 }
 
 export async function GET() {
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
     fat_g: it.fat_g ?? null,
     protein_g: it.protein_g ?? null,
     serving_size: it.serving_size ?? '1 serving',
+    qty: it.qty ?? 1,
     position: i,
     packed_at: packedAt,
   }))
