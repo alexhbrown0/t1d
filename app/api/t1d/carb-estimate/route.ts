@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     .join('\n')
 
   const prompt = `You are analyzing a photo of a child's lunch box or meal to estimate carbohydrates for insulin dosing.
-${hint ? `\nThe caregiver added this note about the food — trust it to identify items, brand, and portion size: "${hint}"\n` : ''}
+${hint ? `\nThe caregiver added this note about the food — treat it as GROUND TRUTH. If it states a count or portion (e.g. "6 grapes", "2 strawberries"), use those exact numbers as qty and do not re-estimate them: "${hint}"\n` : ''}
 Known foods in our database (use these exact carb values when you recognize them):
 ${repoSummary || '(no foods in database yet — use general nutrition knowledge)'}
 
@@ -57,6 +57,8 @@ Identify every food item in the photo. For EACH item return three linked fields 
 
 CRITICAL — pick the unit by how the food is naturally counted:
 - Countable small pieces (M&M's and other candies, gummies, individual crackers/chips/pretzels, nuts, berries, grapes): use serving_size "1 piece" (or "1 cracker"/"1 pretzel"/etc.), set carbs to the per-PIECE carbs, and set qty to the number of pieces you see. Example: ~20 peanut M&M's → { carbs: 1.4, qty: 20, serving_size: "1 piece" } = 28g, NOT { carbs: 28, qty: 1 }.
+
+COUNTING — be precise and conservative. You tend to OVER-count clustered small items (grapes, berries, candy). Count only pieces that are distinct and clearly separable; do NOT count a piece twice because it overlaps another, and do NOT round up to a "nicer" number. When you are torn between two counts, choose the LOWER one — a caregiver can bump the number up in one tap, but an overshoot silently over-doses. If a piece is mostly hidden behind another, don't count it.
 - Pre-portioned packages (juice box, yogurt pouch, granola bar, chip bag, sandwich, Lunchable): serving_size is that package ("1 box", "1 bar", "1 sandwich"), carbs is one package, qty is the number of packages.
 - Bulk/measured foods (rice, pasta, hummus, sauce): serving_size is a sensible measure ("1 cup", "2 tbsp"), carbs is one measure, qty is how many measures.
 - When an item matches a known food above, express carbs and serving_size in THAT food's unit and set qty to the count in that unit.
