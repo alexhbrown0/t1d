@@ -22,9 +22,23 @@ export async function GET(req: NextRequest) {
   const since = params.get('since')
   const limit = Math.min(parseInt(params.get('limit') ?? '20'), 50)
 
-  let q = supabase.from('t1d_events').select('*').order('created_at', { ascending: false }).limit(limit)
+  // Only unacknowledged events — once any device acknowledges one it drops
+  // off every device's next poll.
+  let q = supabase.from('t1d_events').select('*').is('acknowledged_at', null).order('created_at', { ascending: false }).limit(limit)
   if (since) q = q.gt('created_at', since)
   const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
+}
+
+// Acknowledge one event (or all) so it clears across every device.
+export async function PATCH(req: NextRequest) {
+  const supabase = createServerClient()
+  const body = await req.json().catch(() => ({})) as { id?: string; all?: boolean }
+  let q = supabase.from('t1d_events').update({ acknowledged_at: new Date().toISOString() }).is('acknowledged_at', null)
+  if (body.id) q = q.eq('id', body.id)
+  else if (!body.all) return NextResponse.json({ error: 'id or all required' }, { status: 400 })
+  const { error } = await q
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }

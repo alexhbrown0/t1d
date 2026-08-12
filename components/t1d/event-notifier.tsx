@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { isParentDevice } from '@/lib/t1d/device'
 
 interface EventRow {
@@ -12,7 +12,6 @@ interface EventRow {
   created_at: string
 }
 
-const ACKED_KEY = 't1d_events_acked'
 const POLL_MS = 20_000
 const LOOKBACK_MS = 24 * 60 * 60 * 1000
 
@@ -23,18 +22,8 @@ const KIND_STYLE: Record<string, { box: string; dot: string; text: string; label
   meal: { box: 'bg-teal-500/10 border-teal-500/40', dot: 'bg-teal-500', text: 'text-teal-300', label: 'MEAL LOGGED' },
 }
 
-function readAcked(): Set<string> {
-  try {
-    const raw = window.localStorage.getItem(ACKED_KEY)
-    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
-  } catch {
-    return new Set()
-  }
-}
-
 export function EventNotifier() {
   const [alerts, setAlerts] = useState<EventRow[]>([])
-  const ackedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -43,14 +32,15 @@ export function EventNotifier() {
     const poll = async () => {
       // Re-check each tick so enabling the toggle takes effect without a reload.
       if (isParentDevice()) {
-        if (ackedRef.current.size === 0) ackedRef.current = readAcked()
         const since = new Date(Date.now() - LOOKBACK_MS).toISOString()
         try {
+          // Server returns only unacknowledged events, so acknowledging on one
+          // device clears the alert on every device by the next poll.
           const res = await fetch(`/api/t1d/events?since=${encodeURIComponent(since)}&limit=50`)
           const rows = (await res.json()) as EventRow[]
           if (Array.isArray(rows)) {
             const pending = rows
-              .filter(r => r.logged_by !== 'parent' && !ackedRef.current.has(r.id))
+              .filter(r => r.logged_by !== 'parent')
               .reverse() // oldest first, newest at the bottom
             setAlerts(pending)
           }
@@ -66,11 +56,12 @@ export function EventNotifier() {
   }, [])
 
   const ack = (id: string) => {
-    ackedRef.current.add(id)
-    try {
-      window.localStorage.setItem(ACKED_KEY, JSON.stringify([...ackedRef.current].slice(-200)))
-    } catch { /* ignore */ }
     setAlerts(prev => prev.filter(a => a.id !== id))
+    fetch('/api/t1d/events', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }).catch(() => { /* next poll will retry visibility */ })
   }
 
   if (alerts.length === 0) return null
