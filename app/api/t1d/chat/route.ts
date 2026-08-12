@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     // All of today's app dose sessions (more current than Glooko)
     supabase.from('t1d_dose_sessions').select('timestamp, recommended_dose_grams, actual_dose_grams, actual_dose_timestamp, pump_suggested_units, engine_reasoning, context_snapshot').gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(10),
     // Today's meal events (lunch + snack)
-    supabase.from('t1d_meal_events').select('timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs, fpu_count').in('context', ['school_lunch', 'snack']).gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(3),
+    supabase.from('t1d_meal_events').select('timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs, fpu_count').in('context', ['school_lunch', 'snack', 'extended_day_snack']).gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(4),
     // Today's schedule overrides
     supabase.from('t1d_daily_overrides').select('pe_cancelled, pe_start_time, lunch_start_time, notes').eq('override_date', getCentralDateStr()).limit(1),
     // Full day's schedule (code-defined, see lib/t1d/day-schedule.ts)
@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
   const todayMeals = mealResult.data ?? []
   const todayMeal = todayMeals.find((m: { context: string }) => m.context === 'school_lunch') ?? null
   const todaySnack = todayMeals.find((m: { context: string }) => m.context === 'snack') ?? null
+  const todayExtendedSnack = todayMeals.find((m: { context: string }) => m.context === 'extended_day_snack') ?? null
   const todayOverride = overrideResult.data?.[0] ?? null
   const schedule = scheduleResult.data ?? []
   const foodRepo = foodRepoResult.data ?? []
@@ -180,12 +181,19 @@ export async function POST(req: NextRequest) {
     })(),
     (() => {
       if (!todaySnack) return null
-      const offered = (todaySnack.items_offered as Array<{ name: string; carbs: number; qty_offered: number }>) ?? []
       const eaten = (todaySnack.items_eaten as Array<{ name: string; carbs: number; qty_offered: number; qty_eaten: number | null }> | null)
       if (eaten) {
-        return `Afternoon snack: ${todaySnack.total_eaten_carbs ?? '?'}g eaten (of ${todaySnack.total_offered_carbs ?? '?'}g packed)`
+        return `Morning snack: ${todaySnack.total_eaten_carbs ?? '?'}g eaten (of ${todaySnack.total_offered_carbs ?? '?'}g packed)`
       }
-      return `Afternoon snack packed (${todaySnack.total_offered_carbs ?? '?'}g) — not yet eaten`
+      return `Morning snack (${todaySnack.total_offered_carbs ?? '?'}g) — not yet eaten`
+    })(),
+    (() => {
+      if (!todayExtendedSnack) return null
+      const eaten = (todayExtendedSnack.items_eaten as Array<{ name: string; carbs: number; qty_offered: number; qty_eaten: number | null }> | null)
+      if (eaten) {
+        return `Extended day snack: ${todayExtendedSnack.total_eaten_carbs ?? '?'}g eaten (of ${todayExtendedSnack.total_offered_carbs ?? '?'}g)`
+      }
+      return `Extended day snack (${todayExtendedSnack.total_offered_carbs ?? '?'}g) — not yet eaten`
     })(),
     todayOverride?.pe_cancelled ? 'TODAY: PE CANCELLED — no activity reduction' :
     todayOverride?.pe_start_time ? `TODAY: PE moved to ${todayOverride.pe_start_time}` :

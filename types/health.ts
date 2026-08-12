@@ -188,7 +188,7 @@ export interface MealItem {
   protein: number | null
 }
 
-export type MealContext = 'school_lunch' | 'home_dinner' | 'grandparent' | 'breakfast' | 'snack'
+export type MealContext = 'school_lunch' | 'home_dinner' | 'grandparent' | 'breakfast' | 'snack' | 'extended_day_snack'
 
 export interface T1dMealEvent {
   id: string

@@ -78,7 +78,7 @@ export async function generateInsight(): Promise<void> {
     supabase.from('glooko_bolus').select('timestamp, carbs_input_g, insulin_delivered_u, bg_input_mgdl').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('t1d_dose_sessions').select('timestamp, recommended_dose_grams, actual_dose_grams, actual_dose_timestamp, pump_suggested_units, engine_reasoning, context_snapshot').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(5),
     supabase.from('t1d_low_treatments').select('timestamp, bg_at_treatment, treatment_type, treatment_carbs_g').gte('timestamp', sixHoursAgo).order('timestamp', { ascending: false }).limit(3),
-    supabase.from('t1d_meal_events').select('timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs').in('context', ['school_lunch', 'snack']).gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(3),
+    supabase.from('t1d_meal_events').select('timestamp, context, items_offered, items_eaten, total_offered_carbs, total_eaten_carbs').in('context', ['school_lunch', 'snack', 'extended_day_snack']).gte('timestamp', midnightIso).order('timestamp', { ascending: false }).limit(4),
     supabase.from('t1d_daily_overrides').select('pe_cancelled, pe_start_time, notes').eq('override_date', todayDate).limit(1),
     supabase.from('t1d_engine_params').select('current_icr, current_dia, pre_bolus_lead_min, activity_reduction_pct, clinical_notes').lte('effective_from', todayDate).order('effective_from', { ascending: false }).limit(1).maybeSingle(),
   ])
@@ -97,6 +97,7 @@ export async function generateInsight(): Promise<void> {
   const todayMeals = mealResult.data ?? []
   const todayMeal = todayMeals.find((m: { context: string }) => m.context === 'school_lunch') ?? todayMeals[0] ?? null
   const todaySnack = todayMeals.find((m: { context: string }) => m.context === 'snack') ?? null
+  const todayExtendedSnack = todayMeals.find((m: { context: string }) => m.context === 'extended_day_snack') ?? null
   const schedule = scheduleToday
   const todayOverride = overrideResult.data?.[0] ?? null
   const params = paramsResult.data
@@ -136,8 +137,13 @@ export async function generateInsight(): Promise<void> {
       : 'No school lunch packed today',
     todaySnack
       ? todaySnack.items_eaten
-        ? `Afternoon snack: ${todaySnack.total_offered_carbs ?? '?'}g, ${todaySnack.total_eaten_carbs ?? '?'}g eaten`
-        : `Afternoon snack packed: ${todaySnack.total_offered_carbs ?? '?'}g — not eaten yet`
+        ? `Morning snack: ${todaySnack.total_offered_carbs ?? '?'}g, ${todaySnack.total_eaten_carbs ?? '?'}g eaten`
+        : `Morning snack: ${todaySnack.total_offered_carbs ?? '?'}g — not eaten yet`
+      : null,
+    todayExtendedSnack
+      ? todayExtendedSnack.items_eaten
+        ? `Extended day snack: ${todayExtendedSnack.total_offered_carbs ?? '?'}g, ${todayExtendedSnack.total_eaten_carbs ?? '?'}g eaten`
+        : `Extended day snack: ${todayExtendedSnack.total_offered_carbs ?? '?'}g — not eaten yet`
       : null,
   ].filter(Boolean).join(' | ')
 

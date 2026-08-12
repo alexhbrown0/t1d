@@ -14,10 +14,20 @@ function formatIcrForPrompt(params: T1dEngineParams): string {
   return params.icr_segments.map((s: IcrSegment) => `${s.icr} g/unit (${s.start}–${s.end})`).join(', ')
 }
 
-export function buildDoseEngineSystemPrompt(params: T1dEngineParams, clinicalNotes?: string | null, mealType: 'lunch' | 'snack' = 'lunch'): string {
+export function buildDoseEngineSystemPrompt(params: T1dEngineParams, clinicalNotes?: string | null, mealType: 'lunch' | 'snack' | 'extended_day_snack' = 'lunch'): string {
   const activeIcr = resolveActiveIcr(params)
   const fpuCarbEquiv = ((params.fpu_insulin_factor ?? 0.5) * activeIcr).toFixed(1)
-  void mealType
+  const isExtendedDay = mealType === 'extended_day_snack'
+
+  const extendedDayProtocol = `## Extended-day snack dosing — CRITICAL (this overrides the sizing rule below)
+This is Brooks's **extended-day (after-care) snack**, eaten ~2:45–3:15 PM, and it is usually **high-GI** (cookie, chips).
+- Dose it as ONE single dose — there is NO 70/30 follow-up (no caregiver at after-care for a top-up). The >30g split rule does NOT apply here; cover it in one dose even if total carbs slightly exceed 30g.
+- A **caregiver-reported "expected activity after"** signal is in the user context and is AUTHORITATIVE (do not expect a schedule block for it):
+  - **HARD play expected** (the usual case): he goes straight into intense outdoor play. Reduce the dose to **roughly half — target ~50% of the full carb dose**. (This is a larger cut than the standard ${(params.activity_reduction_pct * 100).toFixed(0)}% activity reduction, because the play is prolonged/hard and the snack is high-GI.) Set hold_for_activity: true.
+  - **CALM expected** (movie / rain day): give the FULL carb dose; add a note to watch for a high-GI spike.
+- Still apply the low/dropping-BG delay and wait_and_see rules below on top of this.
+
+`
 
   const doseProtocol = `## Dose sizing — CRITICAL (decided by TOTAL carbs)
 Look at the total carbs of what he's eating and pick the strategy. This rule is universal — it applies to snacks, lunches, everything.
@@ -36,7 +46,7 @@ Both paths still account for UPCOMING activity (see below).`
 ${clinicalNotes ? `\n## Clinical notes — follow these:\n${clinicalNotes}\n` : ''}
 
 Your job: analyze a meal or snack and its current context, then output a specific dosing recommendation as JSON. You output carbs to enter into the pump — not insulin units. The pump converts to units using its ICR.
-
+${isExtendedDay ? `\n${extendedDayProtocol}` : ''}
 ## Brooks's Profile
 - Insulin: ${params.insulin_type} (Fiasp onset 0–5 min — dose when he starts eating, not before)
 - Target range: 70–180 mg/dL (target: ${params.target_bg} mg/dL)
@@ -93,7 +103,7 @@ When dropping: insulin is still needed — food must be covered. The goal is to 
    - Starts in ~90–180 min: meaningful — reduce by ~25% of activity_reduction_pct. Note in reasoning.
    - Starts 180+ min out: light note only. Minimal dose impact but mention it.
    - Activity he is CURRENTLY IN, that is ENDING (even a few minutes left), or ALREADY FINISHED: treat him as DONE with it and do NOT reduce the dose for it at all. It is not upcoming activity — assume it's over. Past activity never drives a normal-BG dose toward zero.
-   IMPORTANT — school-year schedule: activity happens in the MORNING and just BEFORE lunch (PE ~9:30–10:00, recess 12:00–12:25; Specials 9:00–9:30 is non-physical), and the AFTERNOON is sedentary (Social Studies/Science, Math, Writing). Lunch is 12:25. So for the lunch dose, do NOT reduce for "upcoming activity" — there is none after lunch. Recess ends right as lunch begins; its main effect is that he may arrive at lunch already running lower, so weigh current BG and trend, not a post-meal activity reduction. Only apply activity reduction when the schedule actually shows high-intensity activity ahead of the dose you're calculating.
+   IMPORTANT — school-year schedule: activity happens in the MORNING and just BEFORE lunch (PE ~9:30–10:00, recess 12:00–12:25; Specials 9:00–9:30 is non-physical). For the LUNCH dose specifically, the regular academic afternoon (Social Studies/Science, Math, Writing) has no scheduled activity, so don't invent a post-lunch activity reduction; recess ends right as lunch begins, so weigh current BG and trend rather than a post-meal activity cut. NOTE: this does not mean afternoons are always sedentary — on school days Brooks also has an extended-day snack that is often followed by hard outdoor play. That case is handled by the caregiver-reported activity signal (see the extended-day section / the post-snack activity line in the context), not by this timetable. Only apply activity reduction when the schedule OR the caregiver-reported signal actually shows high-intensity activity ahead of the dose you're calculating.
 
 ## Using food history
 Each food item comes with its playbook (if one exists from prior meals) and similar-food outcomes.
@@ -138,8 +148,10 @@ export function buildDoseEngineUserContext(input: {
   lowTreatmentType?: string | null
   startingBg?: number | null
   startingTrend?: string | null
+  mealType?: 'lunch' | 'snack' | 'extended_day_snack'
+  expectedActivity?: 'high' | 'none' | null
 }): string {
-  const { meal, last5Egvs, scheduleNext2h, recentFastCarbs, foodPlaybooks, similarFoodOutcomes, recentBoluses, params, mealGiCategory, lowTreatmentCarbs, lowTreatmentType, startingBg, startingTrend } = input
+  const { meal, last5Egvs, scheduleNext2h, recentFastCarbs, foodPlaybooks, similarFoodOutcomes, recentBoluses, params, mealGiCategory, lowTreatmentCarbs, lowTreatmentType, startingBg, startingTrend, expectedActivity } = input
 
   const minsOld = (iso: string) => Math.round((Date.now() - new Date(iso).getTime()) / 60000)
   const egvsWithDelta = last5Egvs.map((egv, i) => {
@@ -200,6 +212,15 @@ export function buildDoseEngineUserContext(input: {
       const note = s.notes ? ` — ${s.notes}` : ''
       lines.push(`  ${s.start_time}–${s.end_time} (${relStr}): ${s.event_type} (${s.activity_level ?? 'normal'})${note}`)
     }
+  }
+
+  if (expectedActivity != null) {
+    lines.push('\n## Post-snack activity (caregiver-reported — authoritative)')
+    lines.push(
+      expectedActivity === 'high'
+        ? '  Brooks goes straight into HARD outdoor play right after this snack — imminent, high intensity, starting now.'
+        : '  Calm afternoon (movie / rain) — no meaningful activity after this snack.'
+    )
   }
 
   lines.push('\n## Recent fast carbs (last 30 min)')

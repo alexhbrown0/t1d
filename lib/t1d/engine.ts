@@ -18,7 +18,8 @@ interface EngineContext {
   lowTreatmentType?: string | null
   startingBg?: number | null
   startingTrend?: string | null
-  mealType?: 'lunch' | 'snack'
+  mealType?: 'lunch' | 'snack' | 'extended_day_snack'
+  expectedActivity?: 'high' | 'none' | null
 }
 
 export async function runDoseEngine(meal: MealItem[], ctx: EngineContext = {}): Promise<EngineOutput> {

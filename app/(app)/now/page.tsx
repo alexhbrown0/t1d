@@ -20,7 +20,7 @@ export default async function NowPage() {
   const snackDayStart = getCentralDayStartUTC()
   const weekStart = getSnackWeekStartUTC()
 
-  const [egvsResult, lunchResult, snackResult, packedResult] = await Promise.all([
+  const [egvsResult, lunchResult, snackResult, packedResult, extSnackResult] = await Promise.all([
     supabase
       .from('dexcom_egvs')
       .select('*')
@@ -45,6 +45,13 @@ export default async function NowPage() {
       .from('t1d_packed_snacks')
       .select('packed_at')
       .order('packed_at', { ascending: false })
+      .limit(1),
+    supabase
+      .from('t1d_meal_events')
+      .select('id, total_offered_carbs')
+      .eq('context', 'extended_day_snack')
+      .gte('timestamp', snackDayStart.toISOString())
+      .order('timestamp', { ascending: false })
       .limit(1),
   ])
 
@@ -114,8 +121,26 @@ export default async function NowPage() {
     if (snackSessions && snackSessions.length > 0) snackPhase = 'dosed'
   }
 
+  // Extended-day (after-care) snack: 'none' | 'dosed', surfaced only in the afternoon window on school days
+  let extPhase: 'none' | 'dosed' = 'none'
+  let extCarbs: number | null = null
+  const extMeal = extSnackResult.data?.[0] ?? null
+  if (extMeal) {
+    extCarbs = extMeal.total_offered_carbs
+    const { data: extSessions } = await supabase
+      .from('t1d_dose_sessions')
+      .select('actual_dose_grams')
+      .eq('meal_event_id', extMeal.id)
+      .not('actual_dose_grams', 'is', null)
+      .limit(1)
+    if (extSessions && extSessions.length > 0) extPhase = 'dosed'
+  }
+  const nowMins = getCentralTime().minutesSinceMidnight
+
   // Lunch overdue = not packed, on a school day, and we're packing for today (not the evening "for tomorrow" window)
   const isSchoolDay = snackWeekday >= 1 && snackWeekday <= 5
+  // Show the extended-day tile from ~dismissal (2:20 PM) through the evening on school days, or any time it's already been dosed today
+  const showExtendedSnack = (isSchoolDay && nowMins >= 860 && nowMins < 1140) || extPhase === 'dosed'
   const lunchOverdue = lunchPhase === 'none' && !packingForTomorrow && isSchoolDay
   const lunchAmber = lunchOverdue || lunchPhase === 'needs_followup'
 
@@ -209,6 +234,34 @@ export default async function NowPage() {
           </svg>
         </div>
       </Link>
+
+      {/* Extended day (after-care) snack tile — afternoon window on school days */}
+      {showExtendedSnack && (
+        <Link href="/snack/extended">
+          <div className={`rounded-2xl border px-4 py-3.5 flex items-center gap-3 active:opacity-80 ${
+            extPhase === 'dosed' ? 'bg-[#141414] border-teal-500/20' : 'bg-[#141414] border-teal-500/20'
+          }`}>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${extPhase === 'dosed' ? 'bg-teal-500/20' : 'bg-teal-500/10'}`}>
+              {extPhase === 'dosed' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 12h8" /></svg>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-semibold tracking-widest text-teal-400">
+                EXTENDED DAY SNACK · {extPhase === 'dosed' ? 'DOSED' : 'NOT DOSED'}
+              </p>
+              <p className="text-sm font-semibold text-white mt-0.5">
+                {extPhase === 'dosed' ? `${extCarbs ?? '—'}g dosed ✓` : 'Identify & dose after-care snack'}
+              </p>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
+        </Link>
+      )}
 
       <QuickActions />
       <NextUpCard />
