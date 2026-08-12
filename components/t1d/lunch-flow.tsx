@@ -215,6 +215,18 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
     }
   }
 
+  const handleResetDose = async () => {
+    if (!data.meal) return
+    if (!window.confirm('Reset this lunch back to packed? This removes the dose(s) and eaten record but keeps the packed items.')) return
+    setLoading(true)
+    try {
+      await fetch(`/api/t1d/meal/${data.meal.id}/reset`, { method: 'POST' })
+      await refresh()
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleReadyToEat = async () => {
     if (!data.meal) return
     setLoading(true)
@@ -1045,6 +1057,17 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
           {data.meal && <InlineAsk mealEventId={data.meal.id} />}
         </div>
+      )}
+
+      {/* Undo an accidental dose / eaten marking — keeps the packed lunch */}
+      {data.meal && phase !== 'no_lunch' && phase !== 'packed' && (
+        <button
+          onClick={handleResetDose}
+          disabled={loading}
+          className="w-full mt-3 text-xs text-gray-500 py-2 active:text-red-400 disabled:opacity-40"
+        >
+          Reset lunch to packed (undo dose)
+        </button>
       )}
     </div>
   )
