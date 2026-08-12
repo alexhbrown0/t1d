@@ -180,6 +180,39 @@ function InlineAsk({ mealEventId, onSuggestDose, label }: { mealEventId: string;
   )
 }
 
+function phaseToStep(phase: Phase): 1 | 2 | 3 | null {
+  if (phase === 'packed' || phase === 'pre_dose_ready') return 1
+  if (phase === 'eating') return 2
+  if (phase === 'followup_pending' || phase === 'followup_ready') return 3
+  return null // no_lunch, complete
+}
+
+function StepHeader({ phase }: { phase: Phase }) {
+  if (phase === 'no_lunch') return null
+  const current = phaseToStep(phase)
+  const allDone = phase === 'complete'
+  const steps = ['First dose', 'Log what he ate', 'Follow-up'] as const
+  return (
+    <div className="flex items-stretch gap-1.5">
+      {steps.map((label, i) => {
+        const n = (i + 1) as 1 | 2 | 3
+        const isDone = allDone || (current != null && n < current)
+        const isCurrent = !allDone && current === n
+        return (
+          <div key={n} className={`flex-1 rounded-lg px-2 py-1.5 border text-center ${
+            isCurrent ? 'bg-teal-500/15 border-teal-500/40' : isDone ? 'bg-teal-500/5 border-teal-500/20' : 'bg-white/5 border-white/10'
+          }`}>
+            <p className={`text-[9px] font-semibold tracking-wide ${isCurrent ? 'text-teal-300' : isDone ? 'text-teal-500' : 'text-gray-600'}`}>
+              {isDone ? '✓ DONE' : `STEP ${n}`}
+            </p>
+            <p className={`text-[10px] mt-0.5 leading-tight ${isCurrent ? 'text-white' : 'text-gray-500'}`}>{label}</p>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const [data, setData] = useState<LunchData>(initialData)
   const [loading, setLoading] = useState(false)
@@ -346,6 +379,8 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
     }
   }
 
+  // Step 2 saves what he ate only — it does NOT calculate a dose. The follow-up
+  // dose (step 3) is triggered separately ~20-30 min later via handleAnotherDose.
   const handleSubmitEaten = async () => {
     if (!data.meal || !data.session) return
     setLoading(true)
@@ -358,11 +393,6 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items_eaten, entered_by: 'alexandra' }),
-      })
-      await fetch('/api/t1d/lunch/follow-up', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meal_event_id: data.meal.id, pre_dose_session_id: data.session.id }),
       })
       await refresh()
     } finally {
@@ -469,6 +499,8 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           <button onClick={() => setFlowError(null)} className="text-[10px] text-gray-600 active:text-gray-400">Dismiss</button>
         </div>
       )}
+
+      <StepHeader phase={phase} />
 
       {/* ── No lunch ─────────────────────────────────────────────────────── */}
       {phase === 'no_lunch' && (
@@ -604,7 +636,10 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           })()}
 
           <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
-            <p className="text-[10px] tracking-widest text-teal-400 font-semibold">FIRST DOSE</p>
+            <div>
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 1 OF 3 · FIRST DOSE</p>
+              <p className="text-xs text-gray-500 mt-1">Give this now (~70%). After he eats, you&apos;ll log it and give a follow-up to finish.</p>
+            </div>
 
             <PreDoseAmount
               recommended={data.session.recommended_dose_grams ?? 0}
@@ -665,18 +700,9 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
       {phase === 'eating' && data.session && data.meal && (
         <>
           <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">
-                {data.preDoseSessions.length > 1 ? `PRE-DOSES (${data.preDoseSessions.length})` : 'PRE-DOSE'}
-              </p>
-              <button
-                onClick={handleReadyToEat}
-                disabled={loading}
-                className="text-[10px] text-teal-500 font-semibold active:opacity-70 disabled:opacity-40"
-              >
-                {loading ? '+ Adding…' : '+ Give another dose'}
-              </button>
-            </div>
+            <p className="text-[10px] tracking-widest text-teal-400 font-semibold">
+              {data.preDoseSessions.length > 1 ? `PRE-DOSES (${data.preDoseSessions.length})` : 'PRE-DOSE'}
+            </p>
             {data.preDoseSessions.map((s, i) => (
               <p key={s.id} className="text-sm text-white">
                 {i > 0 && <span className="text-gray-600 text-xs mr-1.5">#{i + 1}</span>}
@@ -700,7 +726,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           </div>
 
           <div className="bg-[#141414] rounded-2xl border border-white/5 p-5 space-y-4">
-            {/* Submit at top — always visible, shows live total */}
+            <div>
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 2 OF 3 · LOG WHAT HE ATE</p>
+              <p className="text-xs text-gray-500 mt-1">Just record how much he ate — this does NOT give a dose. You&apos;ll give the follow-up next.</p>
+            </div>
+            {/* Save at top — always visible, shows live total */}
             {(() => {
               const totalEaten = data.meal.items_offered.reduce((s, item) => {
                 const pct = eatenPcts[item.name] ?? 100
@@ -713,8 +743,8 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                   className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
                 >
                   {loading ? (
-                    <span className="flex items-center justify-center gap-2"><Spinner /> Calculating follow-up…</span>
-                  ) : `He ate ${Math.round(totalEaten)}g — Get Follow-up Dose →`}
+                    <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span>
+                  ) : `Save what he ate (${Math.round(totalEaten)}g) →`}
                 </button>
               )
             })()}
@@ -789,15 +819,28 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
             <InlineAsk mealEventId={data.meal.id} />
           </div>
+
+          <button
+            onClick={handleReadyToEat}
+            disabled={loading}
+            className="w-full text-xs text-gray-500 py-2 active:text-teal-400 disabled:opacity-40"
+          >
+            {loading ? 'Adding…' : 'Need an extra dose now? →'}
+          </button>
         </>
       )}
 
-      {/* ── Follow-up pending ─────────────────────────────────────────────── */}
+      {/* ── Step 3: follow-up (waiting to be calculated) ──────────────────── */}
       {phase === 'followup_pending' && (
-        data.followUpSession ? (
-          // Returned to pending because carbs are still uncovered
+        loading ? (
+          <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-10 text-center space-y-3">
+            <Spinner className="h-6 w-6 text-teal-400 mx-auto" />
+            <p className="text-sm text-white">Calculating follow-up dose…</p>
+          </div>
+        ) : data.followUpSession ? (
+          // Returned here after confirming a follow-up but carbs are still uncovered
           <div className="bg-[#141414] rounded-2xl border border-amber-500/20 p-5 space-y-3">
-            <p className="text-[10px] tracking-widest text-amber-400 font-semibold">CARBS NOT FULLY COVERED</p>
+            <p className="text-[10px] tracking-widest text-amber-400 font-semibold">STEP 3 OF 3 · STILL UNCOVERED</p>
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Dosed for</span>
               <span className="text-white font-semibold">{Math.round(data.totalDosedCarbs)}g</span>
@@ -817,7 +860,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               disabled={loading}
               className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-semibold py-3.5 rounded-xl disabled:opacity-40"
             >
-              {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Checking…</span> : 'Check if another dose is needed →'}
+              Check if another dose is needed →
             </button>
             {!data.bg && (
               <div className="space-y-2">
@@ -833,19 +876,43 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               </div>
             )}
           </div>
-        ) : loading ? (
-          <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-10 text-center space-y-3">
-            <Spinner className="h-6 w-6 text-teal-400 mx-auto" />
-            <p className="text-sm text-white">Calculating follow-up dose…</p>
-          </div>
         ) : (
-          <div className="bg-[#141414] rounded-2xl border border-amber-500/20 p-5 space-y-3 text-center">
-            <p className="text-sm text-gray-400">Follow-up calculation didn't complete.</p>
+          // Just logged what he ate — waiting screen for the follow-up dose
+          <div className="bg-[#141414] rounded-2xl border border-teal-500/20 p-5 space-y-4">
+            <div>
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 3 OF 3 · FOLLOW-UP DOSE</p>
+              <p className="text-sm text-white font-semibold mt-1">Give the follow-up dose in ~20–30 minutes.</p>
+              <p className="text-xs text-gray-500 mt-1">Come back to Lunch then and tap below to get the dose.</p>
+            </div>
+            <div className="space-y-1 border-t border-white/5 pt-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Pre-dosed</span>
+                <span className="text-white font-semibold">{Math.round(data.totalDosedCarbs)}g</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">He ate</span>
+                <span className="text-white font-semibold">{Math.round(data.meal?.total_eaten_carbs ?? 0)}g</span>
+              </div>
+            </div>
+            {!data.bg && (
+              <div className="space-y-2">
+                <p className="text-[10px] tracking-widest text-gray-500 font-semibold">ENTER CURRENT BG (OPTIONAL)</p>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={manualBg}
+                  onChange={e => setManualBg(e.target.value)}
+                  placeholder="e.g. 145"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white text-base placeholder:text-gray-600 focus:outline-none focus:border-teal-500/50"
+                />
+              </div>
+            )}
             <button
               onClick={handleAnotherDose}
-              className="w-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-sm font-semibold py-3.5 rounded-xl"
+              disabled={loading}
+              className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
             >
-              Try again →
+              Get follow-up dose →
             </button>
           </div>
         )
@@ -860,7 +927,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
           {data.followUpSession.recommended_dose_grams === 0 ? (
             <div className="bg-[#141414] rounded-2xl border border-teal-500/20 p-5 space-y-3">
-              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">NO DOSE NEEDED RIGHT NOW</p>
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 3 OF 3 · NO FOLLOW-UP NEEDED</p>
               <p className="text-sm text-gray-300 leading-relaxed">{data.followUpSession.engine_reasoning}</p>
 
               {followOverrideDose ? (
@@ -912,7 +979,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             </div>
           ) : (
             <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
-              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">FOLLOW-UP DOSE</p>
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 3 OF 3 · FOLLOW-UP DOSE</p>
 
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-bold text-white">{followOverrideDose || data.followUpSession.recommended_dose_grams}g</span>
