@@ -4,7 +4,8 @@ import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { getCentralTime } from '@/lib/utils/central-time'
 import { logEvent } from '@/lib/t1d/device'
-import type { T1dMealEvent, T1dDoseSession, MealItem } from '@/types/health'
+import { CafeteriaBuilder } from '@/components/t1d/cafeteria-builder'
+import type { T1dMealEvent, T1dDoseSession, MealItem, T1dCafeteriaMenuItem } from '@/types/health'
 
 type Phase = 'no_lunch' | 'packed' | 'pre_dose_ready' | 'eating' | 'followup_pending' | 'followup_ready' | 'complete'
 type EatenPct = 0 | 25 | 50 | 75 | 100
@@ -21,6 +22,8 @@ interface LunchData {
   override: { pe_cancelled?: boolean; pe_start_time?: string | null } | null
   phase: Phase
   totalDosedCarbs: number
+  cafeteriaMenu?: T1dCafeteriaMenuItem[]
+  stapleNames?: string[]
 }
 
 const TREND: Record<string, string> = {
@@ -521,13 +524,30 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               <p className="text-white font-semibold">Calculating dose…</p>
               <p className="text-xs text-gray-500">This takes a few seconds</p>
             </div>
+          ) : (data.meal.is_cafeteria && (data.meal.items_offered?.length ?? 0) === 0) ? (
+            <div className="space-y-3">
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 1 OF 3 · PICK HIS PLATE</p>
+              <p className="text-xs text-gray-500">Select what he got from the cafeteria line. You&apos;ll size portions with a tray photo, then dose.</p>
+              <CafeteriaBuilder
+                menu={data.cafeteriaMenu ?? []}
+                stapleNames={data.stapleNames ?? []}
+                existingMealId={data.meal.id}
+                initialSelectedNames={[]}
+                saveTimestamp={data.meal.timestamp}
+                targetLabel="today"
+                onSaved={refresh}
+              />
+              <button onClick={handleClearLunch} disabled={loading} className="w-full text-xs text-gray-500 py-2 active:text-red-400 disabled:opacity-40">
+                Cancel lunchroom lunch
+              </button>
+            </div>
           ) : (
             <>
               <PackedItems items={data.meal.items_offered} total={data.meal.total_offered_carbs} />
 
               {data.meal.is_cafeteria && (
                 <div className="bg-[#141414] rounded-2xl border border-amber-500/20 p-4 space-y-2">
-                  <p className="text-[10px] tracking-widest text-amber-400 font-semibold">CAFETERIA · SET PORTIONS</p>
+                  <p className="text-[10px] tracking-widest text-amber-400 font-semibold">STEP 1 OF 3 · SET PORTIONS</p>
                   <p className="text-xs text-gray-500">These are standard servings. Take a photo of his tray before he eats to size the actual portions.</p>
                   <button
                     onClick={() => portionRef.current?.click()}
@@ -668,7 +688,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
             <div>
               <label className="text-[10px] tracking-widest text-gray-500 font-semibold">
-                INSULIN UNITS (what the pump showed)
+                INSULIN UNITS GIVEN
               </label>
               <input
                 type="number"
@@ -939,7 +959,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                     </div>
                     <div>
                       <label className="text-[10px] tracking-widest text-gray-500 font-semibold">
-                        INSULIN UNITS (what the pump showed)
+                        INSULIN UNITS GIVEN
                       </label>
                       <input
                         type="number"
@@ -981,10 +1001,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 3 OF 3 · FOLLOW-UP DOSE</p>
 
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold text-white">{followOverrideDose || data.followUpSession.recommended_dose_grams}g</span>
-                <span className="text-gray-500 text-sm">into pump</span>
-              </div>
+              <PreDoseAmount
+                recommended={data.followUpSession.recommended_dose_grams ?? 0}
+                override={followOverrideDose}
+                onOverride={setFollowOverrideDose}
+              />
 
               {data.followUpSession.engine_reasoning && (
                 <p className="text-xs text-gray-400 leading-relaxed">{data.followUpSession.engine_reasoning}</p>
@@ -992,7 +1013,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
               <div>
                 <label className="text-[10px] tracking-widest text-gray-500 font-semibold">
-                  INSULIN UNITS (what the pump showed)
+                  INSULIN UNITS GIVEN
                 </label>
                 <input
                   type="number"

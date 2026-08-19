@@ -182,7 +182,7 @@ export default function LogCorrectionPage() {
         <div className="bg-[#141414] rounded-2xl border border-yellow-500/20 p-4 space-y-3">
           <p className="text-[10px] tracking-widest text-yellow-400 font-semibold">CORRECTION GIVEN</p>
           <div>
-            <label className="text-[10px] tracking-widest text-gray-500 font-semibold">INSULIN UNITS (what the pump gave)</label>
+            <label className="text-[10px] tracking-widest text-gray-500 font-semibold">INSULIN UNITS GIVEN</label>
             <input
               type="number" step="0.01" inputMode="decimal" value={units}
               onChange={e => setUnits(e.target.value)} placeholder="e.g. 0.55"

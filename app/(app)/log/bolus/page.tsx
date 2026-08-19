@@ -36,6 +36,8 @@ export default function LogBolusPage() {
   const [items, setItems] = useState<FoodItem[]>([])
   const [mealGi, setMealGi] = useState<'high' | 'medium' | 'low' | null>(null)
   const [dose, setDose] = useState<{ grams: number; reasoning: string } | null>(null)
+  const [doseOverride, setDoseOverride] = useState('')
+  const [doseUnits, setDoseUnits] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [currentBg, setCurrentBg] = useState<{ value: number; trend: string; arrow: string; delta: number | null } | null>(null)
   const [lowTreatment, setLowTreatment] = useState<{ type: string; carbs: number; label: string } | null>(null)
@@ -163,6 +165,7 @@ export default function LogBolusPage() {
 
   const logDose = async () => {
     setSubmitting(true)
+    const actualGrams = doseOverride ? parseFloat(doseOverride) : dose?.grams
     await fetch('/api/t1d/dose-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -170,6 +173,8 @@ export default function LogBolusPage() {
         items,
         total_carbs: totalCarbs,
         recommended_dose_grams: dose?.grams,
+        actual_dose_grams: actualGrams,
+        pump_suggested_units: doseUnits ? parseFloat(doseUnits) : undefined,
         context: 'home_dinner',
         meal_gi_category: mealGi,
         starting_bg: currentBg?.value ?? null,
@@ -179,7 +184,7 @@ export default function LogBolusPage() {
         entered_by: 'alexandra',
       }),
     }).catch(() => null)
-    await logEvent('dose', `Bolus logged · ${Math.round(totalCarbs)}g${dose?.grams != null ? ` · dose ${dose.grams}g` : ''}`)
+    await logEvent('dose', `Bolus logged · ${Math.round(totalCarbs)}g${actualGrams != null ? ` · dose ${actualGrams}g` : ''}`)
     router.push('/now')
   }
 
@@ -512,10 +517,28 @@ export default function LogBolusPage() {
               <span className="text-xs text-orange-400">{lowTreatment.label} ({lowTreatment.carbs}g fast carbs) factored in</span>
             </div>
           )}
-          <div className="bg-[#141414] rounded-2xl border border-blue-500/20 p-5">
-            <p className="text-[10px] tracking-widest text-blue-400 font-semibold mb-2">RECOMMENDED DOSE</p>
-            <p className="text-4xl font-bold text-white">{dose.grams}g</p>
-            <p className="text-xs text-gray-500 mt-1">Enter into the pump</p>
+          <div className="bg-[#141414] rounded-2xl border border-blue-500/20 p-5 space-y-3">
+            <p className="text-[10px] tracking-widest text-blue-400 font-semibold">CARBS INTO PUMP</p>
+            <div className="flex items-baseline gap-2">
+              <input
+                type="number" inputMode="decimal" step="1" min="0"
+                value={doseOverride || dose.grams}
+                onChange={e => setDoseOverride(e.target.value)}
+                className="w-28 bg-black/40 border border-blue-500/40 rounded-xl px-3 py-2 text-4xl font-bold text-white focus:outline-none"
+              />
+              <span className="text-gray-500 text-sm">g</span>
+            </div>
+            {doseOverride && parseFloat(doseOverride) !== dose.grams && (
+              <p className="text-[10px] text-gray-600">Engine recommended {dose.grams}g</p>
+            )}
+            <div>
+              <label className="text-[10px] tracking-widest text-gray-500 font-semibold">INSULIN UNITS GIVEN</label>
+              <input
+                type="number" step="0.01" inputMode="decimal" value={doseUnits}
+                onChange={e => setDoseUnits(e.target.value)} placeholder="e.g. 1.20"
+                className="mt-2 w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
+              />
+            </div>
           </div>
           {dose.reasoning && (
             <div className="bg-[#141414] rounded-2xl border border-white/5 p-4">

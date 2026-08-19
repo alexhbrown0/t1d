@@ -27,6 +27,7 @@ export function CafeteriaBuilder({
   initialSelectedNames,
   saveTimestamp,
   targetLabel,
+  onSaved,
 }: {
   menu: T1dCafeteriaMenuItem[]
   stapleNames: string[]
@@ -34,6 +35,7 @@ export function CafeteriaBuilder({
   initialSelectedNames: string[]
   saveTimestamp: string
   targetLabel: string
+  onSaved?: () => void
 }) {
   const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(
@@ -89,7 +91,8 @@ export function CafeteriaBuilder({
         })
       }
       await logEvent('meal', `Cafeteria lunch loaded · ${totalCarbs}g`)
-      router.push('/lunch')
+      if (onSaved) onSaved()
+      else router.push('/lunch')
     } finally {
       setSaving(false)
     }

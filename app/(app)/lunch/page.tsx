@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { getLatestEgvs } from '@/lib/dexcom/client'
 import { dosingRowsForDay } from '@/lib/t1d/day-schedule'
 import { LunchFlow } from '@/components/t1d/lunch-flow'
-import type { T1dMealEvent, T1dDoseSession } from '@/types/health'
+import type { T1dMealEvent, T1dDoseSession, T1dCafeteriaMenuItem } from '@/types/health'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +46,28 @@ export default async function LunchPage() {
   const scheduleRows = dosingRowsForDay(getCentralTime().dayOfWeek)
 
   const meal = (mealRes.data?.[0] as T1dMealEvent) ?? null
+
+  // For cafeteria meals the nurse picks the plate at dose time, so load today's menu + staples.
+  let cafeteriaMenu: T1dCafeteriaMenuItem[] = []
+  let stapleNames: string[] = []
+  if (meal?.is_cafeteria) {
+    const [menuRes, allMenuRes] = await Promise.all([
+      supabase.from('t1d_cafeteria_menu').select('*').eq('menu_date', todayDate).order('carbs_g', { ascending: false }),
+      supabase.from('t1d_cafeteria_menu').select('menu_date, name'),
+    ])
+    cafeteriaMenu = (menuRes.data ?? []) as T1dCafeteriaMenuItem[]
+    const allMenu = (allMenuRes.data ?? []) as Array<{ menu_date: string; name: string }>
+    const allDates = new Set(allMenu.map(r => r.menu_date))
+    const nameDates = new Map<string, Set<string>>()
+    for (const r of allMenu) {
+      if (!nameDates.has(r.name)) nameDates.set(r.name, new Set())
+      nameDates.get(r.name)!.add(r.menu_date)
+    }
+    stapleNames = allDates.size > 0
+      ? [...nameDates.entries()].filter(([, dates]) => dates.size / allDates.size >= 0.5).map(([name]) => name)
+      : []
+  }
+
   const egv = egvs[0]
   const prevEgv = egvs[1]
   const bgAge = egv ? Date.now() - new Date(egv.system_time).getTime() : Infinity
@@ -98,6 +120,8 @@ export default async function LunchPage() {
           override: (overrideRes.data?.[0] as { pe_cancelled?: boolean; pe_start_time?: string | null }) ?? null,
           phase: inferPhase(meal, session, followUpSession, allSessions),
           totalDosedCarbs,
+          cafeteriaMenu,
+          stapleNames,
         }}
       />
     </div>

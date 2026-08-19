@@ -18,6 +18,14 @@ export function buildDoseEngineSystemPrompt(params: T1dEngineParams, clinicalNot
   const activeIcr = resolveActiveIcr(params)
   const fpuCarbEquiv = ((params.fpu_insulin_factor ?? 0.5) * activeIcr).toFixed(1)
   const isExtendedDay = mealType === 'extended_day_snack'
+  const isRegularSnack = mealType === 'snack'
+
+  const snackProtocol = `## Snack dosing — CRITICAL (this overrides the sizing rule below)
+This is a regular snack. Dose about **80% of the total carbs**, NOT 100% — Brooks has been trending low after snacks, so we deliberately under-cover a little.
+- Still ONE single dose (no 70/30 split, no follow-up).
+- Apply the low/dropping-BG delay and wait_and_see rules, and any genuinely UPCOMING activity reduction, ON TOP of the 80% (they can lower it further, never raise it above 80%).
+
+`
 
   const extendedDayProtocol = `## Extended-day snack dosing — CRITICAL (this overrides the sizing rule below)
 This is Brooks's **extended-day (after-care) snack**, eaten ~2:45–3:15 PM, and it is usually **high-GI** (cookie, chips).
@@ -46,7 +54,7 @@ Both paths still account for UPCOMING activity (see below).`
 ${clinicalNotes ? `\n## Clinical notes — follow these:\n${clinicalNotes}\n` : ''}
 
 Your job: analyze a meal or snack and its current context, then output a specific dosing recommendation as JSON. You output carbs to enter into the pump — not insulin units. The pump converts to units using its ICR.
-${isExtendedDay ? `\n${extendedDayProtocol}` : ''}
+${isExtendedDay ? `\n${extendedDayProtocol}` : ''}${isRegularSnack ? `\n${snackProtocol}` : ''}
 ## Brooks's Profile
 - Insulin: ${params.insulin_type} (Fiasp onset 0–5 min — dose when he starts eating, not before)
 - Target range: 70–180 mg/dL (target: ${params.target_bg} mg/dL)

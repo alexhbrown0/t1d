@@ -5,6 +5,7 @@ import { AppHeader } from '@/components/t1d/app-header'
 import { AutoRefresh } from '@/components/t1d/auto-refresh'
 import { BgCard } from '@/components/t1d/bg-card'
 import { EventNotifier } from '@/components/t1d/event-notifier'
+import { LunchroomStartButton } from '@/components/t1d/lunchroom-start-button'
 import { QuickActions } from '@/components/t1d/quick-actions'
 import { NextUpCard } from '@/components/t1d/next-up-card'
 import type { T1dMealEvent, T1dDoseSession } from '@/types/health'
@@ -153,8 +154,21 @@ export default async function NowPage() {
       <EventNotifier />
 
       {/* Lunch tile */}
-      {(
-        <Link href={lunchPhase === 'none' ? '/engine/lunch' : '/lunch'}>
+      {lunchPhase === 'none' ? (
+        <div className={`rounded-2xl border px-4 py-3.5 ${lunchAmber ? 'bg-amber-500/10 border-amber-500/30' : 'bg-[#141414] border-teal-500/20'}`}>
+          <p className={`text-[10px] font-semibold tracking-widest ${lunchAmber ? 'text-amber-400' : 'text-teal-400'}`}>
+            {packingForTomorrow ? "TOMORROW'S LUNCH" : 'SCHOOL LUNCH'} · NOT SET
+          </p>
+          <p className="text-sm font-semibold text-white mt-0.5 mb-3">How is he eating {packingForTomorrow ? 'tomorrow' : 'today'}?</p>
+          <div className="flex gap-2">
+            <Link href="/engine/lunch" className="flex-1 bg-white/5 border border-white/10 text-gray-200 text-xs font-semibold py-2.5 rounded-xl text-center active:opacity-70">
+              Pack lunch
+            </Link>
+            <LunchroomStartButton className="flex-1 bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold py-2.5 rounded-xl active:opacity-70 disabled:opacity-50" />
+          </div>
+        </div>
+      ) : (
+        <Link href="/lunch">
           <div className={`rounded-2xl border px-4 py-3.5 flex items-center gap-3 active:opacity-80 ${
             lunchAmber ? 'bg-amber-500/10 border-amber-500/30' : 'bg-[#141414] border-teal-500/20'
           }`}>
@@ -179,13 +193,11 @@ export default async function NowPage() {
             <div className="flex-1 min-w-0">
               <p className={`text-[10px] font-semibold tracking-widest ${lunchAmber ? 'text-amber-400' : 'text-teal-400'}`}>
                 {packingForTomorrow ? "TOMORROW'S LUNCH" : 'SCHOOL LUNCH'} ·{' '}
-                {lunchPhase === 'none' ? 'NOT PACKED' :
-                 lunchPhase === 'packed' ? 'READY TO DOSE' :
+                {lunchPhase === 'packed' ? 'READY TO DOSE' :
                  lunchPhase === 'dosed' ? 'IN PROGRESS' :
                  lunchPhase === 'needs_followup' ? 'NEEDS FOLLOW-UP' : 'DONE'}
               </p>
               <p className="text-sm font-semibold text-white mt-0.5">
-                {lunchPhase === 'none' && `Pack lunch for ${packingForTomorrow ? 'tomorrow' : 'today'}`}
                 {lunchPhase === 'packed' && `${lunchCarbs ?? '—'}g packed${packingForTomorrow ? ' for tomorrow' : ''} · tap to dose`}
                 {lunchPhase === 'dosed' && 'Dose given · record what he ate'}
                 {lunchPhase === 'needs_followup' && `${lunchUncovered}g still uncovered · tap to check`}

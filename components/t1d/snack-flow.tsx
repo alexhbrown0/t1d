@@ -235,7 +235,7 @@ export function SnackFlow({
           </div>
           {session.reasoning && <p className="text-xs text-gray-400 leading-relaxed">{session.reasoning}</p>}
           <div>
-            <label className="text-[10px] tracking-widest text-gray-500 font-semibold">INSULIN UNITS (what the pump showed)</label>
+            <label className="text-[10px] tracking-widest text-gray-500 font-semibold">INSULIN UNITS GIVEN</label>
             <input
               type="number" step="0.01" inputMode="decimal" value={units}
               onChange={e => setUnits(e.target.value)} placeholder="e.g. 0.85"
