@@ -5,7 +5,6 @@ import { AppHeader } from '@/components/t1d/app-header'
 import { AutoRefresh } from '@/components/t1d/auto-refresh'
 import { BgCard } from '@/components/t1d/bg-card'
 import { EventNotifier } from '@/components/t1d/event-notifier'
-import { LunchroomStartButton } from '@/components/t1d/lunchroom-start-button'
 import { QuickActions } from '@/components/t1d/quick-actions'
 import { NextUpCard } from '@/components/t1d/next-up-card'
 import type { T1dMealEvent, T1dDoseSession } from '@/types/health'
@@ -164,7 +163,9 @@ export default async function NowPage() {
             <Link href="/engine/lunch" className="flex-1 bg-white/5 border border-white/10 text-gray-200 text-xs font-semibold py-2.5 rounded-xl text-center active:opacity-70">
               Pack lunch
             </Link>
-            <LunchroomStartButton className="flex-1 bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold py-2.5 rounded-xl active:opacity-70 disabled:opacity-50" />
+            <Link href="/lunch/lunchroom" className="flex-1 bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold py-2.5 rounded-xl text-center active:opacity-70">
+              Eating in lunchroom
+            </Link>
           </div>
         </div>
       ) : (
