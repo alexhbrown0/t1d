@@ -526,8 +526,8 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             </div>
           ) : (data.meal.is_cafeteria && (data.meal.items_offered?.length ?? 0) === 0) ? (
             <div className="space-y-3">
-              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 1 OF 3 · PICK HIS PLATE</p>
-              <p className="text-xs text-gray-500">Select what he got from the cafeteria line. You&apos;ll size portions with a tray photo, then dose.</p>
+              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 1 OF 3 · WHAT&apos;S ON HIS TRAY</p>
+              <p className="text-xs text-gray-500">Snap a tray photo — AI reads the items and carbs. Confirm or tweak, then dose.</p>
               <CafeteriaBuilder
                 menu={data.cafeteriaMenu ?? []}
                 stapleNames={data.stapleNames ?? []}

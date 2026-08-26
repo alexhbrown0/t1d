@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
   let imageBase64: string | null = null
   let mediaType: 'image/jpeg' | 'image/png' | 'image/webp' = 'image/jpeg'
   let hint = ''
+  let menuItems: Array<{ name: string; carbs: number }> = []
 
   if (contentType.includes('multipart/form-data')) {
     const form = await req.formData()
@@ -29,9 +30,15 @@ export async function POST(req: NextRequest) {
     if (file.type === 'image/png') mediaType = 'image/png'
     else if (file.type === 'image/webp') mediaType = 'image/webp'
     hint = ((form.get('hint') as string | null) ?? '').trim()
+    const menuRaw = form.get('menu') as string | null
+    if (menuRaw) { try { menuItems = JSON.parse(menuRaw) } catch { /* ignore */ } }
   } else {
     return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 })
   }
+
+  const menuSummary = menuItems.length > 0
+    ? menuItems.map(m => `- ${m.name}: ${m.carbs}g`).join('\n')
+    : ''
 
   // Load food repo for matching
   const supabase = createServerClient()
@@ -45,7 +52,7 @@ export async function POST(req: NextRequest) {
     .join('\n')
 
   const prompt = `You are analyzing a photo of a child's lunch box or meal to estimate carbohydrates for insulin dosing.
-${hint ? `\nThe caregiver added this note about the food — treat it as GROUND TRUTH. If it states a count or portion (e.g. "6 grapes", "2 strawberries"), use those exact numbers as qty and do not re-estimate them: "${hint}"\n` : ''}
+${hint ? `\nThe caregiver added this note about the food — treat it as GROUND TRUTH. If it states a count or portion (e.g. "6 grapes", "2 strawberries"), use those exact numbers as qty and do not re-estimate them: "${hint}"\n` : ''}${menuSummary ? `\nThis is a SCHOOL CAFETERIA tray. Today's cafeteria menu options with their published carb counts are below — when a tray item clearly matches one of these, use that item's name and its published per-serving carb value (scaled by the portion you see). Also identify anything on the tray NOT on this list (e.g. chips, brownie, carrots, fruit) using general nutrition knowledge:\n${menuSummary}\n` : ''}
 Known foods in our database (use these exact carb values when you recognize them):
 ${repoSummary || '(no foods in database yet — use general nutrition knowledge)'}
 
