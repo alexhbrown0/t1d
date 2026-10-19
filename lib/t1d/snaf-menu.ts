@@ -68,7 +68,10 @@ async function fetchMonth(year: number, month: number): Promise<MenuRow[]> {
     for (const it of mt.items ?? []) {
       const p = it.product
       if (!p || !p.name || p.prod_carbs == null) continue
-      if (p.is_ancillary || p.hide_on_mobile) continue
+      // Keep hide_on_mobile items: the school hides the repeating daily
+      // grab-and-go kits / chocolate milk from the calendar view, but those
+      // are real choices Brooks can get. Only drop true ancillary rows.
+      if (p.is_ancillary) continue
       if ((p.category ?? '').toLowerCase() === 'ancillary') continue
       const iso = toIsoDate(it.date)
       if (!iso) continue
