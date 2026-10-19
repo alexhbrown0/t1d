@@ -47,12 +47,14 @@ export default async function LunchPage() {
 
   const meal = (mealRes.data?.[0] as T1dMealEvent) ?? null
 
-  // For cafeteria meals the nurse picks the plate at dose time, so load today's menu + staples.
+  // For cafeteria meals the nurse picks the plate at dose time, so load the
+  // menu for the meal's own date (which may be tomorrow if set up in the evening).
   let cafeteriaMenu: T1dCafeteriaMenuItem[] = []
   let stapleNames: string[] = []
   if (meal?.is_cafeteria) {
+    const mealDate = meal.timestamp ? getCentralTime(new Date(meal.timestamp)).dateStr : todayDate
     const [menuRes, allMenuRes] = await Promise.all([
-      supabase.from('t1d_cafeteria_menu').select('*').eq('menu_date', todayDate).order('carbs_g', { ascending: false }),
+      supabase.from('t1d_cafeteria_menu').select('*').eq('menu_date', mealDate).order('carbs_g', { ascending: false }),
       supabase.from('t1d_cafeteria_menu').select('menu_date, name'),
     ])
     cafeteriaMenu = (menuRes.data ?? []) as T1dCafeteriaMenuItem[]

@@ -22,7 +22,7 @@ function Spinner() {
 
 // View-only preview of today's cafeteria menu. Nothing is created until the
 // caregiver taps "Verify" — so just looking at the menu never commits the day.
-export function LunchroomVerify({ menu, stapleNames }: { menu: T1dCafeteriaMenuItem[]; stapleNames: string[] }) {
+export function LunchroomVerify({ menu, stapleNames, saveTimestamp, dayLabel = 'today' }: { menu: T1dCafeteriaMenuItem[]; stapleNames: string[]; saveTimestamp?: string; dayLabel?: string }) {
   const router = useRouter()
   const [verifying, setVerifying] = useState(false)
   const [staplesOpen, setStaplesOpen] = useState(false)
@@ -47,6 +47,7 @@ export function LunchroomVerify({ menu, stapleNames }: { menu: T1dCafeteriaMenuI
           items: [],
           source: 'cafeteria',
           entered_by: 'alexandra',
+          ...(saveTimestamp ? { timestamp: saveTimestamp } : {}),
         }),
       })
       await logEvent('meal', 'Eating in lunchroom today')
@@ -72,7 +73,7 @@ export function LunchroomVerify({ menu, stapleNames }: { menu: T1dCafeteriaMenuI
           </svg>
         </Link>
         <div>
-          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">TODAY&apos;S LUNCHROOM MENU</p>
+          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">LUNCHROOM MENU · {dayLabel.toUpperCase()}</p>
           <p className="text-lg font-semibold text-white">What&apos;s being served</p>
         </div>
       </div>
@@ -81,7 +82,7 @@ export function LunchroomVerify({ menu, stapleNames }: { menu: T1dCafeteriaMenuI
 
       {menu.length === 0 ? (
         <div className="bg-[#141414] rounded-2xl border border-white/5 px-5 py-8 text-center space-y-3">
-          <p className="text-sm text-gray-400">No cafeteria menu loaded for today.</p>
+          <p className="text-sm text-gray-400">No cafeteria menu loaded for {dayLabel}.</p>
           <Link href="/engine/menu" className="inline-block text-xs font-semibold text-teal-400">Upload the month&apos;s menu →</Link>
         </div>
       ) : (

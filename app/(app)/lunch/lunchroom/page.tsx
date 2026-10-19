@@ -1,5 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { getCentralDateStr } from '@/lib/utils/central-time'
+import { getLunchTargetDate } from '@/lib/t1d/lunch-date'
 import { LunchroomVerify } from '@/components/t1d/lunchroom-verify'
 import type { T1dCafeteriaMenuItem } from '@/types/health'
 
@@ -7,10 +8,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function LunchroomPage() {
   const supabase = createServerClient()
-  const todayDate = getCentralDateStr()
+  // Match the lunch tile: in the evening we're setting up tomorrow's lunch.
+  const { packingForTomorrow, saveTimestamp, targetLabel } = getLunchTargetDate()
+  const targetDate = getCentralDateStr(packingForTomorrow ? 1 : 0)
 
   const [menuRes, allMenuRes] = await Promise.all([
-    supabase.from('t1d_cafeteria_menu').select('*').eq('menu_date', todayDate).order('carbs_g', { ascending: false }),
+    supabase.from('t1d_cafeteria_menu').select('*').eq('menu_date', targetDate).order('carbs_g', { ascending: false }),
     supabase.from('t1d_cafeteria_menu').select('menu_date, name'),
   ])
 
@@ -28,7 +31,7 @@ export default async function LunchroomPage() {
 
   return (
     <div className="px-4 pt-5 pb-6">
-      <LunchroomVerify menu={menu} stapleNames={stapleNames} />
+      <LunchroomVerify menu={menu} stapleNames={stapleNames} saveTimestamp={saveTimestamp.toISOString()} dayLabel={packingForTomorrow ? `tomorrow (${targetLabel})` : 'today'} />
     </div>
   )
 }
