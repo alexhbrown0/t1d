@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { MenuUploader } from '@/components/t1d/menu-uploader'
+import { CafeteriaSyncButton } from '@/components/t1d/cafeteria-sync-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,9 +24,10 @@ export default async function CafeteriaMenuPage() {
         </Link>
         <div>
           <p className="text-[10px] tracking-widest text-teal-400 font-semibold">CAFETERIA MENU</p>
-          <p className="text-lg font-semibold text-white">Upload Monthly Menu</p>
+          <p className="text-lg font-semibold text-white">Cafeteria Menu</p>
         </div>
       </div>
+      <CafeteriaSyncButton />
       <MenuUploader existingDates={existingDates} />
     </div>
   )
