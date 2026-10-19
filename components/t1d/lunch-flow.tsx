@@ -382,8 +382,8 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
     }
   }
 
-  // Step 2 saves what he ate only — it does NOT calculate a dose. The follow-up
-  // dose (step 3) is triggered separately ~20-30 min later via handleAnotherDose.
+  // Step 2 saves what he ate and immediately calculates the follow-up dose so
+  // the nurse finishes the dose right after he eats (no 20-30 min wait).
   const handleSubmitEaten = async () => {
     if (!data.meal || !data.session) return
     setLoading(true)
@@ -396,6 +396,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items_eaten, entered_by: 'alexandra' }),
+      })
+      await fetch('/api/t1d/lunch/follow-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meal_event_id: data.meal.id, pre_dose_session_id: data.session.id }),
       })
       await refresh()
     } finally {
@@ -658,7 +663,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
             <div>
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 1 OF 3 · FIRST DOSE</p>
-              <p className="text-xs text-gray-500 mt-1">Give this now (~70%). After he eats, you&apos;ll log it and give a follow-up to finish.</p>
+              <p className="text-xs text-gray-500 mt-1">Give this now (~50%). Right after he eats, log it and give the follow-up to finish.</p>
             </div>
 
             <PreDoseAmount
@@ -748,7 +753,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           <div className="bg-[#141414] rounded-2xl border border-white/5 p-5 space-y-4">
             <div>
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 2 OF 3 · LOG WHAT HE ATE</p>
-              <p className="text-xs text-gray-500 mt-1">Just record how much he ate — this does NOT give a dose. You&apos;ll give the follow-up next.</p>
+              <p className="text-xs text-gray-500 mt-1">Record how much he ate — this calculates the follow-up dose to give now.</p>
             </div>
             {/* Save at top — always visible, shows live total */}
             {(() => {
@@ -763,8 +768,8 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                   className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
                 >
                   {loading ? (
-                    <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span>
-                  ) : `Save what he ate (${Math.round(totalEaten)}g) →`}
+                    <span className="flex items-center justify-center gap-2"><Spinner /> Calculating follow-up…</span>
+                  ) : `He ate ${Math.round(totalEaten)}g — get follow-up dose →`}
                 </button>
               )
             })()}
@@ -897,12 +902,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             )}
           </div>
         ) : (
-          // Just logged what he ate — waiting screen for the follow-up dose
+          // Fallback: eaten logged but the follow-up didn't calculate — let the nurse retry now
           <div className="bg-[#141414] rounded-2xl border border-teal-500/20 p-5 space-y-4">
             <div>
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 3 OF 3 · FOLLOW-UP DOSE</p>
-              <p className="text-sm text-white font-semibold mt-1">Give the follow-up dose in ~20–30 minutes.</p>
-              <p className="text-xs text-gray-500 mt-1">Come back to Lunch then and tap below to get the dose.</p>
+              <p className="text-sm text-white font-semibold mt-1">Finish the dose now based on what he ate.</p>
             </div>
             <div className="space-y-1 border-t border-white/5 pt-3">
               <div className="flex justify-between text-sm">

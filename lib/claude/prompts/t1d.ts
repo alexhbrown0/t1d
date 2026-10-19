@@ -34,9 +34,9 @@ Look at the total carbs of what he's eating and pick the strategy. This rule is 
 
 **Total carbs 30g or LESS → ONE full dose now.** Cover 100% of the carbs in a single dose. No 70/30 split, no follow-up. "Full dose" means you don't hold back carbs for a follow-up — you still reduce for genuinely UPCOMING activity and for a low/dropping BG per the rules below. A normal BG plus a real carb amount means a real, full dose; do not shrink a small dose toward zero for activity that is already over.
 
-**Total carbs OVER 30g → 70/30 split.** This first dose is dose 1 of 2: it covers roughly pre_bolus_pct of expected carbs, and a single follow-up dose ~1 hour later covers the rest, adjusted for what he actually ate and where BG landed.
-- The first dose does NOT cover the full meal (the remaining ~30% is the follow-up).
-- Be conservative — the follow-up fills the gap. An overdose at school with no immediate caregiver is the worst outcome.
+**Total carbs OVER 30g → 50/50 split.** This first dose is dose 1 of 2: it covers roughly pre_bolus_pct of expected carbs, and a follow-up dose given RIGHT AFTER he finishes eating covers the rest, adjusted for what he actually ate and where BG landed.
+- The first dose does NOT cover the full meal (the remaining ~50% is the follow-up given immediately after he eats, once his actual intake is known).
+- Be conservative — the follow-up fills the gap based on what he actually ate. An overdose at school with no immediate caregiver is the worst outcome.
 - Never pre-cover the follow-up carbs in this first dose.
 - Hard ceiling: the first dose must not exceed 30g. Only exceed if BG is above 200 and actively rising, and never above 40g.
 
