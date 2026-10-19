@@ -28,7 +28,9 @@ const DAY: DayBlock[] = [
   { label: 'Science / Social Studies', start: '13:40', end: '14:10', event_type: null, activity_level: null },
   { label: 'Pack Up', start: '14:10', end: '14:20', event_type: null, activity_level: null },
   { label: 'Snack', start: '14:20', end: '14:32', event_type: 'snack', activity_level: 'low' },
-  { label: 'Dismissal', start: '14:32', end: '14:37', event_type: null, activity_level: null },
+  // After dismissal he waits in Amanda's office (Legos / quiet play) while she
+  // finishes the car-rider line and drives him home — no activity to dose for.
+  { label: "Amanda's Office", start: '14:32', end: '15:00', event_type: null, activity_level: null },
 ]
 
 // day_of_week: 0=Sun … 6=Sat

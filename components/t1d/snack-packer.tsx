@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation'
 import type { T1dFoodRepo, PackedSnack } from '@/types/health'
 import type { RecentItem } from '@/components/t1d/lunch-builder'
 
-const TARGET = 5
-
 function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
@@ -40,16 +38,8 @@ export function SnackPacker({
   const [editCarbsVal, setEditCarbsVal] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
 
-  const key = (i: { food_repo_id: string | null; name: string }) => i.food_repo_id ?? i.name.toLowerCase()
-
-  // Adding the same snack again bumps its quantity instead of a duplicate row.
-  const add = (item: RecentItem) => {
-    setPacked(prev => {
-      const idx = prev.findIndex(p => key(p) === key(item))
-      if (idx >= 0) return prev.map((p, i) => i === idx ? { ...p, qty: p.qty + 1 } : p)
-      return [...prev, { ...item, qty: 1 }]
-    })
-  }
+  // Only one snack per day — picking a snack replaces whatever was chosen.
+  const add = (item: RecentItem) => setPacked([{ ...item, qty: 1 }])
 
   const setQty = (i: number, delta: number) => {
     setPacked(prev => prev.map((p, j) => j === i ? { ...p, qty: Math.max(1, p.qty + delta) } : p))
@@ -148,13 +138,10 @@ export function SnackPacker({
       {/* Packed list */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">
-            THIS WEEK&apos;S SNACKS · {packed.length} of ~{TARGET}
-          </p>
-          {packed.length > 6 && <span className="text-[10px] text-amber-400">that&apos;s a lot — {packed.length}</span>}
+          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">TODAY&apos;S SNACK</p>
         </div>
         {packed.length === 0 && (
-          <p className="text-xs text-gray-600">Add ~5 snacks Brooks will take this week.</p>
+          <p className="text-xs text-gray-600">Pick the one snack he&apos;s taking today.</p>
         )}
         {packed.map((item, i) => (
           <div key={i} className="bg-[#141414] rounded-xl border border-white/5 px-4 py-3 flex items-center gap-3">
@@ -190,7 +177,7 @@ export function SnackPacker({
       {packed.length > 0 && (
         <button onClick={save} disabled={saving}
           className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50">
-          {saving ? <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span> : `Save ${packed.length} Snack${packed.length === 1 ? '' : 's'} for the Week`}
+          {saving ? <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span> : "Save Today's Snack"}
         </button>
       )}
 

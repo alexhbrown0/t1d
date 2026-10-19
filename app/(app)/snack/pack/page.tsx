@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
-import { getSnackWeekStartUTC } from '@/lib/utils/central-time'
+import { getCentralDayStartUTC } from '@/lib/utils/central-time'
 import { SnackPacker } from '@/components/t1d/snack-packer'
 import type { RecentItem } from '@/components/t1d/lunch-builder'
 import type { T1dFoodRepo, MealItem, PackedSnack } from '@/types/health'
@@ -37,9 +37,9 @@ export default async function SnackPackPage() {
 
   const foodRepo = (foodRes.data ?? []) as T1dFoodRepo[]
 
-  // Don't seed last week's stale set — start fresh after Friday.
+  // One snack per day — don't seed yesterday's choice; start fresh each day.
   const allPacked = (packedRes.data ?? []) as PackedRow[]
-  const packStale = allPacked.length > 0 && new Date(allPacked[0].packed_at) < getSnackWeekStartUTC()
+  const packStale = allPacked.length > 0 && new Date(allPacked[0].packed_at) < getCentralDayStartUTC()
   const initialPacked: PackedSnack[] = (packStale ? [] : allPacked).map(p => ({
     food_repo_id: p.food_repo_id,
     name: p.name,
@@ -82,8 +82,8 @@ export default async function SnackPackPage() {
           </svg>
         </Link>
         <div>
-          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">PACK THIS WEEK</p>
-          <p className="text-lg font-semibold text-white">This Week&apos;s Snacks</p>
+          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">AFTERNOON SNACK</p>
+          <p className="text-lg font-semibold text-white">Choose Today&apos;s Snack</p>
         </div>
       </div>
       <SnackPacker foodRepo={foodRepo} initialPacked={initialPacked} recentItems={recentItems} />

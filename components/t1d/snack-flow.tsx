@@ -25,8 +25,8 @@ interface ExistingSnack {
   total_carbs: number | null
 }
 
-type Tab = 'packed' | 'options' | 'search' | 'photo'
-const TAB_LABEL: Record<Tab, string> = { packed: 'Packed', options: 'Options', search: 'Search', photo: 'Photo' }
+type Tab = 'packed' | 'search' | 'photo'
+const TAB_LABEL: Record<Tab, string> = { packed: "Today's", search: 'Search', photo: 'Photo' }
 
 function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -42,21 +42,15 @@ export function SnackFlow({
   packedSnacks,
   packedAt,
   existing,
-  variant = 'morning',
-  optionFoods = [],
 }: {
   foodRepo: T1dFoodRepo[]
   packedSnacks: PackedSnack[]
   packedAt: string | null
   existing: ExistingSnack | null
-  variant?: 'morning' | 'extended_day'
-  optionFoods?: T1dFoodRepo[]
 }) {
   const router = useRouter()
-  const isExtended = variant === 'extended_day'
-  const tabs: Tab[] = isExtended ? ['options', 'search', 'photo'] : ['packed', 'search', 'photo']
-  const [tab, setTab] = useState<Tab>(isExtended ? 'options' : 'packed')
-  const [expectedActivity, setExpectedActivity] = useState<'high' | 'none'>('high')
+  const tabs: Tab[] = ['packed', 'search', 'photo']
+  const [tab, setTab] = useState<Tab>('packed')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Selected | null>(null)
   const [session, setSession] = useState<{ id: string; recommended: number; reasoning: string | null } | null>(
@@ -150,7 +144,7 @@ export function SnackFlow({
       const mealRes = await fetch('/api/t1d/meal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: isExtended ? 'extended_day_snack' : 'snack', items: [mealItem], source: 'manual', entered_by: 'alexandra' }),
+        body: JSON.stringify({ context: 'snack', items: [mealItem], source: 'manual', entered_by: 'alexandra' }),
       })
       const meal = await mealRes.json()
       if (!mealRes.ok) { setError(meal.error ?? 'Could not save the snack.'); return }
@@ -163,8 +157,7 @@ export function SnackFlow({
         body: JSON.stringify({
           meal: [mealItem],
           meal_event_id: meal.id,
-          meal_type: isExtended ? 'extended_day_snack' : 'snack',
-          ...(isExtended ? { expected_activity: expectedActivity } : {}),
+          meal_type: 'snack',
           starting_bg: freshBg?.value_mgdl ?? null,
           starting_trend: freshBg?.trend ?? null,
           entered_by: 'alexandra',
@@ -198,7 +191,7 @@ export function SnackFlow({
           actual_dose_timestamp: minutesAgo > 0 ? new Date(Date.now() - minutesAgo * 60000).toISOString() : undefined,
         }),
       })
-      await logEvent('dose', `${isExtended ? 'Extended day snack' : 'Snack'} dose given · ${grams}g${selected ? ` (${selected.name})` : ''}`)
+      await logEvent('dose', `Snack dose given · ${grams}g${selected ? ` (${selected.name})` : ''}`)
       router.push('/now')
     } finally {
       setLoading(false)
@@ -305,22 +298,6 @@ export function SnackFlow({
         </div>
       )}
 
-      {selected && isExtended && (
-        <div className="bg-[#141414] rounded-2xl border border-white/5 px-4 py-3 space-y-2">
-          <p className="text-[10px] tracking-widest text-teal-400 font-semibold">ACTIVITY AFTER SNACK?</p>
-          <div className="flex gap-2">
-            <button onClick={() => setExpectedActivity('high')}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-semibold ${expectedActivity === 'high' ? 'bg-teal-500/20 border border-teal-500/40 text-teal-300' : 'bg-white/5 border border-white/10 text-gray-400'}`}>
-              Active · outdoor play
-            </button>
-            <button onClick={() => setExpectedActivity('none')}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-semibold ${expectedActivity === 'none' ? 'bg-teal-500/20 border border-teal-500/40 text-teal-300' : 'bg-white/5 border border-white/10 text-gray-400'}`}>
-              Calm · movie/inside
-            </button>
-          </div>
-        </div>
-      )}
-
       {selected ? (
         <button onClick={getDose} disabled={loading}
           className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50">
@@ -353,33 +330,16 @@ export function SnackFlow({
             ))}
           </div>
 
-          {tab === 'options' && (
-            <div className="space-y-2">
-              <p className="text-[10px] tracking-widest text-teal-400 font-semibold px-1">EXTENDED DAY OPTIONS</p>
-              {optionFoods.length === 0 ? (
-                <p className="text-xs text-gray-500 px-1 py-4 text-center">No tagged options yet — search or take a photo.</p>
-              ) : (
-                optionFoods.map(f => (
-                  <button key={f.id} onClick={() => pickRepo(f)}
-                    className="w-full bg-[#141414] border border-white/5 rounded-xl px-4 py-3 flex items-center justify-between active:opacity-70">
-                    <span className="text-sm text-white">{f.name}</span>
-                    <span className="text-xs text-teal-400">{f.carbs_g}g</span>
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-
           {tab === 'packed' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between px-1">
-                <p className="text-[10px] tracking-widest text-teal-400 font-semibold">PACKED THIS WEEK</p>
-                <Link href="/snack/pack" className="text-[10px] text-gray-500 active:text-gray-300">Edit pack →</Link>
+                <p className="text-[10px] tracking-widest text-teal-400 font-semibold">TODAY&apos;S SNACK</p>
+                <Link href="/snack/pack" className="text-[10px] text-gray-500 active:text-gray-300">Change →</Link>
               </div>
               {packedSnacks.length === 0 ? (
                 <div className="bg-[#141414] rounded-xl border border-white/5 px-4 py-6 text-center space-y-2">
-                  <p className="text-xs text-gray-500">No snacks packed yet.</p>
-                  <Link href="/snack/pack" className="inline-block text-xs font-semibold text-teal-400">Pack this week&apos;s snacks →</Link>
+                  <p className="text-xs text-gray-500">No snack chosen yet.</p>
+                  <Link href="/snack/pack" className="inline-block text-xs font-semibold text-teal-400">Choose today&apos;s snack →</Link>
                 </div>
               ) : (
                 <>

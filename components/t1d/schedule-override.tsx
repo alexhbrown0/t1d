@@ -103,10 +103,10 @@ export function ScheduleOverride({ date, initial }: Props) {
 
       {!draft.camp_cancelled && (
         <>
-          {/* PE → Specials */}
+          {/* No PE */}
           <Toggle
-            label="PE → Specials today"
-            sub="No morning PE — removes the 9:30 activity effect"
+            label="No PE today"
+            sub="Removes the afternoon PE activity effect"
             value={draft.pe_cancelled}
             onChange={v => set('pe_cancelled', v)}
           />
@@ -123,14 +123,6 @@ export function ScheduleOverride({ date, initial }: Props) {
               </div>
             </div>
           )}
-
-          {/* Recess */}
-          <Toggle
-            label="No recess today"
-            sub="Removes the 12:00 pre-lunch activity"
-            value={draft.recess_cancelled}
-            onChange={v => set('recess_cancelled', v)}
-          />
 
           {/* Lunch time */}
           <div className="space-y-1.5">

@@ -86,8 +86,6 @@ export default async function SchedulePage() {
 
   const lunchEvent = schedule.find(e => e.event_type === 'lunch')
   const snackEvents = schedule.filter(e => e.event_type === 'snack')
-  const recessEvents = schedule.filter(e => e.event_type === 'recess')
-  const recessMinutes = recessEvents.reduce((acc, e) => acc + (minutesSinceMidnight(e.end) - minutesSinceMidnight(e.start)), 0)
 
   return (
     <div className="px-4 pt-5 pb-4 space-y-4">
@@ -136,14 +134,10 @@ export default async function SchedulePage() {
           </div>
 
           {/* Stat chips */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <div className="bg-[#141414] rounded-xl border border-green-500/20 px-3 py-3 text-center">
               <p className="text-xs font-semibold text-green-400">{peMinutes}m</p>
-              <p className="text-[10px] text-gray-600 mt-0.5">Active</p>
-            </div>
-            <div className="bg-[#141414] rounded-xl border border-yellow-500/20 px-3 py-3 text-center">
-              <p className="text-xs font-semibold text-yellow-400">{recessMinutes}m</p>
-              <p className="text-[10px] text-gray-600 mt-0.5">Recess</p>
+              <p className="text-[10px] text-gray-600 mt-0.5">PE</p>
             </div>
             <div className="bg-[#141414] rounded-xl border border-white/10 px-3 py-3 text-center">
               <p className="text-xs font-semibold text-gray-400">
