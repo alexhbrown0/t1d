@@ -26,6 +26,11 @@ export async function POST(req: NextRequest) {
   const eaten = meal.items_eaten as MealItem[]
   const totalEaten = Math.round(eaten.reduce((s, i) => s + i.carbs * (i.qty_eaten ?? 0), 0))
 
+  // Lunch is deliberately UNDER-covered: ~40% up front + ~25% follow-up = ~65%
+  // total, leaving ~35% intentionally uncovered. The follow-up brings total
+  // coverage up to COVERAGE_TARGET_PCT of what he ate — it does NOT top up to 100%.
+  const COVERAGE_TARGET_PCT = 0.65
+
   // Sum ALL confirmed doses for this meal so subsequent follow-ups are calculated correctly
   const { data: allConfirmed } = await supabase
     .from('t1d_dose_sessions')
@@ -34,7 +39,8 @@ export async function POST(req: NextRequest) {
     .not('actual_dose_grams', 'is', null)
   const totalGiven = allConfirmed?.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
     ?? ((preSession as T1dDoseSession).actual_dose_grams ?? (preSession as T1dDoseSession).recommended_dose_grams ?? 0)
-  const remainingCarbs = Math.max(0, totalEaten - totalGiven)
+  const coverageTarget = Math.round(COVERAGE_TARGET_PCT * totalEaten)
+  const remainingCarbs = Math.max(0, coverageTarget - totalGiven)
 
   const { data: params } = await supabase
     .from('t1d_engine_params')
@@ -44,9 +50,9 @@ export async function POST(req: NextRequest) {
     .limit(1)
     .single()
 
-  // Nothing meaningful left to cover
+  // Already at (or past) the ~65% coverage target — no follow-up needed
   if (remainingCarbs <= 2) {
-    const reasoning = `Pre-bolus of ${totalGiven}g covered the full meal (${totalEaten}g eaten). No follow-up dose needed.`
+    const reasoning = `Already dosed ${totalGiven}g for ${totalEaten}g eaten — at the ~65% target (we intentionally leave ~35% uncovered). No follow-up dose needed.`
     const { data: session } = await supabase
       .from('t1d_dose_sessions')
       .insert({
@@ -65,22 +71,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ session_id: session?.id, dose_now_grams: 0, remaining_carbs: 0, reasoning })
   }
 
-  // Use engine for the remaining uncovered carbs
-  const remainingItems: MealItem[] = eaten.length > 0
-    ? eaten.filter(i => i.carbs * (i.qty_offered - (i.qty_eaten ?? 0)) > 1)
-    : [{
-        food_repo_id: null,
-        name: 'Remaining lunch (uncovered)',
-        qty_offered: 1,
-        qty_eaten: null,
-        carbs: remainingCarbs,
-        fat: null,
-        protein: null,
-      }]
-
-  const engineItems = remainingItems.length > 0 ? remainingItems : [{
+  // Dose exactly the follow-up portion that brings total coverage to ~65%.
+  const engineItems: MealItem[] = [{
     food_repo_id: null,
-    name: 'Remaining lunch (uncovered)',
+    name: 'Lunch follow-up (to ~65% coverage)',
     qty_offered: 1,
     qty_eaten: null,
     carbs: remainingCarbs,
@@ -98,7 +92,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Engine failed: ${message}` }, { status: 500 })
   }
 
-  const reasoning = `Follow-up: ${totalEaten}g eaten, ${totalGiven}g dosed so far, ${remainingCarbs}g uncovered. ${output.reasoning}`
+  const reasoning = `Follow-up: ${totalEaten}g eaten, ${totalGiven}g dosed so far. Covering ${remainingCarbs}g to reach the ~65% target (~35% left uncovered on purpose). ${output.reasoning}`
 
   const { data: session } = await supabase
     .from('t1d_dose_sessions')

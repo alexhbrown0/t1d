@@ -25,7 +25,9 @@ function inferPhase(
   // Only complete if carbs are actually covered
   const totalEaten = meal.total_eaten_carbs ?? 0
   const totalDosed = allSessions.reduce((s, d) => s + (Number(d.actual_dose_grams) || 0), 0)
-  if (totalEaten > 0 && totalDosed < totalEaten - COVERAGE_TOLERANCE_G) return 'followup_pending'
+  // Lunch is intentionally under-covered (~65% target), so completion is judged
+  // against that target, not 100% of what he ate.
+  if (totalEaten > 0 && totalDosed < 0.65 * totalEaten - COVERAGE_TOLERANCE_G) return 'followup_pending'
 
   return 'complete'
 }

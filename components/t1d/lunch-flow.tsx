@@ -663,7 +663,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
             <div>
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 1 OF 3 · FIRST DOSE</p>
-              <p className="text-xs text-gray-500 mt-1">Give this now (~50%). Right after he eats, log it and give the follow-up to finish.</p>
+              <p className="text-xs text-gray-500 mt-1">Give this now (~40%). Right after he eats, log it and give the ~25% follow-up (we leave ~35% uncovered on purpose).</p>
             </div>
 
             <PreDoseAmount

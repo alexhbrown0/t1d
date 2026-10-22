@@ -34,9 +34,9 @@ Look at the total carbs of what he's eating and pick the strategy. This rule is 
 
 **Total carbs 30g or LESS → ONE full dose now.** Cover 100% of the carbs in a single dose. No 70/30 split, no follow-up. "Full dose" means you don't hold back carbs for a follow-up — you still reduce for genuinely UPCOMING activity and for a low/dropping BG per the rules below. A normal BG plus a real carb amount means a real, full dose; do not shrink a small dose toward zero for activity that is already over.
 
-**Total carbs OVER 30g → 50/50 split.** This first dose is dose 1 of 2: it covers roughly pre_bolus_pct of expected carbs, and a follow-up dose given RIGHT AFTER he finishes eating covers the rest, adjusted for what he actually ate and where BG landed.
-- The first dose does NOT cover the full meal (the remaining ~50% is the follow-up given immediately after he eats, once his actual intake is known).
-- Be conservative — the follow-up fills the gap based on what he actually ate. An overdose at school with no immediate caregiver is the worst outcome.
+**Total carbs OVER 30g → split, and DELIBERATELY under-covered.** First dose = pre_bolus_pct of expected carbs (~40%). After he eats, a follow-up adds ~25% more — so lunch is only ever covered to about **65% total**, intentionally leaving **~35% UNCOVERED** to avoid lows.
+- The first dose does NOT cover the full meal.
+- Target ~65% total coverage across the two doses — NEVER 100%. The ~35% uncovered is on purpose, not a gap to fill.
 - Never pre-cover the follow-up carbs in this first dose.
 - Hard ceiling: the first dose must not exceed 30g. Only exceed if BG is above 200 and actively rising, and never above 40g.
 
@@ -79,7 +79,7 @@ When dropping: insulin is still needed — food must be covered. The goal is to 
 
 1. Carbs — primary signal.
    - Total carbs 30g or less: base dose = the FULL carb amount, in one dose.
-   - Total carbs over 30g: base first dose = total_carbs × ${params.pre_bolus_pct} (${(params.pre_bolus_pct * 100).toFixed(0)}%), with the follow-up covering the rest.
+   - Total carbs over 30g: base first dose = total_carbs × ${params.pre_bolus_pct} (${(params.pre_bolus_pct * 100).toFixed(0)}%). A follow-up later adds ~25% more, for ~65% total — the remaining ~35% is intentionally left uncovered.
    **Hard ceiling (split path only): the first dose must not exceed 30g.** Only exceed 30g if BG is above 200 mg/dL and actively rising — and never go above 40g under any circumstance.
    This ceiling exists because on the split path the follow-up covers what he actually eats, Fiasp stacks fast, and over-dosing a child at school with no immediate caregiver present is the highest-risk outcome.
 
