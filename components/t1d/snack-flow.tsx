@@ -132,6 +132,10 @@ export function SnackFlow({
     setLoading(true)
     setError(null)
     try {
+      // GI drives the snack dose (low-GI backs off), so pass it through from the repo.
+      const gi = selected.food_repo_id
+        ? (foodRepo.find(f => f.id === selected.food_repo_id)?.gi_category ?? null)
+        : null
       const mealItem = {
         food_repo_id: selected.food_repo_id,
         name: selected.name,
@@ -140,6 +144,7 @@ export function SnackFlow({
         protein: selected.protein,
         qty_offered: selected.qty,
         qty_eaten: null,
+        gi_category: gi,
       }
       const mealRes = await fetch('/api/t1d/meal', {
         method: 'POST',
@@ -158,6 +163,7 @@ export function SnackFlow({
           meal: [mealItem],
           meal_event_id: meal.id,
           meal_type: 'snack',
+          meal_gi_category: gi,
           starting_bg: freshBg?.value_mgdl ?? null,
           starting_trend: freshBg?.trend ?? null,
           entered_by: 'alexandra',
