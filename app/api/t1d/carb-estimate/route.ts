@@ -72,7 +72,11 @@ COUNTING — this matters most. Before writing any JSON, actually count each cou
 
 Also for each item:
 - Estimate fat and protein per serving_size if visible (null if unclear)
-- Assign gi_category: "high" (white potato, white rice, white bread, crackers, juice, candy), "medium" (pasta, banana, oats, whole grain bread), or "low" (protein, fat, non-starchy veg, dairy, nuts)
+- Assign gi_category:
+    - "high": white potato/rice/bread, crackers (incl. graham crackers), juice, candy, cookies, AND concentrated/dried fruit — fruit snacks, fruit roll-ups/leather, pressed-fruit bars (e.g. "That's It")
+    - "medium": pasta, banana, oats, whole grain bread, veggie-fruit puree blends
+    - "low": protein, fat, non-starchy veg, dairy, nuts, nut/dark-chocolate bars (e.g. KIND), AND unsweetened applesauce or other pureed fruit pouches (e.g. GoGo squeeZ)
+  Key nuance: WET pureed fruit (applesauce, squeeze pouches) is LOW, but DRIED/pressed fruit (rolls, fruit bars, gummy fruit snacks) is HIGH.
 - Note if it matches a database entry (repo items already have gi_category — use those values)
 
 First write your piece-by-piece tally as plain text. THEN, as the last thing in your reply, output the final JSON inside a \`\`\`json code block with this structure (qty must equal your tally):
