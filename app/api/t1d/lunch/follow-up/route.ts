@@ -52,7 +52,17 @@ export async function POST(req: NextRequest) {
 
   // Already at (or past) the ~65% coverage target — no follow-up needed
   if (remainingCarbs <= 2) {
-    const reasoning = `Already dosed ${totalGiven}g for ${totalEaten}g eaten — at the ~65% target (we intentionally leave ~35% uncovered). No follow-up dose needed.`
+    // Over-coverage check: if what's already been given exceeds the ~65% target
+    // by a meaningful margin (e.g. first dose was given at the full/eaten amount,
+    // or the plate was corrected DOWN after dosing), flag it so the nurse watches
+    // for a low. The follow-up is still 0 — we can't un-give insulin.
+    const overBy = totalGiven - coverageTarget
+    const overCovered = overBy > 4
+    const warning = overCovered
+      ? `⚠️ OVER-COVERED: ${totalGiven}g already dosed vs the ~${coverageTarget}g (65%) target for ${totalEaten}g eaten — about ${Math.round(overBy)}g more insulin than planned. Watch for a low over the next 1–2h and treat early if he drops.`
+      : null
+    const reasoning = warning
+      ?? `Already dosed ${totalGiven}g for ${totalEaten}g eaten — at the ~65% target (we intentionally leave ~35% uncovered). No follow-up dose needed.`
     const { data: session } = await supabase
       .from('t1d_dose_sessions')
       .insert({
@@ -62,13 +72,13 @@ export async function POST(req: NextRequest) {
         recommended_dose_grams: 0,
         engine_reasoning: reasoning,
         engine_confidence: 'high',
-        context_snapshot: { is_followup: true, pre_bolus_session_id: pre_dose_session_id },
+        context_snapshot: { is_followup: true, pre_bolus_session_id: pre_dose_session_id, over_covered: overCovered, over_by_grams: overCovered ? Math.round(overBy) : 0 },
         entered_by: 'followup',
       })
       .select()
       .single()
 
-    return NextResponse.json({ session_id: session?.id, dose_now_grams: 0, remaining_carbs: 0, reasoning })
+    return NextResponse.json({ session_id: session?.id, dose_now_grams: 0, remaining_carbs: 0, reasoning, over_covered: overCovered })
   }
 
   // Dose exactly the follow-up portion that brings total coverage to ~65%.

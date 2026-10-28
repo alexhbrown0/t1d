@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { getCentralTime } from '@/lib/utils/central-time'
 import { logEvent } from '@/lib/t1d/device'
-import { CafeteriaBuilder } from '@/components/t1d/cafeteria-builder'
+import { CafeteriaBuilder, type PlateItem } from '@/components/t1d/cafeteria-builder'
 import type { T1dMealEvent, T1dDoseSession, MealItem, T1dCafeteriaMenuItem } from '@/types/health'
 
 type Phase = 'no_lunch' | 'packed' | 'pre_dose_ready' | 'eating' | 'followup_pending' | 'followup_ready' | 'complete'
@@ -219,6 +219,7 @@ function StepHeader({ phase }: { phase: Phase }) {
 export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const [data, setData] = useState<LunchData>(initialData)
   const [loading, setLoading] = useState(false)
+  const [editingPlate, setEditingPlate] = useState(false)
   const [preUnits, setPreUnits] = useState('')
   const [followUnits, setFollowUnits] = useState('')
   const [manualBg, setManualBg] = useState('')
@@ -462,6 +463,43 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
   const peMin = nextPe ? timeToMinutes(nextPe.start_time) - nowMin : null
   const phase = data.phase
 
+  // Inline plate editor (cafeteria) — reachable from any step via "Edit plate".
+  if (editingPlate && data.meal?.is_cafeteria) {
+    const plateItems: PlateItem[] = (data.meal.items_offered ?? []).map(i => ({
+      name: i.name, carbs: i.carbs, qty: i.qty_offered, fat: i.fat, protein: i.protein,
+      food_repo_id: i.food_repo_id, portion_size: i.portion_size ?? null,
+    }))
+    const alreadyDosed = data.totalDosedCarbs > 0
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setEditingPlate(false)} className="text-gray-500 flex-shrink-0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <div>
+            <p className="text-[10px] tracking-widest text-teal-400 font-semibold">EDIT PLATE</p>
+            <p className="text-lg font-semibold text-white">Fix what&apos;s on his tray</p>
+          </div>
+        </div>
+        {alreadyDosed && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+            <p className="text-xs text-amber-300">A dose has already been given ({Math.round(data.totalDosedCarbs)}g). After you save, the follow-up re-checks against the corrected plate — targeting ~65% total and subtracting what&apos;s already given — and warns if he&apos;s already over-covered.</p>
+          </div>
+        )}
+        <CafeteriaBuilder
+          menu={data.cafeteriaMenu ?? []}
+          stapleNames={data.stapleNames ?? []}
+          existingMealId={data.meal.id}
+          initialSelectedNames={[]}
+          initialItems={plateItems}
+          saveTimestamp={data.meal.timestamp}
+          targetLabel="today"
+          onSaved={() => { setEditingPlate(false); refresh() }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
 
@@ -566,12 +604,21 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
               )}
 
               <div className="flex gap-2">
-                <Link
-                  href="/engine/lunch"
-                  className="flex-1 bg-white/5 border border-white/10 text-gray-300 text-sm font-semibold py-3 rounded-xl text-center active:opacity-70"
-                >
-                  Edit Lunch
-                </Link>
+                {data.meal.is_cafeteria ? (
+                  <button
+                    onClick={() => setEditingPlate(true)}
+                    className="flex-1 bg-white/5 border border-white/10 text-gray-300 text-sm font-semibold py-3 rounded-xl text-center active:opacity-70"
+                  >
+                    Edit plate
+                  </button>
+                ) : (
+                  <Link
+                    href="/engine/lunch"
+                    className="flex-1 bg-white/5 border border-white/10 text-gray-300 text-sm font-semibold py-3 rounded-xl text-center active:opacity-70"
+                  >
+                    Edit Lunch
+                  </Link>
+                )}
                 <button
                   onClick={handleClearLunch}
                   disabled={loading}
@@ -755,6 +802,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
             <div>
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 2 OF 3 · LOG WHAT HE ATE</p>
               <p className="text-xs text-gray-500 mt-1">Record how much he ate — this calculates the follow-up dose to give now.</p>
+              {data.meal.is_cafeteria && (
+                <button onClick={() => setEditingPlate(true)} className="text-xs text-amber-400 underline underline-offset-2 mt-2 active:opacity-70">
+                  Wrong food or portion? Edit the plate
+                </button>
+              )}
             </div>
             {/* Save at top — always visible, shows live total */}
             {(() => {
@@ -951,9 +1003,12 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
           )}
 
           {data.followUpSession.recommended_dose_grams === 0 ? (
-            <div className="bg-[#141414] rounded-2xl border border-teal-500/20 p-5 space-y-3">
-              <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 3 OF 3 · NO FOLLOW-UP NEEDED</p>
-              <p className="text-sm text-gray-300 leading-relaxed">{data.followUpSession.engine_reasoning}</p>
+            (() => { const overCovered = (data.followUpSession.engine_reasoning ?? '').includes('OVER-COVERED'); return (
+            <div className={`bg-[#141414] rounded-2xl border p-5 space-y-3 ${overCovered ? 'border-red-500/40' : 'border-teal-500/20'}`}>
+              <p className={`text-[10px] tracking-widest font-semibold ${overCovered ? 'text-red-400' : 'text-teal-400'}`}>
+                {overCovered ? 'STEP 3 OF 3 · WATCH FOR A LOW' : 'STEP 3 OF 3 · NO FOLLOW-UP NEEDED'}
+              </p>
+              <p className={`text-sm leading-relaxed ${overCovered ? 'text-red-200' : 'text-gray-300'}`}>{data.followUpSession.engine_reasoning}</p>
 
               {followOverrideDose ? (
                 <>
@@ -1003,6 +1058,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
               {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => setFollowOverrideDose(String(g))} label="Adjust this dose or ask a question" />}
             </div>
+          )})()
           ) : (
             <div className="bg-[#141414] rounded-2xl border border-teal-500/30 p-5 space-y-4">
               <p className="text-[10px] tracking-widest text-teal-400 font-semibold">STEP 3 OF 3 · FOLLOW-UP DOSE</p>

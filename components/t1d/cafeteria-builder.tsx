@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { logEvent } from '@/lib/t1d/device'
 import type { T1dCafeteriaMenuItem } from '@/types/health'
 
-interface PlateItem {
+export interface PlateItem {
   name: string
   carbs: number // carbs for ONE serving (portion_size)
   qty: number   // number of servings
@@ -35,6 +35,7 @@ export function CafeteriaBuilder({
   stapleNames,
   existingMealId,
   initialSelectedNames,
+  initialItems,
   saveTimestamp,
   targetLabel,
   onSaved,
@@ -43,15 +44,18 @@ export function CafeteriaBuilder({
   stapleNames: string[]
   existingMealId: string | null
   initialSelectedNames: string[]
+  initialItems?: PlateItem[]
   saveTimestamp: string
   targetLabel: string
   onSaved?: () => void
 }) {
   const router = useRouter()
   const [items, setItems] = useState<PlateItem[]>(
-    () => menu.filter(m => initialSelectedNames.includes(m.name)).map(m => ({
-      name: m.name, carbs: Number(m.carbs_g), qty: 1, fat: null, protein: null, food_repo_id: null, portion_size: m.portion_size ?? null,
-    }))
+    () => initialItems && initialItems.length > 0
+      ? initialItems
+      : menu.filter(m => initialSelectedNames.includes(m.name)).map(m => ({
+          name: m.name, carbs: Number(m.carbs_g), qty: 1, fat: null, protein: null, food_repo_id: null, portion_size: m.portion_size ?? null,
+        }))
   )
   const [saving, setSaving] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
