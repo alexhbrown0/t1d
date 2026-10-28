@@ -8,11 +8,12 @@ import type { T1dCafeteriaMenuItem } from '@/types/health'
 
 interface PlateItem {
   name: string
-  carbs: number // per unit
-  qty: number
+  carbs: number // carbs for ONE serving (portion_size)
+  qty: number   // number of servings
   fat: number | null
   protein: number | null
   food_repo_id: string | null
+  portion_size: string | null // what one serving is, e.g. "3 Each", "1 Slice"
 }
 
 function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
@@ -49,7 +50,7 @@ export function CafeteriaBuilder({
   const router = useRouter()
   const [items, setItems] = useState<PlateItem[]>(
     () => menu.filter(m => initialSelectedNames.includes(m.name)).map(m => ({
-      name: m.name, carbs: Number(m.carbs_g), qty: 1, fat: null, protein: null, food_repo_id: null,
+      name: m.name, carbs: Number(m.carbs_g), qty: 1, fat: null, protein: null, food_repo_id: null, portion_size: m.portion_size ?? null,
     }))
   )
   const [saving, setSaving] = useState(false)
@@ -88,7 +89,7 @@ export function CafeteriaBuilder({
         const have = new Set(prev.map(p => p.name.toLowerCase()))
         const additions = detected
           .filter(d => !have.has(d.name.toLowerCase()))
-          .map(d => ({ name: d.name, carbs: d.carbs, qty: d.qty ?? 1, fat: d.fat ?? null, protein: d.protein ?? null, food_repo_id: d.matched_repo_id ?? null }))
+          .map(d => ({ name: d.name, carbs: d.carbs, qty: d.qty ?? 1, fat: d.fat ?? null, protein: d.protein ?? null, food_repo_id: d.matched_repo_id ?? null, portion_size: null }))
         return [...prev, ...additions]
       })
     } finally {
@@ -109,7 +110,7 @@ export function CafeteriaBuilder({
 
   const useManual = () => {
     if (!manual || !manual.carbs) return
-    addItem({ name: manual.name.trim() || 'Item', carbs: parseFloat(manual.carbs) || 0, qty: 1, fat: null, protein: null, food_repo_id: null })
+    addItem({ name: manual.name.trim() || 'Item', carbs: parseFloat(manual.carbs) || 0, qty: 1, fat: null, protein: null, food_repo_id: null, portion_size: null })
     setManual(null)
   }
 
@@ -125,6 +126,7 @@ export function CafeteriaBuilder({
         carbs: i.carbs,
         fat: i.fat,
         protein: i.protein,
+        portion_size: i.portion_size,
       }))
       if (existingMealId) {
         await fetch(`/api/t1d/meal/${existingMealId}`, {
@@ -158,12 +160,15 @@ export function CafeteriaBuilder({
     const added = items.some(p => p.name.toLowerCase() === m.name.toLowerCase())
     return (
       <button key={m.id}
-        onClick={() => added ? setItems(prev => prev.filter(p => p.name.toLowerCase() !== m.name.toLowerCase())) : addItem({ name: m.name, carbs: Number(m.carbs_g), qty: 1, fat: null, protein: null, food_repo_id: null })}
+        onClick={() => added ? setItems(prev => prev.filter(p => p.name.toLowerCase() !== m.name.toLowerCase())) : addItem({ name: m.name, carbs: Number(m.carbs_g), qty: 1, fat: null, protein: null, food_repo_id: null, portion_size: m.portion_size ?? null })}
         className={`w-full rounded-xl border px-4 py-3 flex items-center gap-3 text-left active:opacity-80 ${added ? 'bg-teal-500/10 border-teal-500/40' : 'bg-[#141414] border-white/5'}`}>
         <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${added ? 'border-teal-500 bg-teal-500' : 'border-gray-600'}`}>
           {added && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
         </div>
-        <span className="text-sm text-white flex-1 min-w-0">{m.name}</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm text-white">{m.name}</span>
+          <span className="block text-[10px] text-gray-500">1 serving{m.portion_size ? ` = ${m.portion_size}` : ''} · {Math.round(Number(m.carbs_g))}g</span>
+        </div>
         <span className="text-xs text-teal-400 flex-shrink-0">{Math.round(Number(m.carbs_g))}g</span>
       </button>
     )
@@ -171,7 +176,7 @@ export function CafeteriaBuilder({
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gray-500">Take a photo of his tray — AI reads each item (using today&apos;s menu) and estimates carbs. Confirm or tweak below.</p>
+      <p className="text-xs text-gray-500">Take a photo of his tray — AI reads each item (using today&apos;s menu) and estimates carbs. Confirm or tweak below. <span className="text-gray-400">Quantity is SERVINGS (1 = the standard serving shown), not pieces.</span></p>
 
       {/* Photo-first capture */}
       <div className="space-y-2">
@@ -207,11 +212,17 @@ export function CafeteriaBuilder({
                   onChange={e => setItems(prev => prev.map((p, j) => j === i ? { ...p, name: e.target.value } : p))}
                   className="w-full bg-transparent text-sm text-white outline-none border-b border-transparent focus:border-teal-500/40"
                 />
+                <span className="block text-[10px] text-gray-500">
+                  {item.qty} serving{item.qty > 1 ? 's' : ''}{item.portion_size ? ` · 1 serving = ${item.portion_size}` : ''} · {item.carbs}g each
+                </span>
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button onClick={() => setQty(i, -1)} className="w-6 h-6 rounded-md bg-white/5 text-white text-base font-bold flex items-center justify-center">−</button>
-                <span className="text-white text-sm font-semibold w-4 text-center tabular-nums">{item.qty}</span>
-                <button onClick={() => setQty(i, 1)} className="w-6 h-6 rounded-md bg-white/5 text-white text-base font-bold flex items-center justify-center">+</button>
+              <div className="flex flex-col items-center flex-shrink-0">
+                <span className="text-[9px] tracking-wide text-gray-600 mb-0.5">SERVINGS</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setQty(i, -1)} className="w-6 h-6 rounded-md bg-white/5 text-white text-base font-bold flex items-center justify-center">−</button>
+                  <span className="text-white text-sm font-semibold w-4 text-center tabular-nums">{item.qty}</span>
+                  <button onClick={() => setQty(i, 1)} className="w-6 h-6 rounded-md bg-white/5 text-white text-base font-bold flex items-center justify-center">+</button>
+                </div>
               </div>
               <div className="flex items-center gap-0.5 flex-shrink-0">
                 <input

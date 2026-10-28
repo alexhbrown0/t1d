@@ -186,6 +186,7 @@ export interface MealItem {
   carbs: number
   fat: number | null
   protein: number | null
+  portion_size?: string | null
 }
 
 export type MealContext = 'school_lunch' | 'home_dinner' | 'grandparent' | 'breakfast' | 'snack' | 'extended_day_snack'
@@ -216,6 +217,7 @@ export interface T1dCafeteriaMenuItem {
   name: string
   carbs_g: number
   category: 'entree' | 'side' | 'milk' | 'condiment' | null
+  portion_size: string | null
   created_at: string
 }
 

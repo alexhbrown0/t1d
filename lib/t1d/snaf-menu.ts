@@ -21,7 +21,7 @@ const MENU_QUERY = `query($s:String!,$e:String!,$a:String!,$b:String!){
     name
     items(start_date:$s,end_date:$e){
       date
-      product{ name category prod_carbs is_ancillary hide_on_mobile }
+      product{ name category prod_carbs portion_size is_ancillary hide_on_mobile }
     }
   }
 }`
@@ -45,9 +45,9 @@ function toIsoDate(mdy: string): string | null {
   return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
 }
 
-interface SnafItem { date: string; product: { name: string; category: string | null; prod_carbs: number | null; is_ancillary: boolean | null; hide_on_mobile: boolean | null } | null }
+interface SnafItem { date: string; product: { name: string; category: string | null; prod_carbs: number | null; portion_size: string | null; is_ancillary: boolean | null; hide_on_mobile: boolean | null } | null }
 
-interface MenuRow { menu_date: string; name: string; carbs_g: number; category: string }
+interface MenuRow { menu_date: string; name: string; carbs_g: number; category: string; portion_size: string | null }
 
 async function fetchMonth(year: number, month: number): Promise<MenuRow[]> {
   const mm = String(month).padStart(2, '0')
@@ -78,7 +78,7 @@ async function fetchMonth(year: number, month: number): Promise<MenuRow[]> {
       const key = `${iso}|${p.name.toLowerCase()}`
       if (seen.has(key)) continue
       seen.add(key)
-      rows.push({ menu_date: iso, name: p.name, carbs_g: Number(p.prod_carbs), category: mapCategory(p.category) })
+      rows.push({ menu_date: iso, name: p.name, carbs_g: Number(p.prod_carbs), category: mapCategory(p.category), portion_size: p.portion_size ?? null })
     }
   }
   return rows

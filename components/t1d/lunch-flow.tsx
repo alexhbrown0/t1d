@@ -693,7 +693,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
             <div>
               <label className="text-[10px] tracking-widest text-gray-500 font-semibold">
-                INSULIN UNITS GIVEN
+                INSULIN UNITS GIVEN · REQUIRED
               </label>
               <input
                 type="number"
@@ -710,12 +710,13 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
             <button
               onClick={handleConfirmPre}
-              disabled={loading}
+              disabled={loading || !(parseFloat(preUnits) > 0)}
               className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span>
-              ) : `Dose Given${preMinutesAgo > 0 ? ` (${preMinutesAgo}m ago)` : ''} ✓`}
+              ) : !(parseFloat(preUnits) > 0) ? 'Enter the units the pump gave ↑'
+                : `Dose Given${preMinutesAgo > 0 ? ` (${preMinutesAgo}m ago)` : ''} ✓`}
             </button>
           </div>
         </>
@@ -963,7 +964,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                     </div>
                     <div>
                       <label className="text-[10px] tracking-widest text-gray-500 font-semibold">
-                        INSULIN UNITS GIVEN
+                        INSULIN UNITS GIVEN · REQUIRED
                       </label>
                       <input
                         type="number"
@@ -978,10 +979,11 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
                     <MinutesAgoPills value={followMinutesAgo} onChange={setFollowMinutesAgo} />
                     <button
                       onClick={handleConfirmFollowUp}
-                      disabled={loading}
+                      disabled={loading || !(parseFloat(followUnits) > 0)}
                       className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
                     >
                       {loading ? <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span>
+                        : !(parseFloat(followUnits) > 0) ? 'Enter the units the pump gave ↑'
                         : `Follow-up Given${followMinutesAgo > 0 ? ` (${followMinutesAgo}m ago)` : ''} ✓`}
                     </button>
                   </div>
@@ -1017,7 +1019,7 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
               <div>
                 <label className="text-[10px] tracking-widest text-gray-500 font-semibold">
-                  INSULIN UNITS GIVEN
+                  INSULIN UNITS GIVEN · REQUIRED
                 </label>
                 <input
                   type="number"
@@ -1034,12 +1036,13 @@ export function LunchFlow({ initialData }: { initialData: LunchData }) {
 
               <button
                 onClick={handleConfirmFollowUp}
-                disabled={loading}
+                disabled={loading || !(parseFloat(followUnits) > 0)}
                 className="w-full bg-teal-500 text-black font-bold py-4 rounded-2xl active:opacity-80 disabled:opacity-50"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2"><Spinner /> Saving…</span>
-                ) : `Follow-up Given${followMinutesAgo > 0 ? ` (${followMinutesAgo}m ago)` : ''} ✓`}
+                ) : !(parseFloat(followUnits) > 0) ? 'Enter the units the pump gave ↑'
+                  : `Follow-up Given${followMinutesAgo > 0 ? ` (${followMinutesAgo}m ago)` : ''} ✓`}
               </button>
 
               {data.meal && <InlineAsk mealEventId={data.meal.id} onSuggestDose={g => setFollowOverrideDose(String(g))} label="Adjust this dose or ask a question" />}
@@ -1237,9 +1240,9 @@ function PackedItems({ items, total, dimmed = false }: { items: MealItem[]; tota
         <div key={i} className="bg-[#141414] rounded-xl border border-white/5 px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-white">{item.name}</p>
-            {item.qty_offered !== 1 && (
-              <p className="text-xs text-gray-500 mt-0.5">× {item.qty_offered}</p>
-            )}
+            <p className="text-xs text-gray-500 mt-0.5">
+              {item.qty_offered} serving{item.qty_offered !== 1 ? 's' : ''}{item.portion_size ? ` · 1 = ${item.portion_size}` : ''}
+            </p>
           </div>
           <p className="text-sm font-semibold text-teal-400">{Math.round(item.carbs * item.qty_offered)}g</p>
         </div>
